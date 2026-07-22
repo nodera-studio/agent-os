@@ -1,0 +1,76 @@
+# Lefthook — git hooks.
+#
+# See https://lefthook.dev/configuration/.
+#
+# Why lefthook (and not Husky):
+#   - Single Go binary, no Node.js startup overhead per hook → fast
+#   - Native parallelism + per-workspace glob filtering for monorepos
+#   - Built-in {staged_files} template (no lint-staged dependency needed)
+#
+# Bypass instructions:
+#   - `git commit --no-verify` skips the pre-commit hook
+#   - `git push --no-verify` skips the pre-push hook
+#   - Only bypass with a written reason — the hooks exist because CI failures
+#     take minutes to come back and a short local check pays back the moment
+#     it catches one failure
+#
+# Hook layers:
+#   - pre-commit  → cheap formatters + linters on STAGED files only + secret
+#                   scan. Target: < 5 seconds typical. Auto-fixes are
+#                   re-staged via `stage_fixed`.
+#   - pre-push    → expensive gates that block bad code from reaching CI:
+#                   full typecheck + full lint + unit/integration tests.
+#                   Target: < 60 seconds. Keep E2E / build-heavy gates in CI
+#                   only — too slow / too environmental for a local hook.
+#
+# Tooling expectations:
+#   - prettier + eslint — the formatter/linter names below are reasonable
+#     defaults; swap them for your project's actual toolchain (e.g. black +
+#     ruff, gofmt + golangci-lint) if it differs.
+#   - gitleaks — optional dev tool, `brew install gitleaks`. Hook degrades
+#     gracefully with a hint message when gitleaks isn't on PATH.
+#
+# {{LINT_CMD}} / {{TYPECHECK_CMD}} / {{TEST_CMD}} are placeholders — replace
+# with your project's actual commands. If this is a monorepo with multiple
+# workspaces, expand {{TEST_CMD}} into multiple parallel `lefthook` commands
+# (one per workspace/filter) rather than a single serial invocation.
+
+pre-commit:
+  parallel: true
+  commands:
+    prettier:
+      glob: '*.{ts,tsx,js,jsx,json,md,mdx,yml,yaml,css,scss}'
+      run: '{{PRETTIER_CMD}} --write {staged_files}'
+      stage_fixed: true
+    eslint:
+      glob: '*.{ts,tsx,js,jsx}'
+      run: '{{ESLINT_CMD}} --fix {staged_files}'
+      stage_fixed: true
+    gitleaks:
+      # Best-effort secret scan on staged changes. Optional dev dependency;
+      # the `|| echo` guard turns absence into a friendly nudge instead of a
+      # hook failure. To enable, run: `brew install gitleaks`.
+      run: |
+        if command -v gitleaks > /dev/null 2>&1; then
+          gitleaks protect --staged --verbose
+        else
+          echo "[hint] gitleaks not installed — run 'brew install gitleaks' to enable secret scanning"
+        fi
+
+pre-push:
+  # Run the layers in parallel so wall-clock ≈ max(the layers) instead of the
+  # serial sum. Only safe once your typecheck/lint/test commands don't share
+  # a mutable cache (e.g. a single `.tsbuildinfo`) — if they do, combine the
+  # racing commands into one serial `run: a && b` entry, the way `checks`
+  # below combines typecheck + lint.
+  parallel: true
+  commands:
+    checks:
+      # typecheck THEN lint in one shell — sequential `&&` keeps them ordered
+      # so there is no concurrent access to a shared build-info cache.
+      run: '{{TYPECHECK_CMD}} && {{LINT_CMD}}'
+    test:
+      # Full unit/integration test suite. Expand into multiple parallel
+      # commands (e.g. test-api / test-web) if this is a monorepo with
+      # more than one workspace to test independently.
+      run: '{{TEST_CMD}}'
