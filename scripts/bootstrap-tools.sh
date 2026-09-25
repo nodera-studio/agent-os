@@ -235,7 +235,8 @@ install_one() { # install_one <cmd>
       else FAILED+=("yq"); fi
       ;;
     # prebuilt GitHub-release binaries
-    difft) gh_install difft Wilfred/difftastic "difft-${RUST_ARCH}.tar.gz" difft ;;
+    # `*` because assets gained a version segment in 0.71 (difft-0.71.0-x86_64-…); it also matches the older unversioned name
+    difft) gh_install difft Wilfred/difftastic "difft-*${RUST_ARCH}.tar.gz" difft ;;
     sd) gh_install sd chmln/sd "sd-*-${RUST_ARCH}.tar.gz" sd ;;
     scc) gh_install scc boyter/scc "scc_Linux_${GO_ARCH}.tar.gz" scc ;; # asset has no version segment
     gron) gh_install gron tomnomnom/gron "gron-linux-${AMD}-*.tgz" gron ;;
