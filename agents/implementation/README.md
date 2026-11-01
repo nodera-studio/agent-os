@@ -38,9 +38,12 @@ changes — fewer gates, same quality bar — dispatched by `/implement-quick`.
    the frontend-design skill, and a required browser check against the named design
    reference.
 3. **Review (fresh context)** — by default the lean `/code-review` gate: a Claude pass ‖ a
-   Codex pass, merged by 2-vote consensus. A high-risk diff, or one where CodeRabbit is
-   installed, runs the triple-engine review instead: Claude comprehensive reviewer ‖
-   `codex review` ‖ CodeRabbit, each blind to the others, folded by the Claude
+   Codex pass ‖ the optional omp pass (via the `glen` CLI, when `omp-engine.sh probe` is
+   ready), merged by 2-vote consensus (omp-only findings are advisory until verified; omp
+   plus one other engine is two votes; a skipped probe is recorded with its reason, and
+   Claude ‖ Codex still run). A high-risk diff, or one where CodeRabbit is installed, runs the
+   triple-engine review instead: Claude comprehensive reviewer ‖ `codex review` ‖ CodeRabbit
+   (plus omp when ready), each blind to the others, folded by the Claude
    **synthesizer** into one dedup'd, provenance-labelled report + ordered fix plan (the
    `/review-implementation` machinery). Neither ever sees the Implementer's transcript.
 4. **parallel tail** — once Review is green: **docs-updater** updates docs from the

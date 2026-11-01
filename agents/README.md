@@ -8,7 +8,7 @@ workflow below) once to adapt the templated files to that project's actual stack
 
 **Engine strategy:**
 
-- **Claude + Codex** (dual-engine) for review comprehensive passes, debug agents, and codebase audits — multi-pass voting with cross-model consensus catches issues a single model misses
+- **Claude + Codex** (dual-engine; omp optional as a third reviewer/investigator when its probe is ready) for review comprehensive passes, debug agents, and codebase audits — multi-pass voting with cross-model consensus catches issues a single model misses
 - **Claude only** for planning, orchestrators, testing, error handling, docs, and all implementation stages EXCEPT the lean code-review gate inside `/implement` (1 Claude + 1 Codex pass, 2-vote)
 - Codebase audits use dual-engine (Claude + Codex) per group. Security audit additionally uses checklist perturbation.
 - **Model rides the session, not a hardcoded tier.** Every frontier role — orchestrators, planner/architect, the Implementer, reviewers, security/error finders, the debug investigator + adversary, research, and copywrite voice — is `model: inherit`, so it runs on whatever the session runs. Never pin a frontier agent to a model that won't follow the session. Mechanical / summarization roles (test-runner, verifier, docs-updater, light audits, plan explorer/researcher, line/microcopy/consistency editors) stay pinned `sonnet` — they don't need frontier compute. Effort: `high` is the default; `xhigh` is reserved for the Implementer, planner, and orchestrators on hard waves.
@@ -55,14 +55,14 @@ workflow below) once to adapt the templated files to that project's actual stack
 │   └── planner.md                   # Detailed plan with backward verification + wave splitting
 │
 ├── review-implementation/           # Workflow: Self-review (triple-engine + synthesizer)
-│   ├── orchestrator.md              # Branch-aware; 3 engines (Claude ‖ codex review ‖ CodeRabbit or equivalent) → synthesizer
+│   ├── orchestrator.md              # Branch-aware; 3 engines (Claude ‖ codex review ‖ CodeRabbit or equivalent) + optional omp → synthesizer
 │   ├── comprehensive-review.md      # Claude engine — all 6 domains in one pass
 │   └── synthesizer.md               # Folds 3 engines: dedup + NEW/MODIFIED/PRE-EXISTING + fix plan + memory decision
 │
 ├── debug/                           # Workflow: Heavy investigation
-│   ├── investigator.md              # Claude + Codex — root cause analysis, log tracing
+│   ├── investigator.md              # Claude + Codex (+ optional omp) — root cause analysis, log tracing
 │   ├── adversary.md                 # Claude — adversarial hypothesis tester (disprove/confirm)
-│   └── queue.md                     # Claude + Codex — background job / async pipeline tracing
+│   └── queue.md                     # Claude + Codex (+ optional omp) — background job / async pipeline tracing
 │
 ├── codebase/                        # Workflow: Full-codebase analysis (occasional)
 │   ├── orchestrator.md              # Two-tier dispatcher (quick health check / deep audits)
@@ -132,7 +132,7 @@ flowchart TD
     REQ -->|"/plan-implementation"| PLAN["Approved plan<br/>saved to .claude/plans/"]
     PLAN -->|"/implement"| CODE["Code, wired + tested +<br/>reviewed (Claude ‖ Codex) +<br/>conformance-gated + docs updated"]
     CODE -->|"gh pr create"| PR["Pull request"]
-    PR -.->|"optional standalone pass"| DEEPREV["/review-implementation<br/>(Claude ‖ Codex ‖ 3rd engine → synthesizer)"]
+    PR -.->|"optional standalone pass"| DEEPREV["/review-implementation<br/>(Claude ‖ Codex ‖ 3rd engine, + optional omp → synthesizer)"]
     PR -->|"CI + review bots green"| SHIP["Merged — shipped"]
 
     IDEA -.->|"or: declare the whole thing as one goal"| GOAL["/goal + /auto-mode"]
@@ -184,7 +184,7 @@ deliberate memory-write decision — not just a wall of comments. See
 ## Debug workflow (`/deep-debug`)
 
 Root-cause investigation with a built-in check on its own conclusions: a dual-engine
-investigator (Claude + Codex) proposes a hypothesis, then a dedicated adversary agent
+investigator (Claude + Codex, + optional omp) proposes a hypothesis, then a dedicated adversary agent
 tries to disprove it — up to 3 cycles — before you act on anything. A quick triage step
 runs first so trivial bugs don't pull in the heavy machinery, and `debug/queue.md` is a
 generic background-job/async-pipeline specialist you adapt to whatever queue or broker
@@ -309,13 +309,13 @@ explicitly approved. See `agents/orchestrator/README.md` for the full loop diagr
 **Debug pipeline:**
 
 - Adversarial verification loop: investigator proposes hypothesis, adversary tries to disprove it (max 3 cycles)
-- Dual-engine investigation (Claude agent + Codex) with cross-reference merge
+- Dual-engine investigation (Claude agent + Codex, + optional read-only omp via `omp-engine.sh`) with cross-reference merge
 - Quick triage step before heavy agent dispatch
 - Generic background-job/async-pipeline specialist (`debug/queue.md`) — adapt to whatever queue/broker system this project actually uses
 
 **Review pipelines:**
 
-- Triple-engine review: Claude comprehensive reviewer ‖ a second-engine diff reviewer (e.g. `codex review`) ‖ a third-party PR bot if this project has one, each blind to the others (recall)
+- Triple-engine review: Claude comprehensive reviewer ‖ a second-engine diff reviewer (e.g. `codex review`) ‖ a third-party PR bot if this project has one, plus optional omp (skipped with a one-line reason when its probe exits 3), each blind to the others (recall)
 - Synthesizer (4th Claude agent): dedupes across engines, cross-engine agreement = HIGH confidence, critical survives a single engine (precision)
 - Branch-aware: detects base, reviews authored working-tree changes (incl. uncommitted)
 - Provenance labelling: each finding tagged NEW / MODIFIED / PRE-EXISTING vs the merge-base

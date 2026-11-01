@@ -19,6 +19,13 @@ commands, just scripts something else invokes (or you run by hand).
 | `suite-lock.sh` | `suite-lock.sh <command> [args…]`: runs the command while holding a per-checkout lock so two test suites never run at once against one build dir; stale-lock takeover; exit 75 on wait timeout | Wrapping the project's test command in parallel runs |
 | `checkpoint-due.sh` | `checkpoint-due.sh [<state-file>]`: reads the `## Checkpoints` section of the auto-mode state file; exit 0 = due, 1 = not due, 3 = no cadence | Every `/auto-mode` wake |
 | `clean-scratch.sh` | `clean-scratch.sh [--dry-run] [--min-age <minutes>] <pattern>…`: the sanctioned way for an agent to delete its `$TMPDIR` scratch (`HARNESS_SCRATCH_PREFIX` + glob); refuses symlinks and anything a process or worktree still uses | `steer-bash.sh` redirects `rm -rf` of scratch here |
+| `omp-profile-setup.sh` | Idempotently configures the isolated `glen-harness` omp profile, policy, MCP, skill and extension; supports `--model`, `--check`, `--dry-run` and checks the default-profile fingerprint | Run by the owner per machine — see `docs/Claude-Code-Setup.md` |
+| `omp-engine.sh` | Optional read-only third review/debug engine run through the `glen` CLI: readiness probe (exit 3 = skip), isolated snapshot/policy/environment, bounded send/wait and one capacity retry; writes final text and result JSON | The review gates and optional `/deep-debug` investigator via `skills/omp/SKILL.md` |
+| `../omp/` | The omp engine's assets: `glen-harness.yml` (approval policy + read containment), `mcp.json`, `model-ladder.sh`, `omp-sandboxed.sh` / `omp-sandboxed-linux.sh`, and the `skills/` the isolated profile loads | Read by `omp-profile-setup.sh` and `omp-engine.sh`; never edited at run time |
+| `tests/omp-engine-smoke.sh` | Offline probe, snapshot, capture-race, policy-source, dispatch-environment and profile-guard smoke tests, compatible with Bash 3.2 | Run with `/bin/bash .claude/scripts/tests/omp-engine-smoke.sh`; no live omp login needed |
+| `tests/omp-profile-setup-smoke.sh` | `omp-profile-setup.sh` against stub `omp`/`glen` binaries in a throwaway HOME (setup, `--check`, `--dry-run`) | Run with `/bin/bash .claude/scripts/tests/omp-profile-setup-smoke.sh` |
+| `tests/steer-omp-profile-smoke.sh` | Checks that `hooks/steer-bash.sh` denies omp with a profile other than `glen-harness` and writes into another `~/.omp/profiles/<name>`, and allows the throwaway-HOME form | Run with `/bin/bash .claude/scripts/tests/steer-omp-profile-smoke.sh`; needs jq |
+| `tests/support/` | Stub `glen` and `omp` executables the omp smoke tests put on `PATH` | Used only by the omp smoke tests |
 | `tests/*-smoke.sh` | Offline smoke tests for the scripts and hooks above (routing, suite-lock, checkpoint-due, clean-scratch, remove-worktree, codex job listing, secret-paste, capture-before-merge waiver, squash-merge recipe) | Run each with `/bin/bash .claude/scripts/tests/<name>.sh`; exit 1 on any FAIL |
 
 ## Two different "Mnemosyne" things, easy to conflate
@@ -35,3 +42,5 @@ commands, just scripts something else invokes (or you run by hand).
 Neither requires the other. You can run the learned-rules loop with zero Mnemosyne MCP
 server, and you can run the Mnemosyne MCP server without ever touching the learned-rules
 loop.
+
+The `omp-*` smoke tests resolve the harness through a git checkout that has it installed as `.claude/` (what `install.sh` produces), so run them from an installed project, not from this template repo.

@@ -176,6 +176,24 @@ Run `.claude/scripts/bootstrap-tools.sh` on each machine (`--dry-run` first to
 preview). The `settings.json` `env` block + any `PostToolUse` hook wiring travel
 with the repo — no manual settings.json edit needed beyond what's already committed.
 
+### 3. omp third engine (optional, per machine)
+
+omp is an optional read-only third review/debug engine run through the `glen` CLI. Skip this
+step to run without it: the engine's probe exits 3 and the harness reports it skipped in one
+line. To enable it, the owner logs into the provider for the dedicated `glen-harness` profile,
+then configures and checks it:
+
+```bash
+omp --profile glen-harness login <provider>
+bash .claude/scripts/omp-profile-setup.sh
+bash .claude/scripts/omp-profile-setup.sh --check
+```
+
+Export `MNEMOSYNE_TOKEN` in the invoking shell if the profile's MCP needs read-only memory
+access; never put its value in the repo. `TMPDIR` (or `/tmp` when unset) must resolve outside
+`$HOME` for the engine to run. Set `GLEN_OMP_ENGINE=off` to skip omp while the other engines
+continue. See `skills/omp/SKILL.md`.
+
 ## Mac bring-up sequence
 
 1. `git pull` (gets repo `.claude/` incl. hooks, scripts, settings, this doc).

@@ -27,7 +27,8 @@ components) goes to the agent `routing.sh ui` names, and Codex reviews it
 
 1. **Review engine** — one of the engines in the Role 2 / `/review-implementation`
    review, via the native **`codex review --base <BASE>`** diff reviewer, and the second
-   engine of the lean `/code-review` gate via `codex:codex-rescue`.
+   engine of the lean `/code-review` gate via `codex:codex-rescue` (the optional omp
+   engine joins that gate as a third pass when its probe is ready).
 2. **Advisor** — the **Step 4.5 advisor gate** in `/implement` and `/codex-advisor`:
    a read-only adversarial critique of the approved plan (verdict/risks/steelman) via
    the **`codex:codex-rescue`** agent — NOT `codex review`, NEVER `codex exec`.
@@ -195,10 +196,13 @@ asked.
 
 ## Review use (review-implementation)
 
-The triple-engine review (`/review-implementation`, `/implement` Role 2) uses ONE Codex
-engine — the native `codex review --base <BASE>` (or `--uncommitted`) reviewer — run by
-the review orchestrator alongside the Claude comprehensive reviewer and CodeRabbit, then
-folded by the synthesizer. No N-pass voting, no shuffled diffs.
+The triple-engine review (`/review-implementation`, or `/implement` Role 2 when the diff is
+high-risk or CodeRabbit is installed) uses ONE Codex engine — the native
+`codex review --base <BASE>` (or `--uncommitted`) reviewer — run by the review orchestrator
+alongside the Claude comprehensive reviewer and CodeRabbit (plus the optional omp engine when
+`omp-engine.sh probe` is ready), then folded by the synthesizer. No N-pass voting, no shuffled
+diffs. Every other Role 2 diff runs the lean `/code-review` gate, where Codex is the
+`codex:codex-rescue` pass beside Claude and the optional omp pass.
 
 ## Fallback (only if `codex:codex-rescue` is unavailable)
 

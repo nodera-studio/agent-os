@@ -443,13 +443,19 @@ the remainder (a fresh context is the entire point of splitting). For wave plans
 dispatch one Implementer per wave. Between slices, the handoff is `progress.md` +
 the plan's `<task>` XML — never the previous Implementer's transcript.
 
-### Role 2 — Review (fresh context, dual-engine by default)
+### Role 2 — Review (fresh context, risk selects the gate)
 
 A fresh, independent review of the diff + spec — **never** the Implementer's
-transcript. By default run the lean **`/code-review` dual-engine gate** (see
+transcript. By default run the lean **`/code-review` gate** (see
 `.claude/commands/code-review.md`): the Claude pass (`implementation/code-review.md`)
-‖ a Codex pass (`codex:codex-rescue`) in ONE message, merged by 2-vote consensus into
-one must-fix / recommended / notes report. No lint/type/style re-check — the
+‖ a Codex pass (`codex:codex-rescue`) ‖ the optional omp engine (`omp-engine.sh review`, when
+`bash .claude/scripts/omp-engine.sh probe` is ready; exit 3 or `GLEN_OMP_ENGINE=off` skips it
+with a one-line "omp skipped: <reason>" note, and Claude ‖ Codex still run) in ONE message,
+merged by 2-vote consensus into one must-fix / recommended / notes report. omp-only findings
+are advisory until a verifier confirms them against the code (an omp-only CRITICAL or HIGH
+goes to a fresh verifier); omp plus Claude or Codex on the same defect is two votes; omp
+votes only with status `ok` (`code-review.md` step 3). The single-vote CRITICAL and
+platform-only-CI rules stay with Claude and Codex. No lint/type/style re-check — the
 deterministic gate already enforced that inside the Implementer; the engines hunt
 real bugs.
 
@@ -470,19 +476,33 @@ message text" and names no output path; you save it (see Review file names) if i
 disk.
 
 **UI diffs are reviewed by running them.** When the diff touches rendered output
-(`{{FRONTEND_DIR}}`, a TUI, terminal rendering), both engines' briefs say: build and run it
-and look at the output (a browser screenshot, or real CLI/TUI output under a pty) before
-calling it correct; a code trace alone is not enough. Both engines once traced a
+(`{{FRONTEND_DIR}}`, a TUI, terminal rendering), the Claude and Codex briefs say: build and
+run it and look at the output (a browser screenshot, or real CLI/TUI output under a pty)
+before calling it correct; a code trace alone is not enough (omp traces code only, so its
+pass never counts as a run). Both engines once traced a
 terminal-demo animation, approved it, and missed 2 of its 4 scenes never appearing. This is
 in addition to the Visual verification step below, not a substitute for it.
 
 **Codex capacity.** If the Codex pass fails on capacity or rate ("Selected model is at
 capacity", 429, rate limit), retry it once after a short wait (about 60 s). If the retry
-fails too, record Codex as unavailable, proceed with the Claude pass as a single-engine
-verdict, and say so in the Report. Never drop the engine silently.
+fails too, record Codex as unavailable, proceed with the Claude pass (and omp's, when it
+ran) without Codex, and say so in the Report. Never drop the engine silently.
 
-**Review file names.** If you save the passes to disk, name them `claude-review.md` and
-`codex-review.md` (plan files `<engine>-plan.md`), never `claude.md`: on macOS's
+**omp deadline.** The omp pass is a background Bash task started in the same message as the
+other passes, from the root of the checkout under review (the wave's `$WT`). Note the launch
+time (`date +%s`) and set an absolute deadline of launch + 20 minutes: omp's own 15-minute
+`--deadline` does not bound the whole pass (the snapshot capture runs before it starts, the
+wait allows 75 s more, and a capacity retry adds a minute). Poll the background task (its
+completion notification, or `.claude/evidence/omp-review.txt.json` reaching a terminal
+`.status`) against that deadline. When it expires with omp still running, merge without omp
+and report "omp: no result by the gate deadline"; never let a late result change a verdict
+already given. A non-zero exit or a status other than `ok` means omp did not run: name its
+`.reason` in the Report and continue with Claude ‖ Codex. omp never blocks the gate.
+Command flags (`--uncommitted` or `--base <base>`, `--out`, `--scope`) and recovery of a
+killed run are in `code-review.md` step 2 and `.claude/skills/omp/SKILL.md`.
+
+**Review file names.** If you save the passes to disk, name them `claude-review.md`,
+`codex-review.md` and `omp-review.txt` (plan files `<engine>-plan.md`), never `claude.md`: on macOS's
 case-insensitive filesystem Claude Code auto-loads any `claude.md` as a nested
 `CLAUDE.md`, which injects the review as project instructions. This holds for every way
 of creating a file, including shell redirects and `mv`. The `guard-claude-md-name.sh`
@@ -490,11 +510,12 @@ hook refuses such a name on the Write tool only.
 
 Escalate to the **triple-engine review block** (see
 `.claude/agents/review-implementation/orchestrator.md`: Claude comprehensive reviewer
-‖ `codex review` ‖ `coderabbit review --plain --agent` → synthesizer) only when
-`command -v coderabbit` succeeds or the diff is high-risk (the risk heuristic
+‖ `codex review` ‖ `coderabbit review --plain --agent`, plus the omp engine when its probe
+is ready → synthesizer) only when `command -v coderabbit` succeeds or the diff is high-risk (the risk heuristic
 `scripts/quick-classify.sh` uses: this project's risk keywords and protected paths). When
-CodeRabbit is not installed, a high-risk diff runs that block with its two available engines
-and says so.
+CodeRabbit is not installed, a high-risk diff runs that block with its available engines
+and says so, naming omp's skip reason when the probe is skipped. Every diff that stays on
+`/code-review` brings omp in as its third pass whenever the probe is ready.
 
 Use the default-branch merge-base as `BASE` (no prompt — this is the in-pipeline
 path). If the report has must-fix items, dispatch a **fresh**
@@ -539,8 +560,8 @@ Every fix cycle (review, conformance, visual or CI findings) follows these rules
   - push the branch and open a **draft** PR (`gh pr create --draft --base
     {{STAGING_BRANCH}}`; announced at Step 4);
   - wait for the CI job(s) for that platform on that head;
-  - put the run id and the failing logs (`gh run view <id> --log-failed`) in both review
-    briefs, so the reviewers do not report "CI run required" for a head that has a run;
+  - put the run id and the failing logs (`gh run view <id> --log-failed`) in the Claude and
+    Codex review briefs (omp gets no CI context), so the reviewers do not report "CI run required" for a head that has a run;
   - a "Platform-only code unverified: CI run required" finding is settled by a passing run on
     the reviewed head, never by an Implementer: it is not a fix-cycle item and does not count
     toward the 2-cycle cap;

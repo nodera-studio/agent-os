@@ -79,7 +79,10 @@ Roles come from `.claude/routing.json`, read through `bash .claude/scripts/routi
 (an owner-confirmed override in `.claude/auto-mode/routing.json` wins). By default Claude
 implements (`impl-coder-claude`) and Codex reviews, plans, debugs and audits. Dispatch Codex
 only through the `codex:codex-rescue` agent, `codex-companion.mjs` (the Implementer, only when
-`routing.sh implementation` prints `codex`) or `codex review`; never `codex exec`. Record an
+`routing.sh implementation` prints `codex`) or `codex review`; never `codex exec`. omp is an optional read-only third review/debug
+engine, run only through `bash .claude/scripts/omp-engine.sh` (see `.claude/skills/omp/SKILL.md`;
+never `omp` directly, never the default profile; skipped with a one-line reason when its probe
+exits 3). Record an
 owner's routing change as a decision before applying it (the `auto-mode` skill → Hard rules).
 
 ### Skills & Tools

@@ -13,6 +13,7 @@ flowchart TD
         E1["Claude<br/>comprehensive-review.md<br/>all 6 domains, one pass"]
         E2["Codex<br/>codex review --base<br/>(never codex exec)"]
         E3["CodeRabbit<br/>coderabbit review<br/>--plain --agent"]
+        E4["omp (optional, read-only)<br/>omp-engine.sh review"]
     end
 
     ENGINES --> SYN["Synthesizer (4th Claude agent)<br/>dedupe by defect · cross-engine agreement = confidence ·<br/>NEW/MODIFIED/PRE-EXISTING provenance vs merge-base ·<br/>ordered fix plan · memory decision"]
@@ -20,7 +21,11 @@ flowchart TD
     SYN --> OUT["Unified report:<br/>must-fix · notes · pre-existing ·<br/>fix plan · recommendation<br/>(BLOCK / REVIEW_REQUIRED / APPROVE_WITH_NOTES / APPROVE)"]
 ```
 
-Total: 4 agents (3 engines + synthesizer) — no multi-pass voting, no shuffled diffs.
+Total: 4 agents (3 engines + synthesizer), plus omp as an optional extra engine — no
+multi-pass voting, no shuffled diffs.
+
+omp runs when `omp-engine.sh probe` passes; otherwise the report says it was skipped
+and why (exit 3 = skip, one line) and the run continues with the other engines.
 
 ## Branch awareness
 
