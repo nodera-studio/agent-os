@@ -61,9 +61,12 @@ claim three engines ran when one was down.
 Launch all three in ONE message: the Claude reviewer as an Agent call, and Codex +
 CodeRabbit as **background** Bash (they're slow LLM reviews — don't serialize them).
 **Match the diff scope across all three engines** so they review the same code:
-committed branch work → `--base "$BASE"`; uncommitted in-pipeline changes (Role 2,
-before the slice is committed) → `--uncommitted` for both Codex and CodeRabbit (the
-same scope `git diff $MERGE_BASE` and the Claude reviewer use).
+the whole branch and `/implement` Role 2 use `--base "$BASE"`, covering committed
+step groups plus working-tree and untracked changes against the merge-base.
+Use `--uncommitted` for Codex and CodeRabbit only when the requested scope is explicitly
+limited to changes since HEAD; use `git diff HEAD` plus untracked files for the
+Claude reviewer in that scope. A slice having uncommitted work does not by itself
+exclude its already-committed changes from review.
 
 **Claude engine** (Agent tool):
 ```
@@ -83,8 +86,19 @@ codex review --base "$BASE" > reports/codex-review.txt 2>&1
 coderabbit review --plain --agent --base "$BASE" > reports/coderabbit-review.txt 2>&1
 ```
 
-Collect all three when they finish. If an engine errored, capture the error and treat
-it as "did not run."
+Collect all three when they finish. If Codex failed on capacity or rate ("Selected model
+is at capacity", 429, rate limit), re-run it once after a short wait (about 60 s). If an
+engine errored (or the Codex retry failed too), capture the error and treat it as "did
+not run": the synthesizer works from the remaining engines and the report names the
+missing one.
+
+Engine outputs keep engine-qualified names (`codex-review.txt`, `coderabbit-review.txt`,
+and `claude-review.md` if you save the Claude pass), never a bare `claude.md`: on macOS's
+case-insensitive filesystem Claude Code loads any `claude.md` as a nested `CLAUDE.md`.
+
+When the diff touches rendered output (`{{FRONTEND_DIR}}`, a TUI, terminal rendering), add to the
+Claude engine's prompt: build and run it and look at the output (browser screenshot, or
+CLI/TUI output under a pty) before calling it correct; a code trace alone is not enough.
 
 ## Step 5 — Synthesize
 
@@ -108,7 +122,8 @@ decides what (if anything) to persist to the memory MCP.
 - **Inside `/implement` (Role 2):** if the fix plan has must-fix items, dispatch a
   **fresh** Implementer — "Fix ONLY these review findings: {fix plan}. Do not
   re-implement the plan." — then re-run this review scoped to the fixed files. Max 2
-  cycles; if must-fix items remain, stop and report to the user.
+  cycles; if must-fix items remain, stop and report to the user. Give each finding its
+  exact line range (`implementation/orchestrator.md` → Role 2 → "Line-range fix briefs").
 
 <rules>
 - Three engines for recall, synthesizer for precision. Never feed an engine another

@@ -178,6 +178,17 @@ controller → service → schema. Then confirm the glue is planned:
 - Shared package rebuild step included, if this project requires one.
 - Error handler / error-state check present; user-facing error messages defined per this
   project's error-catalog convention.
+- Every timing AC (deadline, timeout, abort latency) holds against the worst-case blocking
+  calls on its path (readiness waits, per-call timeouts, retries); fix the AC or make the
+  wait interruptible.
+- Every tool or package the plan names resolves in the real tree ({{PACKAGE_MANAGER}}'s
+  dependency-tree or `ls` command, `--version`), with the resolved version in the step; every
+  new dependency is listed with its exact install command in a **Network pre-flight** block
+  (the Implementer's sandbox may have no network).
+- Every check or gate that names an open branch, PR or worktree carries a fallback: once that
+  branch is merged (`gh pr view <N> --json state` prints `MERGED`), run the check against the
+  branch it merged into instead. A squash merge leaves the branch tip off that branch, so the
+  original check goes stale.
 
 Add any missing steps, marked `[ADDED BY BACKWARD CHECK]` so the user can see what was caught.
 

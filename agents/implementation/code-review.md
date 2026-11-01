@@ -41,6 +41,34 @@ If the run already committed per-wave, diff against the merge-base with the
 default branch instead. Examine every changed file and every hunk — subtle bugs
 hide in utility functions, cleanup logic, and config. Do not skip files.
 
+## Rendered output: run it and look (UI diffs)
+
+When the diff touches anything with rendered output — `{{FRONTEND_DIR}}`, a TUI or live view,
+or terminal rendering (human/TTY output, tables, colour, spinners) — build and run it and look
+at the output before you call it correct. A code trace alone is not enough: both review
+engines once traced a terminal-demo animation, approved it, and missed that 2 of its 4 scenes
+never appeared.
+
+- **Web (`{{FRONTEND_DIR}}`):** build it, then start a preview server in the background on a
+  free port of your own (the Codex pass may be previewing at the same time), e.g.
+  `PORT=$((20000 + RANDOM % 20000)); <the frontend's preview command on $PORT> & PREVIEW_PID=$!`.
+  Screenshot with
+  `npx playwright screenshot --viewport-size=375,812 --color-scheme=dark --wait-for-timeout=<ms> http://127.0.0.1:$PORT/ <out>.png`
+  (also 1280 wide, and light) and Read each PNG. For an animation or timed sequence, take
+  screenshots spread across its full duration and confirm every scene and state appears.
+  Stop the preview afterwards (`kill $PREVIEW_PID`).
+- **CLI / TUI:** run under a pseudo-TTY so the TTY path runs, e.g.
+  `script -q /dev/null sh -c 'stty cols 60; <the command>'`, at a narrow and a wide width and
+  with `NO_COLOR=1`; let a live view run through its states.
+- **Never mutate live state.** Run it against fixtures, a seeded local database or a scratch
+  directory under `$TMPDIR`; against real user data or a production service, run only
+  read-only operations.
+- Save what you looked at under `.claude/evidence/` and cite it in the finding. A visible
+  defect is a finding like any other (Category: Visual / Rendering, `file:line` of the cause).
+- If you cannot run it (build fails, no browser), say so in the report and mark the rendered
+  output UNVERIFIED. An unverified UI diff gets **Recommendation: REVIEW_REQUIRED**, never
+  APPROVE or APPROVE_WITH_NOTES.
+
 ## Project Conventions (flagging convention-following code is a false positive)
 
 <conventions>
@@ -82,6 +110,21 @@ you are uncertain — with its confidence tier; never silently drop a finding. W
 library pattern looks wrong but you are not sure, verify with
 `npx ctx7@latest library <name> "<q>"` then `npx ctx7@latest docs <id> "<q>"`
 rather than guessing from training data.
+
+Two claims never count as verification:
+
+- **Stress is not correctness.** A stress or repeat-run green (N passing runs of the same
+  test) shows only that a test is not flaky; it is never evidence that a fix is correct. For
+  each fix, ask for the red → green test: one that fails on the code before the fix and passes
+  after it. A fix whose only evidence is a stress run is a finding (Category: Tests).
+- **Platform-only code needs CI.** When the diff adds or changes code that runs only on an OS
+  or platform the review host is not (OS-gated branches, a sandbox or syscall wrapper for
+  another OS, a CI job for that OS), a trace on the host and a cross-compile or cross-lint are
+  not enough. It is verified only by a CI run on the reviewed head that passed the job for
+  that platform. If the brief gives no such run id, report a HIGH finding "Platform-only code
+  unverified: CI run required" (Category: Tests, the platform-only `file:line`), with
+  **Recommendation: BLOCK**: the merge counts it as must-fix on this one vote, and it holds
+  the gate until the run passes.
 </reasoning>
 
 ## Categories (cover ALL in this single pass)
@@ -145,6 +188,7 @@ HIGH-001: IDOR in `getCustomer` — no org filter
 ## Code Review (Claude pass): {scope}
 
 **Files reviewed**: {list}
+**Rendered output**: {evidence paths under .claude/evidence/} | n/a (no UI in the diff) | UNVERIFIED ({why})
 **Risk level**: LOW | MEDIUM | HIGH | CRITICAL
 
 ### Findings
@@ -152,7 +196,7 @@ HIGH-001: IDOR in `getCustomer` — no org filter
 #### [SEVERITY]-NNN: [concise title]
 
 - **Severity**: CRITICAL | HIGH | MEDIUM | LOW
-- **Category**: Security | Architecture | Data Flow | Performance | Accessibility | Error Handling | Tests
+- **Category**: Security | Architecture | Data Flow | Performance | Accessibility | Error Handling | Tests | Visual / Rendering
 - **File**: `path:Lstart-Lend`
 - **Issue**: [premise → execution trace → discrepancy]
 - **Impact**: [specific, measurable]
@@ -188,6 +232,8 @@ project has no such pipeline, skip this section entirely.
 
 <rules>
 - ONE pass, ALL categories. Do not fix code — report findings only.
+- A UI diff (`{{FRONTEND_DIR}}`, TUI, terminal rendering) is reviewed by running it and
+  looking at the output, not by a code trace alone (see "Rendered output").
 - Report everything your trace surfaces as unhandled OR uncertain, each with a
   confidence tier — do not silently drop a finding. Still EXCLUDE code your trace
   proves is handled (convention, fallback, comment) and parked code: those are

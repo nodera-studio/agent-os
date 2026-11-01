@@ -8,7 +8,7 @@ effort: high
 <role>
 The fast path for SMALL, LOW-RISK changes — a single-file fix, a copy/string tweak, a config
 change, a CRUD endpoint that copies an existing one, a missing error handler. You keep the fused
-write→test→gate→fix loop (run in Codex — Claude writes no product code) and the full quality bar,
+write→test→gate→fix loop (run by the Implementer `routing.sh implementation` names; design-heavy UI goes to the agent `routing.sh ui` names) and the full quality bar,
 but drop the planner, advisor, triple-engine review, and conformance gates that the full
 `/implement` runs. Same doctrine, smaller blast radius.
 </role>
@@ -51,22 +51,49 @@ copies}." If a tripwire fires: "This needs the full pipeline — run `/implement
 
 ## Pipeline
 
-### 1 — Implement (fused, in Codex)
+### 1 — Implement (fused, routed)
 
-Claude writes no product code — dispatch the **Codex Implementer** even on the quick path:
+You write no product code: dispatch the Implementer routing names, even on the quick path.
+Resolve it first (a non-zero exit is a blocker: report its stderr line, never guess):
+
+```bash
+bash .claude/scripts/routing.sh implementation   # claude → impl-coder-claude, codex → impl-coder-codex
+bash .claude/scripts/routing.sh ui               # the agent for a design-heavy UI change
+# No .claude/scripts/routing.sh in this checkout (a worktree cut before it existed): run the main
+# checkout's, "$(git rev-parse --path-format=absolute --git-common-dir)/../.claude/scripts/routing.sh";
+# neither has it: implementation=claude, ui=impl-coder-ui (the defaults).
+```
+
+A design-heavy UI change goes to the agent `routing.sh ui` names (`orchestrator.md` → UI
+implementation routing); everything else to the routed Implementer:
 
 ```
 Agent tool:
-  prompt: "Read .claude/agents/implementation/coder-codex.md and follow its instructions. Implement this small change (--fresh): {the user's task + the pattern file it copies}."
+  subagent_type: "impl-coder-claude" | "impl-coder-codex"   (from routing.sh implementation)
+  prompt: "Read .claude/agents/implementation/coder-<claude|codex>.md and follow its instructions. Implement this small change (--fresh): {the user's task + the pattern file it copies}."
 ```
 
-Codex reads the affected area + the pattern file, makes the change, wires it, handles the error
-paths, writes/extends the unit test, runs the relevant tests (`make test-api` / `make test-web`) and
-`bash scripts/quality-gate.sh`, and fixes every failure and finding — looping in ITS context until
-tests AND the gate are green (rebuilding `packages/shared` if touched). The write→test→fix loop
-stays in one context — that context is Codex's. If Codex is unavailable, STOP and report
-"BLOCKER: Codex unavailable — pipeline blocked" to the user — do NOT hand-write the change and do
-NOT reroute to `/implement` (it depends on the same Codex implementer).
+If `impl-coder-claude` is not a loaded agent type (agents load at session start), dispatch
+`subagent_type: "general-purpose"` with `model: "opus"` and the same prompt.
+
+Subagents run in the background; continue other work and act on the completion notification,
+never on a guess. The Codex Implementer reports failed Codex attempts by SendMessage to `main`
+(`orchestrator.md` → Role 1 → "Failed Implementer attempts"). A targeted fix gets exact line
+ranges (`orchestrator.md` → Role 2 → "Line-range fix briefs").
+
+Take the file snapshot from `/implement` (`orchestrator.md` → Role 1, "File snapshot") before
+this dispatch and check it after: any pre-existing file, tracked or untracked, that is gone is
+reported and restored.
+
+The Implementer reads the affected area + the pattern file, makes the change, wires it, handles
+the error paths, writes/extends the unit test, runs the relevant tests (`make test-api` /
+`make test-web`) and `bash scripts/quality-gate.sh`, and fixes every failure and finding —
+looping in ITS context until tests AND the gate are green (rebuilding `packages/shared` if
+touched). The write→test→fix loop stays in one context — the routed Implementer's. If it is
+unavailable (on the Codex route, "BLOCKER: Codex unavailable"), STOP and report
+"BLOCKER: <its blocker> — pipeline blocked" to the user — do NOT hand-write the change, do NOT
+switch to the other Implementer (that is an owner routing change) and do NOT reroute to
+`/implement` (it uses the same routed Implementer).
 
 ### 2 — One fresh review pass (the diff only)
 
@@ -77,10 +104,20 @@ quick path. Prefer the Codex diff reviewer for an uncorrelated read:
 Agent tool (subagent_type: codex:codex-rescue):
   prompt: "READ-ONLY review of THIS diff for REAL bugs only — logic, edge cases, missing error
            handling, multi-tenant / fiscal regressions. Not style/lint (the gate owns that).
-           Do NOT edit. Diff:\n{git diff of the change}"
+           If the diff touches rendered output ({{FRONTEND_DIR}}, a TUI, terminal rendering),
+           build and run it and look at the output (browser screenshot, or CLI output under a
+           pty) before calling it correct; a code trace alone is not enough. Run it only
+           against fixtures or scratch state, never against live user data.
+           Do NOT edit or write any file: return the full review as your final message
+           text. --wait. Run in the foreground: wait for the Codex task to finish
+           and return its full result; never return only a background task id.
+           Diff:\n{git diff of the change}"
 ```
 
-(Or `codex review --base <default-branch merge-base>`.) Fix any real bug it finds in THIS context.
+(Or `codex review --base <default-branch merge-base>`.) On a capacity or rate error ("Selected
+model is at capacity", 429), retry once after about 60 s; if it fails again, run the Claude
+`impl-code-review` pass instead and say in the summary that Codex was unavailable. Never skip the
+review silently. Fix any real bug it finds in THIS context.
 If the review reveals the change is bigger or riskier than it looked, stop and escalate to
 `/implement`.
 
@@ -100,7 +137,7 @@ what to manually test in the running app.
 
 - The scope gate is mandatory. When in doubt, bail to `/implement`. The quick path is a SMALLER
   surface, not a lower quality bar — tests + quality gate + one fresh review still hold.
-- Keep the generative loop in ONE context (Codex's); Claude writes no product code; the reviewer is a FRESH context on the diff only.
+- Keep the generative loop in ONE context (the Implementer's that `routing.sh implementation` names); you write no product code yourself (design-heavy UI goes to the agent `routing.sh ui` names); the reviewer is a FRESH context on the diff only.
 - No planner, no advisor, no conformance, no triple-engine — those belong to `/implement`.
 - Commit per logical unit, push by default without asking. Never `--no-verify`.
 - User-facing message language and error-code/log language per this project's convention.

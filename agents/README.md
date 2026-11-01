@@ -13,7 +13,7 @@ workflow below) once to adapt the templated files to that project's actual stack
 - Codebase audits use dual-engine (Claude + Codex) per group. Security audit additionally uses checklist perturbation.
 - **Model rides the session, not a hardcoded tier.** Every frontier role — orchestrators, planner/architect, the Implementer, reviewers, security/error finders, the debug investigator + adversary, research, and copywrite voice — is `model: inherit`, so it runs on whatever the session runs. Never pin a frontier agent to a model that won't follow the session. Mechanical / summarization roles (test-runner, verifier, docs-updater, light audits, plan explorer/researcher, line/microcopy/consistency editors) stay pinned `sonnet` — they don't need frontier compute. Effort: `high` is the default; `xhigh` is reserved for the Implementer, planner, and orchestrators on hard waves.
 
-**Core principle:** The user is ALWAYS in the driver's seat. Agents do the heavy lifting (research, code, review) but NEVER take autonomous actions on git or external systems. No auto-commits, no auto-pushes. Every workflow ends with "ready for your manual testing."
+**Core principle:** Specialist agents do the heavy lifting (research, code, review) but never touch git or external systems. The orchestrator (the main session) owns those actions: it commits and pushes as `/implement` and `/auto-mode` describe, and every outward action (opening or merging a PR, ticket updates, releases) follows the user's authorisation for the run.
 
 ---
 
@@ -35,11 +35,13 @@ workflow below) once to adapt the templated files to that project's actual stack
 ├── respond-to-review.md             # PR review response — verify claims, draft responses
 │
 ├── implementation/                  # Workflow: Build a feature/fix (4 roles)
-│   ├── orchestrator.md              # Pipeline manager: Codex Implementer → Review → tail → re-index
+│   ├── orchestrator.md              # Pipeline manager: routed Implementer → Review → tail → re-index
 │   ├── orchestrator-quick.md        # Fast path for small/low-risk changes — fewer gates, same quality bar
 │   ├── planner.md                   # Codebase analysis, step ordering, backward verification
-│   ├── coder-codex.md               # Role 1 — the fused Implementer, run in Codex (task --json --write); Claude writes no product code
-│   ├── implementer.md               # Canonical fused-loop envelope coder-codex.md forwards to Codex
+│   ├── coder-claude.md              # Role 1 — the fused Implementer, run in Claude (the default: `routing.sh implementation` prints `claude`)
+│   ├── coder-codex.md               # Role 1 — the fused Implementer, run in Codex (task --json --write), only when `routing.sh implementation` prints `codex`; routing picks one of the two
+│   ├── coder-ui.md                  # Role 1 for design-heavy web UI — Claude UI Implementer, frontend-design skill, browser check vs the design reference (`routing.sh ui`)
+│   ├── implementer.md               # Canonical fused-loop envelope both coders follow (coder-codex.md forwards it to Codex)
 │   ├── code-review.md               # Role 2 — Claude reviewer (‖ Codex via codex:codex-rescue), 2-vote
 │   ├── docs-updater.md              # Role 3 (tail) — updates docs after implementation
 │   └── conformance-test-writer.md   # Role 3 (tail) — author-blind, plan-derived conformance gate
@@ -159,7 +161,8 @@ approve it. See `agents/plan/README.md` for the full 8-step diagram.
 
 ## Implementation workflow (`/implement`)
 
-Builds the approved plan. The Implementer (run in Codex) writes the code, wires it in,
+Builds the approved plan. The Implementer (`routing.sh implementation` picks Claude, the default,
+or Codex) writes the code, wires it in,
 and writes its own tests; a lean internal review gate (1 Claude pass ‖ 1 Codex pass, 2-vote
 consensus) catches must-fix issues before the tail — an author-blind conformance-test
 writer (who only ever saw the plan, never the diff or the Implementer's own tests) and a

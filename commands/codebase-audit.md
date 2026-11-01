@@ -29,6 +29,12 @@ file: `security-audit`, `error-audit`, `api-audit`, `docs-audit`,
 deep-mode template and update `.claude/tech-debt/` with new HIGH/CRITICAL
 findings.
 
+**Verification (both modes).** Before the synthesis, every finding of every severity, LOW
+included, gets two independent verifier lenses: REPRODUCE (run it, or cite the exact
+`path:line`) and REFUTE (look for the guard, test or convention that makes it a non-issue). Keep
+a finding only when REPRODUCE confirms it and REFUTE fails to refute it, and record the kill rate
+per lens in the report (`.claude/agents/codebase/orchestrator.md` Step 3).
+
 <rules>
 - Always produce the synthesis summary — raw agent outputs are too long for the
   user to parse.

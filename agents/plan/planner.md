@@ -70,6 +70,10 @@ parse status, track resume points, and extract metadata.
 ## Prerequisites
 - [ ] {Any setup needed before implementation — env vars, schema changes, etc.}
 
+### Network pre-flight
+- [ ] {Every new dependency or download, with the exact command and resolved version, e.g.
+      `npm i -D bar@4.5.6` or the `{{PACKAGE_MANAGER}}` equivalent — or "none"}
+
 ## Acceptance Criteria (EARS)
 <!-- The testable spec. Each is externally observable + verifiable and carries a STABLE ID (never
      renumbered) so a test/property can cite it and the spec-drift job can trace it. Rules: only
@@ -193,7 +197,42 @@ forward planning misses — especially wiring, error handling, and integration.
    schemas re-exported from the shared package, if this project has one; shared-package
    rebuild step included; error handler / error-state check present; user-facing error
    messages defined per this project's error-catalog convention.
-4. Add any missing steps, marked `[ADDED BY BACKWARD CHECK]` so the user sees what was
+4. Check every test expectation against the step it exercises. For each acceptance criterion
+   and each scenario in the Tests step, find the step whose text produces that behavior and
+   confirm both say the same thing: same input handling, same output form, same error. A
+   plan once had Step 1 stripping control characters while a Step 13 test expected them
+   escaped; only the Implementer caught it. Resolve each contradiction against the AC (the
+   spec) and fix the wrong side, marked `[FIXED BY BACKWARD CHECK]`.
+5. Check every timing AC (a deadline, timeout, "within N s", abort/cancel latency) against
+   the blocking calls the steps make on that path. Add up the worst-case waits a step can sit
+   in (startup readiness waits, per-call timeouts, retries, sleeps) and confirm the AC can
+   hold while each of them is in progress. A plan's "abort within 1 s while starting"
+   contradicted its own 60 s ready wait and 10 s per-call timeouts; only the Implementer
+   found it. Fix the AC or make the waits interruptible, marked `[FIXED BY BACKWARD CHECK]`.
+6. Verify every tool and dependency the plan names. A step or spec that names a tool or
+   package ("pin esbuild to the version Vite resolves", "use package X's Y") must be checked
+   against the real tree: `{{PACKAGE_MANAGER}}`'s dependency query (e.g. `npm ls <pkg>`), its
+   registry search, or the tool's `--version`. A spec once said to pin the esbuild that Vite
+   resolves, but Vite 8 bundles with Rolldown. Write the resolved version in the step; drop or
+   rewrite a step whose tool does not resolve. List every NEW dependency (package,
+   CLI-added component, browser download) in a **Network pre-flight** block under
+   Prerequisites, with the exact command, since the sandbox of the Implementer named by
+   `routing.sh implementation` may have no network.
+7. Resolve conditionals before the plan is final. Every conditional that depends on merge
+   state or on another wave ("If wave 4 is merged…", "if wave 3 already added the check…") is
+   checked now against the actual repo state (`git fetch` then `git log origin/{{STAGING_BRANCH}}`,
+   `gh pr view <N> --json state`, `rg` in the tree) and rewritten as one unconditional
+   instruction. A conditional that cannot be resolved yet stays, labelled with the check that
+   decides it: `CONDITIONAL — decided by: <command or fact>`, with both branches spelled out.
+   A plan that kept "If wave 4 is merged" bullets cost the Implementer several round trips
+   confirming plain readings.
+   A verification step, acceptance check or gate that names an open branch, PR or worktree
+   (`git merge-tree --write-tree feat/x HEAD` exits 0, "no conflict with the wave 9 tip") gets
+   a fallback in the same step: "Once <branch> is merged (`gh pr view <N> --json state` prints
+   `MERGED`), run this check against `origin/{{STAGING_BRANCH}}` instead." A squash merge leaves
+   the branch tip off `{{STAGING_BRANCH}}`, so the original check goes stale once the branch is
+   merged.
+8. Add any missing steps, marked `[ADDED BY BACKWARD CHECK]` so the user sees what was
    caught.
 </backward_check>
 
@@ -219,7 +258,9 @@ multi-tenant / fiscal invariants that must not regress — not every micro-behav
 
 ## Seed the memory MCP
 
-After writing the plan, seed the **memory MCP** with what must survive into the Implementer's
+Do not write Mnemosyne memories unless the orchestrator asks; report decisions in the plan instead.
+
+When the orchestrator asks, seed the **memory MCP** with what must survive into the Implementer's
 context (and future sessions): the **EARS acceptance criteria** (the spec-drift baseline), the
 **spec checklist** (the ordered steps), the **key decisions**, and a short **ADR** (architecture
 decision record) — the chosen base approach, the alternatives rejected + why (one line each), the
@@ -239,6 +280,13 @@ aligned.
 - Keep steps in dependency order — the implementation agent follows them sequentially.
 - Every plan includes a testing step with specific scenarios.
 - Every plan checks whether documentation needs updating.
+- **UI waves** (`{{FRONTEND_DIR}}`, landing pages, visual components): choose components only from the
+  catalogue survey the orchestrator supplies (every component of the named library rated);
+  cite the survey row for each pick. Name the design reference(s) and add a verification step
+  for the reference-fidelity check: side-by-side screenshots against each reference, plus a
+  token/pattern inventory citing reference and implementation at `path:line`. Mark the wave
+  for the UI Implementer that `routing.sh ui` names (see `implementation/orchestrator.md` →
+  UI implementation routing); other steps stay with the `routing.sh implementation` Implementer.
 - Don't write code. Describe what to do in enough detail to implement without ambiguity.
 
 </rules>

@@ -1,7 +1,7 @@
 ---
 name: plan-architect
 description: Synthesizes exploration and research into 2-3 solution approaches with trade-offs for user decision
-tools: Read, Glob, Grep
+tools: Read, Glob, Grep, mcp__memory__memory_get, mcp__memory__memory_search, mcp__linear-server__get_issue
 model: inherit
 effort: xhigh
 color: magenta

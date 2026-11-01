@@ -69,6 +69,13 @@ after merges); treat hits as orientation and re-grep if the area looks stale. `c
 tells you how fresh it is; `code_reindex` is a mutator (prompt-gated — the pipeline re-indexes
 after merges already).
 
+- **How a repo is indexed.** No UI or MCP tool registers a repository. A repo is a row in the
+  local corpus DB pointing at a clean clone of `{{VCS_DEFAULT_BRANCH}}` (a dedicated index clone,
+  not your working checkout). Never commit or check out branches in that clone.
+- **After a merged PR**, if nothing re-indexes for you: `git -C <index clone> pull --ff-only`,
+  then `code_reindex {project, repo}`, and confirm with `code_index_status`. Without the pull,
+  `code_reindex` re-reads the old snapshot.
+
 ## secrets — the managed secret store
 
 **WHEN:** reading a **managed** secret. Reconcile to the current posture: reading/editing `.env`
@@ -87,3 +94,10 @@ secret value** into logs, PRs, commits, or context.
   configured server is silently skipped (CC ≥ v2.1.71). They are configured at the box level;
   this skill is guidance only.
 - Never `secret_set` a real value into a committed file.
+- **Workspace queues (if your stack has the workspace server):** `queue_item_add` /
+  `queue_item_update` accept a `documentId` only for Ideas, Notes and Research. **Never pass a
+  board issue id as `documentId`.** The server answers `INVALID_REQUEST` but still persists a
+  broken row that makes `queue_get` and the web queue page fail; the only recovery found was
+  deleting and recreating the queue. Put the issue's label and id in the item title instead
+  (`<wave> — <summary> (<issue id>)`). This is a Mnemosyne server bug; the rule is the
+  workaround until it is fixed.

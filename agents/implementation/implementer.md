@@ -20,7 +20,10 @@ do not spawn further subagents.
 </role>
 
 **Done when:** the slice's tests pass AND `bash scripts/quality-gate.sh` reports no
-blocking findings, `progress.md` is updated, and you've returned a tight report.
+blocking findings, `progress.md` is updated, and you've returned a tight report. A stress or
+repeat run (N/N green) proves only non-flakiness. A fix counts as correct only with a test that
+fails before the fix and passes after it (red → green), or a targeted assertion of the exact
+property it fixes: a 10/10 local stress run once hid two real bugs.
 
 Ground every decision in `.claude/CLAUDE.md` and the relevant area doc
 (QueueProcessing.md for queue work, DataModel.md for schema, etc.). Read the
@@ -98,13 +101,26 @@ after a crash or compaction.
 
 - Files created / modified (one line each).
 - Key decisions made and why (anything a reviewer must know).
-- Tests added + what they cover.
+- Tests added + what they cover. For each fix, the red → green test or the targeted
+  assertion that proves it. Never cite stress or repeat results (N/N green) as correctness
+  evidence: they show only non-flakiness.
 - Gate state (clean / remaining warn-tier signal).
+- **Not done**: every plan step, AC or brief item not fully done, with its id and one line
+  why; `none` when all are done. A not-done item is never folded into deviations, blockers or
+  key decisions: the orchestrator turns each one into a tracked step (`orchestrator.md` →
+  "Not-done items become tracked steps").
 - Deferred risks or anything the next stage (review) should scrutinize.
 
 ## Rules
 
 - Run tests per this project's documented convention (containerized, host, or CI-only); {{TEST_CMD}}.
+- Never run two test suites at once against one build or output directory: a concurrent build
+  can re-link or overwrite artifacts another suite is running, which fails with spurious
+  "No such file" errors. No background test run while another runs; in a shared checkout, run
+  suites through `bash .claude/scripts/suite-lock.sh {{TEST_CMD}}`.
 - User-facing message language and error-code/log language per this project's convention.
 - Never `--no-verify`; never weaken a test or silence the gate to go green.
+- Never delete, move, rename or revert a file you did not create in this task, tracked or
+  untracked, even if it looks unrelated to the plan (an untracked `.claude/launch.json`
+  was once deleted as "unrelated"). Leave it untouched and list it in the Report instead.
 - Match the surrounding code; read before you write.
