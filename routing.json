@@ -1,0 +1,4 @@
+{"implementation":"claude","ui":"impl-coder-ui",
+ "review":["claude","codex"],"planning":["claude","codex"],"debug":["claude","codex"],
+ "audits":["claude","codex"],"integration":"claude",
+ "heavy_concurrency":8}

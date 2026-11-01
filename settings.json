@@ -19,7 +19,8 @@
       "mcp__exa__web_search_advanced_exa",
       "mcp__exa__web_fetch_exa",
       "mcp__claude_ai_Context7__resolve-library-id",
-      "mcp__claude_ai_Context7__query-docs"
+      "mcp__claude_ai_Context7__query-docs",
+      "Bash(bash .claude/scripts/clean-scratch.sh:*)"
     ],
     "deny": [
       "WebSearch",
@@ -76,6 +77,15 @@
             "command": ".claude/hooks/block-old-codex.sh"
           }
         ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/guard-claude-md-name.sh"
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -109,6 +119,16 @@
           {
             "type": "command",
             "command": ".claude/hooks/reinject-invariants.sh"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/secret-paste-warn.sh"
           }
         ]
       }
