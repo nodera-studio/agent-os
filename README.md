@@ -10,11 +10,11 @@ It is not a framework you code against. It's a `.claude/` tree: drop it in, run
 `/bootstrap-project`, and you have a working multi-agent workflow suite tuned for
 disciplined, verifiable, surgical changes.
 
-- **Agents** — 51 orchestration prompts across 8 workflows (plan · implement · review · debug · audit · copywrite · bootstrap · orchestrator)
+- **Agents** — 53 orchestration prompts across 8 workflows (plan · implement · review · debug · audit · copywrite · bootstrap · orchestrator)
 - **Commands** — 29 slash commands, the entry points into those workflows
-- **Skills** — 11 trigger-activated capabilities (Playwright testing, GitHub/PR workflows, Exa web search, branching-model conventions, and more)
-- **Hooks** — 8 enforcement scripts wired into `PreToolUse`/`PostToolUse`/session-lifecycle events
-- **Engine model** — Claude alone for planning/implementation; Claude + Codex dual-engine for review/debug/audits, where cross-model disagreement catches what one model misses
+- **Skills** — 12 trigger-activated capabilities (Playwright testing, GitHub/PR workflows, Exa web search, branching-model conventions, and more)
+- **Hooks** — 10 enforcement scripts wired into `PreToolUse`/`PostToolUse`/session-lifecycle events
+- **Engine model** — who implements comes from `routing.json` (Claude by default, Codex when routed); Claude + Codex dual-engine for review/debug/audits, where cross-model disagreement catches what one model misses. omp is an optional, probe-gated third engine
 
 ## Why this exists
 
@@ -175,8 +175,11 @@ produce the same quality bar; the difference is how much you want to watch.
   status line), `apply-theme.sh` (installs the Linear Dark theme from `themes/`
   into `~/.claude/` and points `settings.json` at it), `brainstorm/` (the local
   server backing the `/brainstorm` skill's browser-mockup mode), `mnemosyne/`
-  (the learned-rules-loop scripts), and `cron/` (reference cron wiring for the
-  codebase-reindex job).
+  (the learned-rules-loop scripts), `cron/` (reference cron wiring for the
+  codebase-reindex job), and the run-hygiene helpers: `routing.sh` (engine routing),
+  `suite-lock.sh`, `clean-scratch.sh`, `checkpoint-due.sh`, `remove-worktree.sh`,
+  `codex-procs.sh` / `sweep-codex-orphans.sh` (Codex broker cleanup), and the optional omp
+  engine scripts (`omp-engine.sh`, `omp-profile-setup.sh`); smokes live in `scripts/tests/`.
 - **Prompts** (`prompts/`) — general-purpose prompt-engineering reference guides
   for Claude and OpenAI models.
 - **Plugin packaging** (`plugin/agent-os-workflow/`) — the whole suite packaged
@@ -267,6 +270,8 @@ for the plugin-packaging details.
 | `docs/`      | Harness reference docs (setup, security posture, statusline, learned-rules schema)         |
 | `scripts/`   | Standalone tooling used by hooks/commands/cron                                            |
 | `prompts/`   | Prompt-engineering reference guides                                                       |
+| `routing.json` | Who does each kind of work (implementation, review, …); read via `scripts/routing.sh` |
+| `omp/`       | Optional omp third-engine profile overlay, sandbox launchers and skills                    |
 | `plugin/`    | The whole suite packaged as a toggleable Claude Code plugin                                |
 | `plans/`     | Implementation plans — accumulate as project history, not deleted after use               |
 | `research/`  | Research reports (topic deep-dives, library comparisons)                                  |

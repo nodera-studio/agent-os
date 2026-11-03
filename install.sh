@@ -4,9 +4,9 @@
 # Usage: ./install.sh <target-project-path>
 #
 # Copies this repo's agents/, commands/, skills/, hooks/, rules/, docs/, scripts/,
-# prompts/, plugin/, the scaffold dirs (plans/, research/, tech-debt/, testing/,
-# evidence/, handoffs/), settings.json, and CLAUDE.md.template into
-# <target>/.claude/. Never overwrites an existing <target>/.claude/settings.json
+# prompts/, plugin/, omp/, the scaffold dirs (plans/, research/, tech-debt/, testing/,
+# evidence/, handoffs/), settings.json, routing.json (if absent), orchestrator/GapLog.md (if absent) and
+# CLAUDE.md.template into <target>/.claude/. Never overwrites an existing <target>/.claude/settings.json
 # or <target>/.claude/CLAUDE.md — those are skipped with a warning if present, so
 # a re-run never clobbers project-specific customization.
 set -euo pipefail
@@ -29,7 +29,7 @@ TARGET_CLAUDE="$TARGET_PROJECT/.claude"
 mkdir -p "$TARGET_CLAUDE"
 
 # Directories copied wholesale (safe to overwrite — this harness owns them).
-DIRS=(agents commands skills hooks rules docs scripts prompts plugin plans research tech-debt testing evidence handoffs)
+DIRS=(agents commands skills hooks rules docs scripts prompts plugin omp plans research tech-debt testing evidence handoffs)
 
 copy_dir() {
   local name="$1"
@@ -52,6 +52,22 @@ done
 # settings.json and CLAUDE.md.template: never clobber an existing settings.json
 # or CLAUDE.md in the target — those carry project-specific customization once
 # /bootstrap-project has run.
+# Project-owned files: seed once, never overwrite (routing.json carries the project's engine
+# routing override; orchestrator/ holds the gap log, which record-gap.mjs appends to).
+seed_once() {
+  local rel="$1"
+  [ -f "$SOURCE_DIR/$rel" ] || return 0
+  if [ -f "$TARGET_CLAUDE/$rel" ]; then
+    echo "install.sh: $rel already exists, skipping (not overwritten)"
+  else
+    mkdir -p "$(dirname "$TARGET_CLAUDE/$rel")"
+    cp "$SOURCE_DIR/$rel" "$TARGET_CLAUDE/$rel"
+    echo "install.sh: wrote $rel"
+  fi
+}
+seed_once routing.json
+seed_once orchestrator/GapLog.md
+
 if [ -f "$TARGET_CLAUDE/settings.json" ]; then
   echo "install.sh: WARNING — $TARGET_CLAUDE/settings.json already exists, skipping (not overwritten)"
 else

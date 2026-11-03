@@ -7,7 +7,7 @@ re-indexed code. Four roles, not eighteen steps.
 
 ```mermaid
 flowchart LR
-    P["planner<br/>(Claude)"] --> I["Codex Implementer<br/>write → wire → harden →<br/>test → gate → fix<br/>(fused loop, coder-codex.md)"]
+    P["planner<br/>(Claude)"] --> I["Implementer<br/>write → wire → harden →<br/>test → gate → fix<br/>(fused loop, coder-claude.md<br/>or coder-codex.md by routing)"]
     I --> RV["Review<br/>(fresh context —<br/>see review-implementation/)"]
     RV --> TAIL
 
@@ -24,28 +24,46 @@ flowchart LR
 changes — fewer gates, same quality bar — dispatched by `/implement-quick`.
 
 1. **planner** — Analyzes the codebase, identifies affected files, produces a numbered plan.
-2. **Codex Implementer** (`coder-codex.md`) — the fused generative loop in ONE
-   context, run in **Codex**: writes the code, wires every layer, hardens error
-   paths, writes unit + integration tests, runs them, runs the deterministic quality
-   gate (`scripts/quality-gate.sh`), and fixes every failure and finding — looping
-   until tests AND the gate are green. Claude writes no product code; the context
-   reading a failure is the one that wrote the code, and that context is Codex's.
-   `implementer.md` is the canonical envelope `coder-codex.md` forwards to Codex.
-3. **Review (fresh context)** — the triple-engine review: Claude comprehensive
-   reviewer ‖ `codex review` ‖ CodeRabbit, each blind to the others, folded by the
-   Claude **synthesizer** into one dedup'd, provenance-labelled report + ordered fix
-   plan (the `/review-implementation` machinery; never sees the Implementer's transcript).
+2. **Implementer** — the fused generative loop in ONE context: writes the code, wires
+   every layer, hardens error paths, writes unit + integration tests, runs them, runs the
+   deterministic quality gate (`scripts/quality-gate.sh`), and fixes every failure and
+   finding — looping until tests AND the gate are green. `bash .claude/scripts/routing.sh
+   implementation` picks the engine: `claude` (the default) dispatches **`coder-claude.md`**
+   (agent `impl-coder-claude`, Opus); `codex` dispatches **`coder-codex.md`** (agent
+   `impl-coder-codex`, `codex-companion.mjs task --json --write`). Either way the context
+   reading a failure is the one that wrote the code. `implementer.md` is the canonical
+   envelope: `coder-claude.md` follows it directly, `coder-codex.md` forwards it to Codex.
+   **UI Implementer** (`coder-ui.md`, agent `impl-coder-ui`, Opus) takes design-heavy web UI
+   when `routing.sh ui` names it: same fused loop with the frontend's build/test commands,
+   the frontend-design skill, and a required browser check against the named design
+   reference.
+3. **Review (fresh context)** — by default the lean `/code-review` gate: a Claude pass ‖ a
+   Codex pass ‖ the optional omp pass (via the `glen` CLI, when `omp-engine.sh probe` is
+   ready), merged by 2-vote consensus (omp-only findings are advisory until verified; omp
+   plus one other engine is two votes; a skipped probe is recorded with its reason, and
+   Claude ‖ Codex still run). A high-risk diff, or one where CodeRabbit is installed, runs the
+   triple-engine review instead: Claude comprehensive reviewer ‖ `codex review` ‖ CodeRabbit
+   (plus omp when ready), each blind to the others, folded by the Claude
+   **synthesizer** into one dedup'd, provenance-labelled report + ordered fix plan (the
+   `/review-implementation` machinery). Neither ever sees the Implementer's transcript.
 4. **parallel tail** — once Review is green: **docs-updater** updates docs from the
    landed code, ‖ **conformance-test-writer** runs the author-blind, plan-derived
    conformance gate (the anti-reward-hacking check).
 5. **re-index** — fold the new/changed files back into the codebase MCP so semantic
    search reflects the merged code (pipeline tail + pre-push hook backstop).
 
-## The fused Implementer runs in Codex
+## Which engine runs the fused Implementer
 
-Claude writes no product code. The fused write→wire→harden→test→gate→fix loop runs in
-**Codex** via `coder-codex.md` (`codex-companion.mjs task --json --write`), which
-forwards the `implementer.md` envelope + the repo-root `AGENTS.md` conventions. The
+The routed Implementer (`routing.sh implementation`) writes all product code; the host
+session never does. Two cases go elsewhere: design-heavy UI (`{{FRONTEND_DIR}}`, landing
+pages, visual components) goes to the agent `routing.sh ui` names, a Claude Opus Implementer
+(`orchestrator.md` → UI implementation routing; `coder-ui.md`); integrating two
+already-reviewed parallel waves goes to the engine `routing.sh integration` names, followed
+by the gate, tests and a scoped Claude ‖ Codex review (`orchestrator.md` → Role 1;
+`loop-procedures.md` → "Shared seams"). The fused write→wire→harden→test→gate→fix loop runs
+in **Claude** via `coder-claude.md` by default, or in **Codex** via `coder-codex.md`
+(`codex-companion.mjs task --json --write`) when routing says `codex`; both carry the
+`implementer.md` envelope + the repo-root `AGENTS.md` conventions. The
 former per-concern agents (`coder.md`, `wiring.md`, `error-handling.md`,
 `test-writer.md`, `test-runner.md`, `verifier.md`, `code-simplifier.md`) were fused
 into that single loop and **deleted** — do not re-create them.
@@ -61,9 +79,10 @@ handoff is `progress.md` + the plan's `<task>` XML, never a transcript.
 
 ## Engines
 
-**Codex writes all product code** — Role 1 (the fused Implementer) runs in Codex via
-`coder-codex.md`, and Codex is also one engine of the Review gate (`codex review` /
-`codex:codex-rescue`, see `.claude/skills/codex/SKILL.md`). The planner, Review
-synthesizer, the parallel tail (docs-updater ‖ conformance-test-writer), and re-index
-are Claude subagents on the main-loop model (Fable 5, then Opus). Claude writes no
-product code.
+Roles come from `.claude/routing.json` through `.claude/scripts/routing.sh`. By default
+Role 1 runs in Claude (`coder-claude.md`); it runs in Codex (`coder-codex.md`) only when
+`routing.sh implementation` prints `codex`. Codex is one engine of the Review gate
+(`codex review` / `codex:codex-rescue`, see `.claude/skills/codex/SKILL.md`). The planner,
+Review synthesizer, the parallel tail (docs-updater ‖ conformance-test-writer), and re-index
+are Claude subagents on the main-loop model (Fable 5, then Opus). Only the routed
+Implementer writes product code.

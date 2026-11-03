@@ -26,6 +26,11 @@ prevent. See your project's branching-model doc if one exists.
 
 1. **Preflight — confirm staging is green and the release branch hasn't drifted.**
    - `git fetch origin {{PROD_BRANCH}} {{STAGING_BRANCH}}`
+   - `gh run list --workflow <ci workflow> --branch {{STAGING_BRANCH}} --limit 1 --json
+     conclusion,headSha,url` — the latest CI run must be green for the commit you will promote:
+     `conclusion` is `success` and `headSha` equals `git rev-parse origin/{{STAGING_BRANCH}}`.
+     Keep `--workflow`: without it the newest run on the branch may be another workflow (a
+     nightly job, a deploy).
    - `git rev-list --count origin/{{PROD_BRANCH}}..origin/{{STAGING_BRANCH}}` — how many commits
      will promote.
    - `git rev-list --no-merges --count origin/{{STAGING_BRANCH}}..origin/{{PROD_BRANCH}}` — **must
@@ -60,6 +65,17 @@ prevent. See your project's branching-model doc if one exists.
      auto-applied.
    - Sanity: `git diff origin/{{PROD_BRANCH}} origin/{{STAGING_BRANCH}}` should be empty
      (tree-identical) right after the promotion.
+7. **Post-release checklist.**
+   - Every promoted ticket carries the prod shipping label (step 6).
+   - Resolve the tech-debt memories whose fixes shipped in this release (`memory_update`, status
+     `resolved`, with the fix `path:line`), if you run a durable-memory system.
+   - Stop any preview server or Codex broker the release work started: for a preview server,
+     check its cwd (`lsof -a -d cwd -p <pid> -Fn`) is under the release worktree before you
+     `kill <pid>`, and confirm it is gone. Then remove any release worktree with
+     `bash .claude/scripts/remove-worktree.sh <absolute path>` and run
+     `bash .claude/scripts/sweep-codex-orphans.sh`.
+   - Under `/auto-mode`, continue with `.claude/skills/auto-mode/references/loop-procedures.md` →
+     "Closing the run" (checkpoints until the run ends, schedule removal).
 
 ## Hard rules
 
@@ -70,6 +86,8 @@ prevent. See your project's branching-model doc if one exists.
   CI guard's escape hatch (e.g. `emergency-hotfix`) and **back-merge release → staging
   immediately**.
 - **Capture the release memory before merging** (if a hook enforces it).
+- **The release is not done until the post-deploy check passes** — the prod app (or the
+  published artifact) answers with the new version.
 
 ## References
 

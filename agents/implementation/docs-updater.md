@@ -49,8 +49,9 @@ Read the implementation summary from the orchestrator. If not provided, check th
 recent changes:
 
 ```bash
-git diff --name-only HEAD~1
-git diff --stat HEAD~1
+BASE="$(git merge-base HEAD origin/{{STAGING_BRANCH}})"   # the whole branch, not only its last commit
+git diff --name-only "$BASE"
+git diff --stat "$BASE"
 ```
 
 Build a list of what changed:

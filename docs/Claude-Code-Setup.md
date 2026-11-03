@@ -96,6 +96,11 @@ cheaper models (mechanical roles) and per-role `effort`. A global
 `CLAUDE_CODE_SUBAGENT_MODEL` would flatten all of that. This survives "optimization"
 passes by being written down here.
 
+Which engine does a kind of work (Claude or Codex for implementation, review, planning, debug
+and audits; the UI Implementer; the fan-out caps) is a separate question: it lives in
+`.claude/routing.json`, read through `bash .claude/scripts/routing.sh <key>`, never hard-coded in
+a prompt.
+
 ## CLI tooling — `bootstrap-tools.sh`
 
 `.claude/scripts/bootstrap-tools.sh` installs the productivity CLI layer.
@@ -170,6 +175,24 @@ Verify: `jq empty < .claude/settings.local.json && echo OK`.
 Run `.claude/scripts/bootstrap-tools.sh` on each machine (`--dry-run` first to
 preview). The `settings.json` `env` block + any `PostToolUse` hook wiring travel
 with the repo — no manual settings.json edit needed beyond what's already committed.
+
+### 3. omp third engine (optional, per machine)
+
+omp is an optional read-only third review/debug engine run through the `glen` CLI. Skip this
+step to run without it: the engine's probe exits 3 and the harness reports it skipped in one
+line. To enable it, the owner logs into the provider for the dedicated `glen-harness` profile,
+then configures and checks it:
+
+```bash
+omp --profile glen-harness login <provider>
+bash .claude/scripts/omp-profile-setup.sh
+bash .claude/scripts/omp-profile-setup.sh --check
+```
+
+Export `MNEMOSYNE_TOKEN` in the invoking shell if the profile's MCP needs read-only memory
+access; never put its value in the repo. `TMPDIR` (or `/tmp` when unset) must resolve outside
+`$HOME` for the engine to run. Set `GLEN_OMP_ENGINE=off` to skip omp while the other engines
+continue. See `skills/omp/SKILL.md`.
 
 ## Mac bring-up sequence
 

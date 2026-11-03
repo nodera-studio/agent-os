@@ -60,6 +60,7 @@ rules there and keep this section to the summary.
 | `evidence/`  | Captured evidence artifacts from audits/reviews (screenshots, logs, reports)                                                                                    | Read on demand                                             |
 | `handoffs/`  | Session handoff notes between agents or sessions                                                                                                                | Read on demand                                             |
 | `orchestrator/` | `/orchestrate` mode's gap log (`GapLog.md` + `gaps.jsonl`) — one-off subagent spawns with no matching harness agent, clustered periodically by `/audit-agent-gaps` | Read when reviewing gaps or running `/audit-agent-gaps`  |
+| `routing.json` | Who does each kind of work (implementation, UI, review, planning, debug, audits) and the fan-out caps | Read through `scripts/routing.sh`, never directly |
 
 ### Agents
 
@@ -71,6 +72,18 @@ e.g. a table mapping `/plan-implementation`, `/implement`, `/review-implementati
 `/orchestrate` (dispatch-only mode) and `/audit-agent-gaps` (cluster the gap log, propose
 promoting recurring one-off shapes into permanent agents) are pre-wired and generic — no
 per-project filling-in needed, see `agents/orchestrator/README.md`.
+
+### Engine routing
+
+Roles come from `.claude/routing.json`, read through `bash .claude/scripts/routing.sh <key>`
+(an owner-confirmed override in `.claude/auto-mode/routing.json` wins). By default Claude
+implements (`impl-coder-claude`) and Codex reviews, plans, debugs and audits. Dispatch Codex
+only through the `codex:codex-rescue` agent, `codex-companion.mjs` (the Implementer, only when
+`routing.sh implementation` prints `codex`) or `codex review`; never `codex exec`. omp is an optional read-only third review/debug
+engine, run only through `bash .claude/scripts/omp-engine.sh` (see `.claude/skills/omp/SKILL.md`;
+never `omp` directly, never the default profile; skipped with a one-line reason when its probe
+exits 3). Record an
+owner's routing change as a decision before applying it (the `auto-mode` skill → Hard rules).
 
 ### Skills & Tools
 

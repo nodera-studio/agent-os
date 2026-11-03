@@ -1,7 +1,7 @@
 # Hooks
 
 Enforcement scripts wired into `settings.json` against Claude Code's lifecycle events
-(`SessionStart`, `PreToolUse`, `PostToolUse`, `Stop`, `PreCompact`). Two postures, used
+(`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `PreCompact`). Two postures, used
 deliberately per hook:
 
 - **Warn-don't-block** — prints guidance, exits 0. Used where a wrong call is annoying,
@@ -17,10 +17,12 @@ deliberately per hook:
 | `session-start.sh` | `SessionStart` | info | Prints a "check available skills" reminder |
 | `reinject-invariants.sh` | `SessionStart`, `PreCompact` | info | Re-injects a short, project-defined invariants list so it survives context compaction — the payload is a placeholder in this template, see below |
 | `block-old-codex.sh` | `PreToolUse` (`Bash`, `Skill`) | hard block | Blocks legacy/duplicate Codex dispatch paths, redirects to the canonical one |
-| `steer-bash.sh` | `PreToolUse` (`Bash`) | warn (steers) | Redirects risky/inefficient bash patterns (`sed -i` → Edit tool, raw `cat`/`head` of code → Read tool, `.env` reads → secrets MCP, external `curl` → an allowlisted host check) toward better tools |
-| `capture-before-merge.sh` | `PreToolUse` (`Bash`, on `gh pr merge`) | hard block | Blocks a PR merge until a durable-memory entry referencing the PR/branch exists in-session (only meaningful if you run a memory MCP) |
+| `steer-bash.sh` | `PreToolUse` (`Bash`) | warn (steers) | Redirects risky/inefficient bash patterns (`sed -i` → Edit tool, raw `cat`/`head` of code → Read tool, `.env` reads → secrets MCP, external `curl` → an allowlisted host check over every URL in the command, recursive `rm` of the project's temp-dir scratch → `scripts/clean-scratch.sh`) toward better tools. Smoke test for the `rm` rule: `scripts/tests/clean-scratch-smoke.sh`. Also denies an `omp` probe with a profile other than `glen-harness` (`--profile`, `OMP_PROFILE`, `PI_PROFILE`) and creating another `~/.omp/profiles/<name>`, pointing to `HOME="$(mktemp -d)"`. Smoke test for the omp rule: `scripts/tests/steer-omp-profile-smoke.sh` |
+| `capture-before-merge.sh` | `PreToolUse` (`Bash`, on `gh pr merge`) | hard block | Blocks a PR merge until a durable-memory entry referencing the PR/branch exists in-session (only meaningful if you run a memory MCP). Owner waiver: a main-session owner message such as "no memory for PR #42" (naming the PR) lifts the memory requirement, and the hook then asks the owner to confirm the merge. Smoke test: `scripts/tests/capture-waiver-smoke.sh` |
+| `guard-claude-md-name.sh` | `PreToolUse` (`Write`) | hard block | Write tool only (shell redirects and `mv` are covered by the prompts, not this hook). Refuses a new file whose basename is `claude.md` in any case, except `<repo>/CLAUDE.md`, `<repo>/.claude/CLAUDE.md` (per checkout or worktree), `~/.claude/CLAUDE.md` and any `CLAUDE.md` that already exists on disk: Claude Code loads any such file as a nested `CLAUDE.md` on macOS's case-insensitive filesystem. Name per-engine output `<engine>-review.md` / `<engine>-plan.md` |
 | `prettier-on-edit.sh` | `PostToolUse` (`Edit\|Write`) | warn-don't-block | Runs prettier on the edited file if the project has it configured |
 | `shellcheck-on-edit.sh` | `PostToolUse` (`Edit\|Write`) | warn-don't-block | Lints edited shell scripts if shellcheck is installed |
+| `secret-paste-warn.sh` | `UserPromptSubmit` | hard block (warns by blocking) | Stops a prompt that looks like it carries a credential (GitHub, Anthropic, OpenAI, AWS, Slack, Google, Stripe live key, PEM private key, JWT) before it reaches the model, with `suppressOriginalPrompt` so the text stays out of the block message. The reason names the label and length, never the value. Bypass: start the message with `[allow-secret]`. Fails open without jq. Smoke test: `scripts/tests/secret-paste-smoke.sh` |
 | `mnemosyne-capture.sh` | `Stop` | opt-in (`MNEMOSYNE_CAPTURE=1`) | Captures an episodic fix summary into a memory MCP's findings table, if you run one |
 
 ## Fill in before this does anything project-specific

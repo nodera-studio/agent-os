@@ -99,9 +99,21 @@ Per wave, in order — this sequence is the spine of the mode:
    before pushing.
 5. **Open the PR into the staging trunk** (`gh pr create --base <staging-trunk>`).
 6. **Poll continuously** — wake ~270s apart; each cycle `gh pr checks` + fetch new
-   comments/reviews since the poll cursor; update the cursor.
-7. **Triage + fix** — Critical/Major → fix+push+reschedule; Minor → fix or batch;
-   keep tests + docs in sync.
+   comments/reviews since the poll cursor; update the cursor. Idling over ~10 min on
+   background agents or CI → a `ScheduleWakeup` heartbeat about every 20 min; a background
+   agent that owns a PR's CI loop gets a `.claude/auto-mode/ci-owner/pr-<N>.json` marker, and
+   you leave that PR's CI events to it (references → step 6). On every wake,
+   `bash .claude/scripts/checkpoint-due.sh` first when the goal has checkpoints; overdue →
+   write the checkpoint before anything else (references → Run checkpoints).
+7. **Triage + fix** — start every fix cycle (CI, review or conformance) by merging the
+   staging trunk into the wave checkout: `git -C "$WT" fetch origin && git -C "$WT" merge
+   --no-edit origin/<staging-trunk>`, never a rebase (a CI-owner agent merges in its own
+   checkout; you merge only into a clean `$WT`); a conflict goes to `routing.sh integration`;
+   after a non-trivial merge re-run the quality gate and tests, and name the merged SHA in the
+   fix brief (references → step 7). A branch cut from another wave's pre-squash commit uses
+   the squash-merged base recipe (`git replace --graft`, references → step 7); fix-cycle
+   decisions quote their governing AC (`Governing AC: AC-<id> — "<verbatim>"`). Then
+   Critical/Major → fix+push+reschedule; Minor → fix or batch; keep tests + docs in sync.
 8. **Capture, then merge when the bar is met** — all checks green (Lint+Typecheck,
    Build, Unit+Integration, E2E, and any configured code-review bots), no new comments
    since the last push, and ≥1 clean cycle (zero new comments AND green CI) to defend
@@ -112,14 +124,19 @@ Per wave, in order — this sequence is the spine of the mode:
    step; delete the branch yourself at wave close.
 9. **Close the wave** — flip the tracker ticket → `Done`, post the wave-end comment
    (files / commit / PR / tests), update the ledger, apply a **`shipped:staging`**-style
-   label (the code is now on the staging trunk), then delete the wave branch.
+   label (the code is now on the staging trunk), then delete the wave branch. A wave run in
+   a worktree is removed with `.claude/scripts/remove-worktree.sh`, then
+   `.claude/scripts/sweep-codex-orphans.sh` (references → Removing a worktree). The harness
+   self-improvement batch and any independent wave run in their own worktrees alongside
+   (references → Parallel work).
 10. **Advance** to the next wave without asking. 2–3 line status at boundaries only;
     silent during polling.
 11. **Promote to prod only if the goal targets the release branch** — when every wave is
     on the staging trunk: status `landing`, open ONE PR staging → release branch, poll
     the same way, merge with **`gh pr merge --merge`** (merge commit, never squash), then
-    flip every goal ticket's shipping label from staging to prod and set status `done`. A
-    staging-only goal is `done` once its last wave is merged + shipped-to-staging.
+    flip every goal ticket's shipping label from staging to prod. A staging-only goal is
+    finished once its last wave is merged + shipped-to-staging. Either way, then "Closing the
+    run" (references), which sets status `done` at its end.
 
 ## Hard rules
 
@@ -143,14 +160,24 @@ Per wave, in order — this sequence is the spine of the mode:
   merges (step 11). Most trackers' label-set APIs REPLACE the whole set on write, so
   always read current labels first and pass the full desired set. (Label mechanics +
   promotion detail in the references file.)
+- **Confirm a routing change before broadcasting it.** Restate an owner routing directive
+  in chat as one line ("Routing: implementation → claude (Codex keeps
+  review/plan/debug/audit). Apply and tell N running agents?") and apply it only after the
+  owner confirms. Then store the decision memory, write `.claude/auto-mode/routing.json`
+  with `decision` set to its id, and only then SendMessage the running agents, pointing
+  them at `bash .claude/scripts/routing.sh` instead of restating the rule. Why: a routing
+  directive broadcast before confirmation was reversed minutes later, then superseded.
+- **Revise briefs in the file.** A changed or revoked decision goes into the brief or plan
+  file as `REVISED`/`REVOKED` before any message; committers re-read it before committing
+  (references → Harness self-improvement loop).
 - **No `Co-Authored-By` trailer on commits** if your project convention says not to add
   one — confirm your project's commit-attribution convention first.
 
 ## Stop conditions
 
-- Staging-only goal: last wave merged + shipped-to-staging → status `done`. Promotion
-  goal: staging → release-branch merged + tickets flipped shipped-to-prod → status
-  `done`. Final summary either way.
+- Staging-only goal: last wave merged + shipped-to-staging. Promotion goal: staging →
+  release-branch merged + tickets flipped shipped-to-prod. Either way, then "Closing the
+  run" (references), which sets status `done`; final summary.
 - A wave PR red 3+ cycles with no path forward → stop that wave, flag the user.
 - User says stop/pause or changes the goal → stop, confirm current state.
 

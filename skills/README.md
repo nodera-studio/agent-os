@@ -47,7 +47,7 @@ the connection itself wherever your team manages account/workspace settings.
 
 ## Skills this template DOES wire up
 
-Two integrations get real client-side wiring in this repo, because their configuration
+Three integrations get real client-side wiring in this repo, because their configuration
 is a portable setup step rather than an account-level OAuth grant:
 
 - **Mnemosyne** (memory/codebase/secrets MCP) — see `skills/mnemosyne/SKILL.md` and the
@@ -55,6 +55,9 @@ is a portable setup step rather than an account-level OAuth grant:
   servers themselves are a separate project you run.
 - **Exa** (web search/fetch) — see `skills/exa/SKILL.md`; a standard MCP server you
   configure once, not an OAuth connector.
+- **omp** (optional third review/debug engine, read-only, run through the `glen` CLI) —
+  see `skills/omp/SKILL.md` and `scripts/omp-engine.sh`; the engine's readiness probe
+  exits 3 (skip) when omp is not set up, so the harness works without it.
 
 Follow the same pattern for any project-local MCP server you add: a `SKILL.md`
 documenting when/how to use its tools, plus whatever server config your setup docs call for.

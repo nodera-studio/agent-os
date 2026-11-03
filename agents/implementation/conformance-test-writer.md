@@ -29,9 +29,11 @@ fix-pass).
 
 Never read the implementation diff, the code the Implementer produced, or its
 report — testing what an implementation *does* internally voids the suite as an
-independent gate. Read ONLY:
+independent gate. Never read `.claude/plans/*.ac-check.md` (the orchestrator's AC source
+check): it cites implementation lines. Use the AC text in the dispatch only. Read ONLY:
 
-- The approved plan (from the dispatch prompt).
+- The approved plan (from the dispatch prompt), with the settled acceptance criteria the
+  dispatch carries.
 - The contracts the plan references: this project's shared request/response schemas,
   its API reference doc, the invariant rules in its own `.claude/rules/*` (or
   equivalent) — e.g. tenant-isolation scoping, append-only audit tables, gap-less
@@ -77,9 +79,13 @@ Run the suite against the working tree and report the result. Output the exact
 command so it can be re-run after a fix — e.g. (adapt to this project's actual runner):
 
 ```bash
-{{TEST_CMD}} -- --testPathPattern=conformance
+bash .claude/scripts/suite-lock.sh {{TEST_CMD}} -- --testPathPattern=conformance
 # and/or the project's E2E command scoped to a "conformance" project/tag
 ```
+
+`suite-lock.sh` holds a lock on the checkout's build output while the suite runs, so it waits
+for any other suite in that checkout instead of racing it (two suites against one build
+directory break each other: `implementer.md` → Rules).
 
 ## Domain-critical rigor — when the change touches a project-critical logic package (Role 3b)
 

@@ -86,8 +86,12 @@ Launch all 4 agents simultaneously in 2 groups.
 
 ### Group 1 -- Endpoint Inventory + Auth Coverage
 
-**Codex Agent (Skill tool):**
-Flags: `-m gpt-5.4-mini --config model_reasoning_effort="medium" --sandbox read-only --full-auto --skip-git-repo-check 2>/dev/null`
+**Codex Agent (Agent tool, `subagent_type: "codex:codex-rescue"`):**
+Read-only (state it in the prompt), in the foreground: end the prompt with
+"Do NOT write any file: return the full result as your final message text. --wait. Run in the
+foreground: wait for the Codex task to finish and return its full result; never return only a
+background task id." Never `codex exec` or a `skill-codex` Skill call; the `block-old-codex`
+hook blocks both.
 
 ```
 # API Endpoint Inventory Scan
@@ -166,8 +170,12 @@ proposed fix.
 
 ### Group 2 -- Contract Consistency
 
-**Codex Agent (Skill tool):**
-Flags: `-m gpt-5.4-mini --config model_reasoning_effort="medium" --sandbox read-only --full-auto --skip-git-repo-check 2>/dev/null`
+**Codex Agent (Agent tool, `subagent_type: "codex:codex-rescue"`):**
+Read-only (state it in the prompt), in the foreground: end the prompt with
+"Do NOT write any file: return the full result as your final message text. --wait. Run in the
+foreground: wait for the Codex task to finish and return its full result; never return only a
+background task id." Never `codex exec` or a `skill-codex` Skill call; the `block-old-codex`
+hook blocks both.
 
 ```
 # API Contract Schema Scan

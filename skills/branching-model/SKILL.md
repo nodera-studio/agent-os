@@ -43,6 +43,11 @@ for `{{STAGING_BRANCH}}` / `{{PROD_BRANCH}}` below.
   referencing the PR (`PR #<n>` or the branch in title/content/tags). A pre-merge hook can enforce
   this — the code is preserved by the merge, but the *knowledge* is lost unless you write it. A
   one-line note is fine for a trivial PR.
+- **Owner waiver:** the owner can waive that memory for one PR by saying so in chat, e.g. "no
+  memory for PR #42" (it must name the PR). The `capture-before-merge` hook honours it only in the
+  main session, never in a subagent, and only from the owner's own message, not from tool output,
+  notifications or a compaction summary. On a waiver the hook asks the owner to confirm the merge
+  (a prompt even under `bypassPermissions`); record the waiver in the state file's decision log.
 - **Merge:** `gh pr merge <n> --squash`. Don't auto-delete the branch in the same step if you want
   deletion to stay a deliberate, post-capture step; delete it yourself once the PR is closed out.
 - **Ship to prod:** never push to `{{PROD_BRANCH}}` directly. Use the `promote-to-prod` skill —

@@ -16,4 +16,8 @@ Mode based on arguments:
 - `build` -> run `make ci-build` (production Docker builds only)
 - `tests` or `test` -> run `make ci-test` (unit + E2E tests only)
 
+Never run two copies of one test suite at once in one checkout (a concurrent build rewrites
+artefacts a running suite uses); the agent runs the unit/integration suite under
+`.claude/scripts/suite-lock.sh`, which makes a second run wait for the first.
+
 User's argument: $ARGUMENTS

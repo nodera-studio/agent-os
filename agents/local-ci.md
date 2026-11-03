@@ -27,8 +27,14 @@ CI workflow config) rather than guessing:
 | 2. Lint             | `{{LINT_CMD}}`        | Lint rules                            |
 | 3. Typecheck        | `{{TYPECHECK_CMD}}`   | Type errors across all workspaces     |
 | 4. Build            | `{{BUILD_CMD}}`       | Production build(s)                   |
-| 5. Unit/integration | `{{TEST_CMD}}`        | Unit + integration test suite         |
+| 5. Unit/integration | `bash .claude/scripts/suite-lock.sh {{TEST_CMD}}` | Unit + integration test suite |
 | 6. E2E (if present) | [project E2E command] | End-to-end suite (Playwright/Cypress) |
+
+Step 5 runs under `suite-lock.sh`, which holds the checkout's suite lock and waits while another
+run of the suite holds it (exit 75 after `HARNESS_SUITE_LOCK_WAIT` seconds, default 3600). Never
+run two copies of one test suite at once against one checkout's build output (another session's
+or agent's run included): a concurrent build rewrites artefacts the running suite uses, and the
+two race on shared ports, fixtures and caches.
 
 If unit/integration and E2E don't share DB/service state, run them **in parallel**
 using two separate Bash tool calls in the same message; otherwise run sequentially.
@@ -73,7 +79,7 @@ typecheck → build), then run the test steps **in parallel** if they're indepen
 {{BUILD_CMD}} 2>&1
 
 # Parallel (two Bash tool calls in one message), if independent:
-{{TEST_CMD}} 2>&1          # unit/integration
+bash .claude/scripts/suite-lock.sh {{TEST_CMD}} 2>&1   # unit/integration
 # [project's E2E command] 2>&1
 ```
 
