@@ -118,7 +118,7 @@ while IFS= read -r seg || [ -n "$seg" ]; do
   if printf '%s' "$seg" | grep -qE '\.env(\.[a-z._-]+)?' \
      && ! printf '%s' "$seg" | grep -qE '\.env(\.[a-z._-]*)?\.example' \
      && printf '%s' "$base" | grep -qE '^(cat|less|more|head|tail|grep|rg|bat|xxd|od|strings|awk|sed)$'; then
-    deny "Don't read .env / secret files from the shell. Use the secrets MCP (mcp__secrets__*) — secrets must never enter context. (.env.example templates are fine via the Read tool.)"
+    deny "Don't read .env / secret files from the shell. Use the secrets MCP (mcp__plugin_mnemosyne_secrets__*) — secrets must never enter context. (.env.example templates are fine via the Read tool.)"
   fi
 
   case "$base" in

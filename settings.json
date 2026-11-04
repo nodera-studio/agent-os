@@ -88,6 +88,10 @@
           },
           {
             "type": "command",
+            "command": ".claude/hooks/block-legacy-engines.sh"
+          },
+          {
+            "type": "command",
             "command": ".claude/hooks/steer-bash.sh"
           },
           {
@@ -102,6 +106,10 @@
           {
             "type": "command",
             "command": ".claude/hooks/block-old-codex.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/block-legacy-engines.sh"
           }
         ]
       },

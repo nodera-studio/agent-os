@@ -115,5 +115,81 @@ printf 'x\n' >"$P3/src/readme.md"
 check 'a non-code extension is ignored' '' "$(prettier_out "$P3/src/readme.md")"
 if grep -q 'pnpm\|rebuild-shared' "$HOOKS/prettier-on-edit.sh"; then check 'no pnpm assumption or dangling comment' clean dirty; else check 'no pnpm assumption or dangling comment' clean clean; fi
 
+# --- 11d: block-legacy-engines segments on the command word (AC-032, AC-033) ---
+legacy() { check "legacy-engines $1: $2" "$1" "$(bash_decision block-legacy-engines.sh "$2")"; }
+# codex exec as a command word
+legacy deny  'codex exec "fix the bug"'
+legacy deny  'cd /repo && codex exec -m x go'
+legacy deny  'echo hi | codex exec -'
+legacy deny  'timeout 30 codex exec x'
+legacy deny  'env FOO=1 /usr/local/bin/codex exec x'
+legacy deny  "sh -c 'codex exec x'"
+legacy deny  'bash -lc "cd x; codex exec y"'
+legacy deny  'x=$(codex exec y)'
+legacy deny  '(codex exec y)'
+legacy deny  'FOO=1 codex exec y'
+legacy deny  'echo ok; codex exec y'
+legacy deny  'git log | xargs codex exec'
+# bare omp as a command word
+legacy deny  'omp -p hello'
+legacy deny  'omp models'
+legacy deny  'HOME="$T" omp models'
+legacy deny  'env OMP_PROFILE=glen-harness-codex omp models'
+legacy deny  'nice -n 5 /usr/local/bin/omp x'
+legacy deny  'bash -c "omp models"'
+legacy deny  'ls && omp'
+# the same words as data: commit messages, echo, heredocs, quotes, comments, searches
+legacy allow 'git commit -m "docs: ban codex exec and bare omp"'
+legacy allow "git commit -m 'codex exec; omp x'"
+legacy allow 'echo "run omp models; codex exec is gone"'
+legacy allow "printf '%s\n' 'codex exec x'"
+legacy allow 'rg "codex exec" docs'
+legacy allow 'grep -rn "omp " .'
+legacy allow '# codex exec x'
+legacy allow 'ls # omp models'
+legacy allow "git commit -m \"\$(cat <<'EOF'
+docs: mention codex exec
+omp models is denied
+EOF
+)\""
+legacy allow "cat <<'EOF' > notes.md
+codex exec foo
+omp bar
+EOF
+echo done"
+legacy allow 'cat <<-EOF
+	omp x
+	EOF'
+legacy deny "cat <<'EOF' > notes.md
+data only
+EOF
+omp models"
+# allowed forms of the real tools
+legacy allow 'codex --version'
+legacy allow 'codex login'
+legacy allow 'node ~/.claude/plugins/codex/scripts/codex-companion.mjs task "x"'
+legacy allow 'bash .claude/scripts/omp-engine.sh review --engine omp:codex --role review --uncommitted --out /tmp/o'
+legacy allow 'bash scripts/omp-engine.sh probe'
+legacy allow 'omp --version'
+legacy allow 'omp --help'
+legacy allow 'command -v omp'
+legacy allow 'which omp'
+legacy allow 'ls /usr/local/bin'
+skill_decision() {
+  local out got
+  out=$(jq -n --arg s "$1" '{tool_name:"Skill",tool_input:{skill:$s}}' | /bin/bash "$HOOKS/block-legacy-engines.sh" 2>/dev/null) || true
+  got=$(printf '%s' "$out" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null) || true
+  printf '%s' "${got:-allow}"
+}
+check 'legacy-engines skill: skill-codex:codex denied' deny "$(skill_decision skill-codex:codex)"
+check 'legacy-engines skill: another skill allowed' allow "$(skill_decision omp)"
+check 'non-Bash tools are ignored' '' "$(jq -n '{tool_name:"Edit",tool_input:{file_path:"codex exec"}}' | /bin/bash "$HOOKS/block-legacy-engines.sh")"
+check 'settings.json wires it for Bash' 1 "$(jq '[.hooks.PreToolUse[] | select(.matcher == "Bash") | .hooks[] | select(.command | endswith("block-legacy-engines.sh"))] | length' "$ROOT/settings.json")"
+check 'settings.json wires it for Skill' 1 "$(jq '[.hooks.PreToolUse[] | select(.matcher == "Skill") | .hooks[] | select(.command | endswith("block-legacy-engines.sh"))] | length' "$ROOT/settings.json")"
+check 'block-old-codex.sh stays wired until the pack move' 2 "$(jq '[.hooks.PreToolUse[] | .hooks[] | select(.command | endswith("block-old-codex.sh"))] | length' "$ROOT/settings.json")"
+
+check 'hook advice names the plugin tool names, not the bare mcp__memory__/mcp__secrets__ ones' 0 \
+  "$(grep -c 'mcp__memory__\|mcp__secrets__' "$HOOKS"/*.sh | awk -F: '{s += $2} END {print s + 0}')"
+
 printf '%d cases, %d failures\n' "$CASES" "$FAILURES"
 [ "$FAILURES" -eq 0 ]
