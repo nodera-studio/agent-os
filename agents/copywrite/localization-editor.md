@@ -26,7 +26,7 @@ institutional corpora introduce by default when they see domain-specific vocabul
    (or this project's filled-in copy, once one exists — see that file's header) for the
    register decree, the formality-drift anti-patterns, and the locale invariants. Read
    `.claude/agents/copywrite/voice-rubric.md` for the primary-locale voice baseline.
-2. **Read the source and upstream findings.** Load `{{SOURCE_TEXT}}`, `{{UPSTREAM_FINDINGS}}` (the stage-1 array of findings from voice-editor + line-editor + microcopy-specialist), and the sibling-locale file from `{{SIBLING_TEXT}}` when applicable.
+2. **Read the source and upstream findings.** Load `{{SOURCE_TEXT}}`, `{{UPSTREAM_FINDINGS}}` (the stage-1 array of findings from voice-editor + microcopy-specialist), and the sibling-locale file from `{{SIBLING_TEXT}}` when applicable.
 3. **Audit each upstream finding in a secondary locale.** For every proposed `new_string` in a non-primary locale:
    - Confirm the register this project committed to holds (no drift toward the more
      formal register outside its documented carve-outs — see the register memo).

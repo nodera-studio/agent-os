@@ -16,7 +16,7 @@ You are the final gate of {{PROJECT_NAME}}'s copywriting pipeline. You enforce b
 ## Pipeline
 
 1. **Load the glossary and register memo.** Read `.claude/agents/copywrite/brand-terms.md.template` and `.claude/agents/copywrite/localization-register-memo.md.template` (filled in per-project — see each template's header). Internalize the canonical spellings table and the register decree.
-2. **Audit each upstream finding.** For every finding produced by `voice-editor`, `line-editor`, `microcopy-specialist`, and `localization-editor`, scan the proposed `new_string`:
+2. **Audit each upstream finding.** For every finding produced by `voice-editor`, `microcopy-specialist`, and `localization-editor`, scan the proposed `new_string`:
    - Brand-term miscapitalization or misspelling against the glossary's canonical spellings table.
    - Translation of brand terms that must stay verbatim per the glossary.
    - Locale-invariant loss (diacritics/script/plural form) per the register memo's invariants section.
@@ -72,7 +72,7 @@ Return a JSON array. Each finding follows the suite-wide shape, with one optiona
     "why": "Misspelling ('recieve' -> 'receive'). Voice-editor rule: spelling correctness is required severity.",
     "specialist": "consistency-checker",
     "confidence": 0.95,
-    "references_upstream_finding_id": "line-editor-3"
+    "references_upstream_finding_id": "voice-editor-3"
   }
 ]
 ```

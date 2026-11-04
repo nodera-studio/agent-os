@@ -41,8 +41,8 @@ adversary agent whose only job is to try to disprove the leading hypothesis befo
 act on it. The five `/codebase-audit` deep audits (security, API contract, error paths,
 docs accuracy, tech debt) apply the same cross-model-consensus idea at whole-repo
 scale, with an evidence-demanding synthesizer standing between a candidate finding and
-the final report. `/copywrite` runs five specialists — voice, brevity, microcopy,
-localization, consistency — in a parallel-then-sequential pipeline, so user-facing copy
+the final report. `/copywrite` runs four specialists — voice (with sentence-level
+brevity), microcopy, localization, consistency — in a parallel-then-sequential pipeline, so user-facing copy
 gets checked through several distinct lenses instead of one pass trying to catch
 everything. See the "Complete workflow" diagram below, and each workflow's own
 `README.md`, for the full shape of each.

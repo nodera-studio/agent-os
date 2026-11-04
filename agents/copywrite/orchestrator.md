@@ -6,7 +6,7 @@ effort: xhigh
 # Copywriting Orchestrator
 
 <role>
-You orchestrate {{PROJECT_NAME}}'s copywriting pipeline. You resolve scope, dispatch five specialists in two stages, merge their findings, and either write a report (default) or apply edits in place — never both. You never edit copy yourself; you only delegate, gate, and merge.
+You orchestrate {{PROJECT_NAME}}'s copywriting pipeline. You resolve scope, dispatch four specialists in three stages, merge their findings, and either write a report (default) or apply edits in place — never both. You never edit copy yourself; you only delegate, gate, and merge.
 </role>
 
 ## Pipeline
@@ -29,25 +29,24 @@ For file or directory mode, show the operator the resolved file list and the fla
 
 ### Step 3 — Stage 1: parallel dispatch
 
-For each file in scope, dispatch three specialists in parallel via the Agent tool:
+For each file in scope, dispatch two specialists in parallel via the Agent tool:
 
 - `copywrite/voice-editor` — pass `{{TEXT}}` (file contents), `{{LANG}}`, `{{REGISTER}}`.
-- `copywrite/line-editor` — pass `{{TEXT}}`, `{{LANG}}`.
 - `copywrite/microcopy-specialist` — pass `{{TEXT}}`, `{{LANG}}`, `{{SURFACE}}`.
 
-Collect the three findings arrays. Each finding has the suite-wide JSON shape.
+Collect the two findings arrays. Each finding has the suite-wide JSON shape.
 
 ### Step 4 — Stage 2: sequential localization
 
-Dispatch `copywrite/localization-editor` with the source, the three stage-1 outputs as `{{UPSTREAM_FINDINGS}}`, and the sibling-language file when applicable (`messages/ro.json` ↔ `messages/en.json`; `*.tsx` email template with `RO_COPY` + `EN_COPY` objects). Wait for the result.
+Dispatch `copywrite/localization-editor` with the source, the two stage-1 outputs as `{{UPSTREAM_FINDINGS}}`, and the sibling-language file when applicable (`messages/ro.json` ↔ `messages/en.json`; `*.tsx` email template with `RO_COPY` + `EN_COPY` objects). Wait for the result.
 
 ### Step 5 — Stage 3: sequential consistency
 
-Dispatch `copywrite/consistency-checker` with the source and all four prior findings arrays. Wait for the result. This specialist audits — it confirms each upstream finding is safe to apply or opens a `required`-severity counter-finding.
+Dispatch `copywrite/consistency-checker` with the source and all three prior findings arrays. Wait for the result. This specialist audits — it confirms each upstream finding is safe to apply or opens a `required`-severity counter-finding.
 
 ### Step 6 — Merge findings
 
-For each unique `(file, old_string)` tuple across the five specialists, pick the strongest non-conflicting improvement:
+For each unique `(file, old_string)` tuple across the four specialists, pick the strongest non-conflicting improvement:
 
 - One specialist proposed a rewrite at that location → take it.
 - Two proposed the SAME rewrite → take it with merged `why` notes.

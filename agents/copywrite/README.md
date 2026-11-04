@@ -4,7 +4,7 @@
 
 A Claude Code agent suite that polishes {{PROJECT_NAME}}'s user-facing copy to Apple
 voice — adapted to this project's locale(s) and register. One orchestrator dispatches
-five specialists in a parallel-then-sequential pipeline and either writes a report
+four specialists in a parallel-then-sequential pipeline and either writes a report
 (default) or applies edits in place (`--apply`). Invoked via the `/copywrite` slash
 command.
 
@@ -19,16 +19,14 @@ register decisions (see each file's header), then reference them by their real n
 | File | What it is | Who loads it |
 |---|---|---|
 | `orchestrator.md` | Pipeline manager — dispatch, merge, write | Invoked by `/copywrite` slash command |
-| `voice-editor.md` | Apple voice transfer specialist | Dispatched by orchestrator (stage 1) |
-| `line-editor.md` | Sentence-level surgery specialist | Dispatched by orchestrator (stage 1) |
-| `microcopy-specialist.md` | Buttons, toasts, errors, empty states, ICU plurals | Dispatched by orchestrator (stage 1) |
+| `voice-editor.md` | Apple voice transfer and sentence-level surgery specialist | Dispatched by orchestrator (stage 1) |
+| `microcopy-specialist.md` | Buttons, toasts, errors, empty states, ICU plurals; carries the microcopy pattern catalogue | Dispatched by orchestrator (stage 1) |
 | `localization-editor.md` | Cross-locale register and cultural adaptation | Dispatched by orchestrator (stage 2) |
 | `consistency-checker.md` | Glossary + parity + diacritic/script gate | Dispatched by orchestrator (stage 3) |
 | `apple-style-guide.md` | Unabridged Apple Style Guide | `voice-editor` only |
 | `voice-rubric.md` | 9-rule distillation of the Apple guide | Every specialist except `voice-editor` |
 | `localization-register-memo.md.template` | Skeleton: register decision + formality-drift pitfalls + locale invariants — fill in per project | `localization-editor` and `consistency-checker` |
 | `brand-terms.md.template` | Skeleton: canonical spellings glossary — fill in per project | `consistency-checker` |
-| `microcopy-patterns.md` | Patterns for buttons / errors / toasts / empty states / labels | `microcopy-specialist` |
 
 ## Invocation cheatsheet
 
@@ -53,7 +51,6 @@ flowchart TD
     subgraph S1["Stage 1 — parallel"]
         direction LR
         VE["voice-editor"]
-        LE["line-editor"]
         MS["microcopy-specialist"]
     end
 

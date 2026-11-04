@@ -85,8 +85,7 @@ workflow below) once to adapt the templated files to that project's actual stack
 │
 └── copywrite/                       # Workflow: Polish user-facing copy to Apple voice
     ├── orchestrator.md              # Pipeline manager — dispatch, merge, gate, write
-    ├── voice-editor.md              # Apple voice transfer (loads full Apple guide)
-    ├── line-editor.md               # Sentence-level surgery
+    ├── voice-editor.md              # Apple voice transfer + sentence-level surgery (loads full Apple guide)
     ├── microcopy-specialist.md      # Buttons, toasts, errors, empty states, ICU plural quarantine
     ├── localization-editor.md       # Cross-locale cultural adaptation, defends the committed register
     ├── consistency-checker.md       # Glossary, cross-locale parity, diacritic/script gate
@@ -94,7 +93,6 @@ workflow below) once to adapt the templated files to that project's actual stack
     ├── voice-rubric.md              # 9-rule distillation of the Apple guide
     ├── localization-register-memo.md.template  # SKELETON — fill in this project's register decision + formality pitfalls + locale invariants
     ├── brand-terms.md.template                 # SKELETON — fill in this project's canonical spellings glossary
-    ├── microcopy-patterns.md        # Buttons / errors / toasts / empty states / form labels (generic examples — swap in real product vocabulary)
     └── README.md                    # Suite overview + invocation cheatsheet + pipeline diagram
 
 └── orchestrator/                    # Workflow: /orchestrate mode -- dispatch-only + gap tracking
@@ -213,10 +211,9 @@ generic mechanism and no real per-project vocabulary baked in.
 
 | Agent                  | Mission                                                                                             |
 | ----------------------- | ---------------------------------------------------------------------------------------------------- |
-| `orchestrator`         | Resolve scope, dispatch parallel triad, sequence localization + consistency, merge, gate, write     |
-| `voice-editor`         | Apply Apple voice — clarity, warmth, second-person, active voice. Loads the full Apple Style Guide. |
-| `line-editor`          | Sentence-level surgery — cut filler, flip passive to active, tighten cadence                        |
-| `microcopy-specialist` | Buttons, toasts, errors, empty states, form labels; quarantines ICU plural strings                  |
+| `orchestrator`         | Resolve scope, dispatch parallel pair, sequence localization + consistency, merge, gate, write     |
+| `voice-editor`         | Apply Apple voice — clarity, warmth, second-person, active voice; sentence-level surgery (filler, passive, long lines). Loads the full Apple Style Guide. |
+| `microcopy-specialist` | Buttons, toasts, errors, empty states, form labels; quarantines ICU plural strings; carries the pattern catalogue |
 | `localization-editor`  | Cross-locale cultural adaptation; defends this project's committed register against formality drift |
 | `consistency-checker`  | Glossary enforcement, cross-locale parity, diacritic/script survival gate                           |
 
