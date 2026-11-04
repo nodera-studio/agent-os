@@ -145,14 +145,14 @@ autonomy is the point of this mode.
 3. **Implement.** Invoke `/implement` for the wave. Let it own its internal gates: the
    loop of the Implementer `bash .claude/scripts/routing.sh implementation` names
    (`impl-implementer` or `impl-coder-codex`) and `scripts/quality-gate.sh`, the local
-   `/code-review` gate (1 Claude ‖ 1 Codex pass, 2-vote), the conformance tail and the docs
+   lean `/review-implementation --lean` gate (1 Claude ‖ 1 Codex pass, 2-vote), the conformance tail and the docs
    updater.
    - **File names.** Saved review or plan files per engine are named `<engine>-review.md` /
      `<engine>-plan.md` (e.g. `.claude/plans/reviews/<wave>/claude-review.md`), never
      `claude.md`: Claude Code loads any `claude.md` as a nested `CLAUDE.md` on macOS's
      case-insensitive filesystem.
    - **Codex unavailable.** If the Codex review pass hits a capacity or rate error, the gate
-     retries once and then runs single-engine (see `.claude/commands/code-review.md`); record
+     retries once and then runs single-engine (see `.claude/commands/review-implementation.md`, `--lean`); record
      that in the wave-end comment.
    - **UI routing.** Design-heavy web UI (landing pages, visual components) is built by the
      agent `bash .claude/scripts/routing.sh ui` names (`impl-coder-ui`,
@@ -407,7 +407,7 @@ parallel:
    it prints `claude`), not necessarily the Implementer `routing.sh implementation` names,
    since it is merge resolution, not new product code (`implementation/orchestrator.md` →
    Role 1). When the two differ, record it as a routing deviation in the decision log and the
-   PR body. Then re-run the gate and tests and a scoped Claude ‖ Codex `/code-review` of the
+   PR body. Then re-run the gate and tests and a scoped Claude ‖ Codex `/review-implementation --lean` of the
    resolved files.
 
 When `.claude/plans/` is git-ignored, a new worktree does not contain the wave's plan. Every

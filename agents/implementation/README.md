@@ -37,9 +37,9 @@ changes — fewer gates, same quality bar — dispatched by `/implement-quick`.
    when `routing.sh ui` names it: same fused loop with the frontend's build/test commands,
    the frontend-design skill, and a required browser check against the named design
    reference.
-3. **Review (fresh context)** — by default the lean `/code-review` gate: a Claude pass ‖ a
+3. **Review (fresh context)** — by default the lean gate (`/review-implementation --lean`): a Claude pass ‖ a
    Codex pass ‖ the optional omp pass (via the `glen` CLI, when `omp-engine.sh probe` is
-   ready), merged by 2-vote consensus (omp-only findings are advisory until verified; omp
+   ready), merged by the synthesizer's 2-vote consensus (omp-only findings are advisory until verified; omp
    plus one other engine is two votes; a skipped probe is recorded with its reason, and
    Claude ‖ Codex still run). A high-risk diff, or one where CodeRabbit is installed, runs the
    triple-engine review instead: Claude comprehensive reviewer ‖ `codex review` ‖ CodeRabbit

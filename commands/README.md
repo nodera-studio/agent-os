@@ -11,8 +11,7 @@ drives.
 | `/plan-implementation` | `agents/plan/orchestrator.md` | Explore, research, dual-engine architect + judge, dual-engine plan + judge — see `agents/plan/README.md` |
 | `/implement` | `agents/implementation/orchestrator.md` | Plan → routed Implementer (`routing.sh implementation`, Claude by default) → triple-engine review → docs + conformance tail → re-index — see `agents/implementation/README.md` |
 | `/implement-quick` | `agents/implementation/orchestrator-quick.md` | Same shape, fewer gates, for small/low-risk changes |
-| `/review-implementation` | `agents/review-implementation/orchestrator.md` | Standalone triple-engine review (+ optional omp) + synthesizer on the current branch |
-| `/code-review` | `agents/implementation/code-review.md` | Lean 2-engine version of the review gate, runnable standalone |
+| `/review-implementation` | `agents/review-implementation/orchestrator.md` | Standalone triple-engine review (+ optional omp) + synthesizer on the current branch; `--lean` runs the lean 2-engine (+ omp) version of the review gate on the current diff |
 | `/respond-to-review` | `agents/respond-to-review.md` | Classify PR review comments, verify claims, draft responses, apply fixes |
 | `/run-ci` | `agents/local-ci.md` | Full local CI pipeline in Docker (format, lint, typecheck, build, test) |
 

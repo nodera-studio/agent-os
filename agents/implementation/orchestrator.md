@@ -446,16 +446,15 @@ the plan's `<task>` XML — never the previous Implementer's transcript.
 ### Role 2 — Review (fresh context, risk selects the gate)
 
 A fresh, independent review of the diff + spec — **never** the Implementer's
-transcript. By default run the lean **`/code-review` gate** (see
-`.claude/commands/code-review.md`): the Claude pass (`implementation/code-review.md`)
-‖ a Codex pass (`codex:codex-rescue`) ‖ the optional omp engine (`omp-engine.sh review`, when
+transcript. By default run the lean gate, **`/review-implementation --lean`** (see
+`.claude/commands/review-implementation.md`): the Claude pass (`review/claude-reviewer.md`,
+`depth: lean`) ‖ a Codex pass (`codex:codex-rescue`) ‖ the optional omp engine (`omp-engine.sh review`, when
 `bash .claude/scripts/omp-engine.sh probe` is ready; exit 3 or `GLEN_OMP_ENGINE=off` skips it
 with a one-line "omp skipped: <reason>" note, and Claude ‖ Codex still run) in ONE message,
-merged by 2-vote consensus into one must-fix / recommended / notes report. omp-only findings
-are advisory until a verifier confirms them against the code (an omp-only CRITICAL or HIGH
-goes to a fresh verifier); omp plus Claude or Codex on the same defect is two votes; omp
-votes only with status `ok` (`code-review.md` step 3). The single-vote CRITICAL and
-platform-only-CI rules stay with Claude and Codex. No lint/type/style re-check — the
+merged by the synthesizer (`review-implementation/synthesizer.md`, `mode: lean`, the only
+merge for the lean and the triple gate) into one must-fix / recommended / notes report. Its
+2-vote rules, and the verifier step for omp-only CRITICAL or HIGH findings, are in
+`review-implementation.md` step 3. No lint/type/style re-check — the
 deterministic gate already enforced that inside the Implementer; the engines hunt
 real bugs.
 
@@ -499,7 +498,7 @@ and report "omp: no result by the gate deadline"; never let a late result change
 already given. A non-zero exit or a status other than `ok` means omp did not run: name its
 `.reason` in the Report and continue with Claude ‖ Codex. omp never blocks the gate.
 Command flags (`--uncommitted` or `--base <base>`, `--out`, `--scope`) and recovery of a
-killed run are in `code-review.md` step 2 and `.claude/skills/omp/SKILL.md`.
+killed run are in `review-implementation.md` (lean gate, step 2) and `.claude/skills/omp/SKILL.md`.
 
 **Review file names.** If you save the passes to disk, name them `claude-review.md`,
 `codex-review.md` and `omp-review.txt` (plan files `<engine>-plan.md`), never `claude.md`: on macOS's
@@ -509,13 +508,13 @@ of creating a file, including shell redirects and `mv`. The `guard-claude-md-nam
 hook refuses such a name on the Write tool only.
 
 Escalate to the **triple-engine review block** (see
-`.claude/agents/review-implementation/orchestrator.md`: Claude comprehensive reviewer
+`.claude/agents/review-implementation/orchestrator.md`: Claude reviewer (`depth: full`)
 ‖ `codex review` ‖ `coderabbit review --plain --agent`, plus the omp engine when its probe
 is ready → synthesizer) only when `command -v coderabbit` succeeds or the diff is high-risk (the risk heuristic
 `scripts/quick-classify.sh` uses: this project's risk keywords and protected paths). When
 CodeRabbit is not installed, a high-risk diff runs that block with its available engines
 and says so, naming omp's skip reason when the probe is skipped. Every diff that stays on
-`/code-review` brings omp in as its third pass whenever the probe is ready.
+the lean gate brings omp in as its third pass whenever the probe is ready.
 
 Use the default-branch merge-base as `BASE` (no prompt — this is the in-pipeline
 path). If the report has must-fix items, dispatch a **fresh**

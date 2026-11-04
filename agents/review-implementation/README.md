@@ -10,7 +10,7 @@ flowchart TD
 
     subgraph ENGINES["Three engines review the SAME diff in parallel — blind to each other"]
         direction LR
-        E1["Claude<br/>comprehensive-review.md<br/>all 6 domains, one pass"]
+        E1["Claude<br/>review/claude-reviewer.md<br/>(depth: full) all 6 domains, one pass"]
         E2["Codex<br/>codex review --base<br/>(never codex exec)"]
         E3["CodeRabbit<br/>coderabbit review<br/>--plain --agent"]
         E4["omp (optional, read-only)<br/>omp-engine.sh review"]
@@ -22,7 +22,8 @@ flowchart TD
 ```
 
 Total: 4 agents (3 engines + synthesizer), plus omp as an optional extra engine — no
-multi-pass voting, no shuffled diffs.
+multi-pass voting, no shuffled diffs. The synthesizer is the only merge: it also folds the lean
+gate (`/review-implementation --lean`: Claude `depth: lean` ‖ Codex ‖ omp) by 2-vote consensus.
 
 omp runs when `omp-engine.sh probe` passes; otherwise the report says it was skipped
 and why (exit 3 = skip, one line) and the run continues with the other engines.

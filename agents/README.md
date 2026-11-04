@@ -40,7 +40,6 @@ workflow below) once to adapt the templated files to that project's actual stack
 │   ├── coder-codex.md               # Role 1 — the fused Implementer, run in Codex (task --json --write), only when `routing.sh implementation` prints `codex`; routing picks one of the two
 │   ├── coder-ui.md                  # Role 1 for design-heavy web UI — Claude UI Implementer, frontend-design skill, browser check vs the design reference (`routing.sh ui`)
 │   ├── implementer.md               # Role 1 — the fused Implementer (agent `impl-implementer`), run in Claude (the default: `routing.sh implementation` prints `claude`); also the canonical loop envelope (coder-codex.md forwards it to Codex)
-│   ├── code-review.md               # Role 2 — Claude reviewer (‖ Codex via codex:codex-rescue), 2-vote
 │   ├── docs-updater.md              # Role 3 (tail) — updates docs after implementation
 │   └── conformance-test-writer.md   # Role 3 (tail) — author-blind, plan-derived conformance gate
 │
@@ -52,10 +51,12 @@ workflow below) once to adapt the templated files to that project's actual stack
 │   ├── judge-selector.md            # Select-then-graft: picks the stronger of two architect/planner passes
 │   └── planner.md                   # Detailed plan with backward verification + wave splitting
 │
+├── review/                          # The Claude reviewer shared by both review gates
+│   └── claude-reviewer.md           # `depth: lean` (Role 2 gate, one full-category pass) | `depth: full` (+ six-domain appendix, triple-engine engine)
+│
 ├── review-implementation/           # Workflow: Self-review (triple-engine + synthesizer)
 │   ├── orchestrator.md              # Branch-aware; 3 engines (Claude ‖ codex review ‖ CodeRabbit or equivalent) + optional omp → synthesizer
-│   ├── comprehensive-review.md      # Claude engine — all 6 domains in one pass
-│   └── synthesizer.md               # Folds 3 engines: dedup + NEW/MODIFIED/PRE-EXISTING + fix plan + memory decision
+│   └── synthesizer.md               # The only merge (triple and lean): dedup + NEW/MODIFIED/PRE-EXISTING + fix plan + memory decision
 │
 ├── debug/                           # Workflow: Heavy investigation
 │   ├── investigator.md              # Claude + Codex (+ optional omp) — root cause analysis, log tracing
@@ -254,8 +255,7 @@ explicitly approved. See `agents/orchestrator/README.md` for the full loop diagr
 | `/plan-implementation`   | Plan before coding                                                                | `plan/orchestrator.md`                                                                        |
 | `/implement`             | Build features/fixes                                                              | `implementation/orchestrator.md` (includes a lean internal Claude‖Codex code-review gate)     |
 | `/implement-quick`       | Fast path for small, low-risk changes                                            | `implementation/orchestrator-quick.md`                                                         |
-| `/review-implementation` | Self-review (heavy, standalone)                                                   | `review-implementation/orchestrator.md`                                                       |
-| `/code-review`           | Lean dual-engine review on current diff (standalone form of `/implement` Step 13) | `implementation/code-review.md` (Claude) ‖ `codex:codex-rescue`                               |
+| `/review-implementation` | Self-review (heavy, standalone); `--lean` is the lean dual-engine gate on the current diff (standalone form of `/implement` Step 13) | `review-implementation/orchestrator.md`; `--lean`: `review/claude-reviewer.md` (`depth: lean`) ‖ `codex:codex-rescue`, merged by `review-implementation/synthesizer.md` |
 | `/codex`                 | Dispatch a task to OpenAI Codex                                                   | `.claude/skills/codex/SKILL.md` → `codex:codex-rescue` agent                                  |
 | `/deep-debug`            | Heavy investigation                                                               | `debug/investigator.md` + `debug/adversary.md` (+ `debug/queue.md` for async-pipeline bugs)   |
 | `/run-ci`                | CI verification                                                                   | `local-ci.md`                                                                                 |
@@ -319,7 +319,7 @@ explicitly approved. See `agents/orchestrator/README.md` for the full loop diagr
 - Provenance labelling: each finding tagged NEW / MODIFIED / PRE-EXISTING vs the merge-base
 - Produces an ordered fix plan for the Implementer + a deliberate memory-write decision
 - No engine re-checks lint/type/style — the deterministic gate owns that
-- Fill in `comprehensive-review.md`'s and `code-review.md`'s Project Conventions blocks with this project's actual conventions before relying on either gate
+- Fill in `review/claude-reviewer.md`'s Project Conventions block with this project's actual conventions before relying on either gate
 
 **Codebase audit two-tier system:**
 
@@ -353,5 +353,5 @@ All review agents produce findings in this format:
 - Model rides the session via `model: inherit` for every frontier role; mechanical/summarization roles stay pinned `sonnet`. Don't pin a frontier agent to a specific model — inherit is what lets the suite follow the session. See the Engine strategy note at the top.
 - Agents read this project's own `CLAUDE.md` dynamically — conventions live there, not hardcoded into the agent files.
 - Several files ship as explicit templates (`{{TOKEN}}` placeholders, `.template` suffixes, or a "STUB — fill this in" header): `bootstrap/orchestrator.md`'s target is `CLAUDE.md`/`settings.json`; `codebase/security-audit/domain-integrity.md`; `copywrite/brand-terms.md.template` and `copywrite/localization-register-memo.md.template`. Fill these in per-project before relying on the agents that read them.
-- Stack-specific checklists (`comprehensive-review.md`, `code-review.md`'s Project Conventions blocks, the error-audit agents' `<context>`/`<conventions>` blocks) ship as placeholder shapes — fill them in with this project's real conventions; project-specific invariants belong in this project's own `.claude/rules/` files, referenced from these agents, not hand-copied into every agent.
+- Stack-specific checklists (`review/claude-reviewer.md`'s Project Conventions block, the error-audit agents' `<context>`/`<conventions>` blocks) ship as placeholder shapes — fill them in with this project's real conventions; project-specific invariants belong in this project's own `.claude/rules/` files, referenced from these agents, not hand-copied into every agent.
 - Each agent is standalone — orchestrators are convenience, any specialist can be invoked directly

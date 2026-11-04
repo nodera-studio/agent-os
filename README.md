@@ -150,7 +150,7 @@ produce the same quality bar; the difference is how much you want to watch.
   investigation), and audits (security, API contract, docs accuracy, tech debt).
 - **Commands** (`commands/`) — the slash-command entry points that kick off those
   agent workflows: `/plan-implementation`, `/implement`, `/review-implementation`,
-  `/code-review`, `/deep-debug`, `/research`, `/security-audit`, `/api-audit`,
+  `/deep-debug`, `/research`, `/security-audit`, `/api-audit`,
   `/docs-audit`, `/tech-debt-audit`, `/codebase-audit`, `/copywrite`, and more.
 - **Skills** (`skills/`) — reusable, trigger-activated capabilities (e.g.
   `/playwright-cli`, `/branching-model`, `/exa`, `/gh`) invoked automatically when

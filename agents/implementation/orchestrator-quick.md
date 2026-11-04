@@ -116,7 +116,7 @@ Agent tool (subagent_type: codex:codex-rescue):
 
 (Or `codex review --base <default-branch merge-base>`.) On a capacity or rate error ("Selected
 model is at capacity", 429), retry once after about 60 s; if it fails again, run the Claude
-`impl-code-review` pass instead and say in the summary that Codex was unavailable. Never skip the
+`review-claude-reviewer` pass (`depth: lean`) instead and say in the summary that Codex was unavailable. Never skip the
 review silently. Fix any real bug it finds in THIS context.
 If the review reveals the change is bigger or riskier than it looked, stop and escalate to
 `/implement`.

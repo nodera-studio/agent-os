@@ -6,7 +6,7 @@ model: inherit
 
 <role>
 You drive an independent review of authored changes before a PR. Three engines
-review the same diff blind to one another — the Claude comprehensive reviewer, Codex
+review the same diff blind to one another — the Claude reviewer (`depth: full`), Codex
 (`codex review`), and CodeRabbit — then a fourth Claude agent (the synthesizer) folds
 their findings into one deduplicated, provenance-labelled report + an ordered fix
 plan. You run in the MAIN Claude session: you dispatch the Claude reviewer and the
@@ -16,7 +16,9 @@ through the `glen` CLI, `.claude/scripts/omp-engine.sh`).
 
 This same block is used two ways: standalone via `/review-implementation` (heavier,
 whole-branch), and inside `/implement` as Role 2 (a single feature's diff). The
-machinery is identical; only the scope and what happens to the fix plan differ.
+machinery is identical; only the scope and what happens to the fix plan differ. The lean form
+of the gate (`/review-implementation --lean`: Claude `depth: lean` ‖ Codex ‖ omp) is in
+`.claude/commands/review-implementation.md` and merges through the same synthesizer.
 </role>
 
 **Done when:** the synthesizer's unified report + fix plan exists. Standalone → hand
@@ -46,7 +48,7 @@ Note which domains the changed files touch (frontend `{{FRONTEND_DIR}}/**`, back
 `{{BACKEND_DIR}}/**`, db/schema + migrations, background jobs, shared `{{SHARED_DIR}}/**`,
 infra `Dockerfile*` / `docker-compose*` / build config — adapt to this project's actual
 layout). This focuses the Claude reviewer; it no longer selects specialist agents (the
-comprehensive reviewer covers all six domains).
+`depth: full` Claude reviewer covers all six domains).
 
 ## Step 3 — Pre-flight (graceful degradation)
 
@@ -76,7 +78,7 @@ exclude its already-committed changes from review.
 
 **Claude engine** (Agent tool):
 ```
-prompt: "Read .claude/agents/review-implementation/comprehensive-review.md and follow it.
+prompt: "Read .claude/agents/review/claude-reviewer.md and follow it with depth: full.
          Review the authored changes vs {BASE} (merge-base {MERGE_BASE}). Changed files:
          {list}. Scope/domains touched: {scope}. Report every finding with severity +
          confidence + file:line trace."
@@ -129,7 +131,7 @@ omp traces code only — it cannot run or observe UI/runtime output.
 Dispatch the synthesizer (Agent tool) with the three outputs + provenance inputs:
 ```
 prompt: "Read .claude/agents/review-implementation/synthesizer.md and follow it.
-         claude_review: {claude output}. codex_review: {reports/codex-review.txt}.
+         mode: triple. claude_review: {claude output}. codex_review: {reports/codex-review.txt}.
          coderabbit_review: {reports/coderabbit-review.txt}.
          omp_review: {reports/omp-review.txt}.
          omp_status: {.status}, omp_reason: {.reason}, omp_model: {.model},
