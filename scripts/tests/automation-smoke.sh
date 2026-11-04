@@ -712,6 +712,57 @@ EOS
   unset STUB_GH_DIR
 }
 
+# ===================================================================== mnemosyne/capture-findings.sh
+suite_capture() {
+  local C="$SCRIPTS/mnemosyne/capture-findings.sh" W="$TMP/capture" out rc recs
+  mkdir -p "$W"
+  cat >"$W/findings.json" <<'EOS'
+[{"finding":"  Missing  tenant\nfilter in list() ","category":"Tenant Isolation","file":"./apps/api/a.ts:42","must_fix":true,"engine":"codex"},
+ {"text":"Rename var","file":"b.ts"},
+ {"description":"Old bug","file":"c.ts","pre_existing":true},
+ {"finding":"Dropped idea","action":"dismissed","file":"d.ts"},
+ {"finding":"","file":"e.ts"},
+ {"finding":"Odd action","action":"bogus","must_fix":true}]
+EOS
+  out="$(bash "$C" --session s1 --source synthesizer --commit abc1234 --input "$W/findings.json" --dry-run)"; rc=$?
+  eq "capture: dry-run exits 0 and prints four records" "$rc:$(printf '%s\n' "$out" | grep -c .)" "0:4"
+  recs="$(printf '%s\n' "$out" | jq -s .)"
+  eq "capture: text is whitespace-collapsed" "$(jqv "$recs" '.[0].finding_text')" "Missing tenant filter in list()"
+  eq "capture: category is kebab-cased, file loses ./ and :line" "$(jqv "$recs" '.[0].category + "|" + .[0].file')" "tenant-isolation|apps/api/a.ts"
+  eq "capture: must_fix maps to action must_fix, accepted true" "$(jqv "$recs" '.[0].action + ":" + (.[0].accepted | tostring)')" "must_fix:true"
+  eq "capture: no flag maps to note, accepted false" "$(jqv "$recs" '.[1].action + ":" + (.[1].accepted | tostring)')" "note:false"
+  eq "capture: an explicit dismissed is kept" "$(jqv "$recs" '.[2].action')" dismissed
+  eq "capture: an invalid action falls back to must_fix when flagged" "$(jqv "$recs" '.[3].action')" must_fix
+  eq "capture: source, engine, session and commit are stamped" "$(jqv "$recs" '.[0].source + "|" + .[0].engine + "|" + .[0].session_id + "|" + .[0].commit_sha')" "synthesizer|codex|s1|abc1234"
+  eq "capture: the default engine is claude and the default category uncategorised" "$(jqv "$recs" '.[1].engine + "|" + .[1].category')" "claude|uncategorised"
+
+  # line-per-record input on stdin, sent through a stub recording command
+  cat >"$W/rec.sh" <<'EOS'
+#!/bin/bash
+cat >"$REC_OUT"
+echo "args: $*" >"$REC_OUT.args"
+[ -z "${REC_FAIL:-}" ] || { echo "ledger down" >&2; exit 1; }
+EOS
+  chmod +x "$W/rec.sh"
+  export REC_OUT="$W/received.jsonl"
+  printf '{"finding":"one","must_fix":true}\n{"finding":"two","pre_existing":true}\n{"finding":"three"}\n' |
+    MNEMOSYNE_RECORD_CMD="$W/rec.sh" bash "$C" --session s2 >"$W/out.json"; rc=$?
+  eq "capture: records are sent to the recording command" "$rc:$(jqv "$(cat "$W/out.json")" '.status + ":" + (.captured | tostring) + ":" + (.skipped_pre_existing | tostring)')" "0:recorded:2:1"
+  eq "capture: the batch arrives on stdin with --batch -" "$(grep -c . "$REC_OUT"):$(cat "$REC_OUT.args")" "2:args: --batch -"
+  printf '{"finding":"one"}\n' | REC_FAIL=1 MNEMOSYNE_RECORD_CMD="$W/rec.sh" bash "$C" --session s3 >"$W/out.json"; rc=$?
+  eq "capture: a failing ledger is reported but never blocks (exit 0)" "$rc:$(jqv "$(cat "$W/out.json")" .status)" "0:failed"
+  has "capture: the failure reason is carried" "$(jqv "$(cat "$W/out.json")" .reason)" "ledger down"
+  printf '{"finding":"one"}\n' | env -u DATABASE_URL -u MNEMOSYNE_RECORD_CMD bash "$C" --session s4 >"$W/out.json"; rc=$?
+  eq "capture: no DATABASE_URL is skipped, exit 0" "$rc:$(jqv "$(cat "$W/out.json")" .status)" "0:skipped"
+  printf '[]' | MNEMOSYNE_RECORD_CMD="$W/rec.sh" bash "$C" --session s5 >"$W/out.json"
+  eq "capture: nothing to record is skipped" "$(jqv "$(cat "$W/out.json")" .status)" skipped
+  printf 'not json' | MNEMOSYNE_RECORD_CMD="$W/rec.sh" bash "$C" --session s6 >"$W/out.json"; rc=$?
+  eq "capture: unreadable input is reported, exit 0" "$rc:$(jqv "$(cat "$W/out.json")" .status)" "0:failed"
+  bash "$C" >/dev/null 2>&1; rc=$?
+  eq "capture: --session is required (exit 2)" "$rc" 2
+  unset REC_OUT
+}
+
 # ===================================================================== sections
 # SECTIONS-BEGIN
 suite_run_ci
@@ -725,6 +776,7 @@ suite_seam
 suite_promote
 suite_poll
 suite_close_run
+suite_capture
 # SECTIONS-END
 
 PATH="$ORIG_PATH"
