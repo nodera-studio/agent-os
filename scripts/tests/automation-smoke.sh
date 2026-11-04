@@ -457,6 +457,261 @@ suite_blind() {
   eq "blind: one candidate is refused" "$rc" 2
 }
 
+# ===================================================================== release scripts
+# A gh stub that serves canned JSON from $STUB_GH_DIR, logs every call, and answers any call that
+# would post, merge, create or otherwise write with exit 99 and a FORBIDDEN line in the log.
+cat >"$STUBS/gh" <<'EOS'
+#!/bin/bash
+echo "gh $*" >>"$STUB_LOG"
+D="${STUB_GH_DIR:-/nonexistent}"
+forbid() { echo FORBIDDEN >>"$STUB_LOG"; exit 99; }
+case "$1" in
+  run) [ "$2" = list ] && { cat "$D/runlist.json"; exit 0; } ;;
+  api)
+    [ -z "${STUB_GH_FAIL:-}" ] || exit 1
+    for a in "$@"; do case "$a" in -X | -f | -F | --method | --field | --raw-field | --input) forbid ;; esac; done
+    case "$*" in
+      *"/reviews"*) cat "$D/reviews.json" ;;
+      *"/issues/"*) cat "$D/issue.json" ;;
+      *"/pulls/"*"/comments"*) cat "$D/inline.json" ;;
+    esac
+    exit 0 ;;
+  pr)
+    case "$2" in
+      checks) cat "$D/checks.json"; exit 1 ;;
+      view) f="$D/pr-$3.txt"; [ -f "$f" ] || exit 1
+        case "$*" in *headRefName*) cat "$f" ;; *) cut -d' ' -f1 "$f" ;; esac
+        exit 0 ;;
+    esac ;;
+esac
+forbid
+EOS
+chmod +x "$STUBS/gh"
+
+suite_seam() {
+  local R out rc
+  printf 'src/a.ts\nsrc/b.ts\nregistry.ts\n' >"$TMP/seam-a.txt"
+  printf 'registry.ts\nsrc/c.ts\nsrc/a.ts\n\n' >"$TMP/seam-b.txt"
+  out="$(bash "$SCRIPTS/seam-overlap.sh" "$TMP/seam-a.txt" "$TMP/seam-b.txt")"; rc=$?
+  eq "seam: two lists overlap (exit 1)" "$rc:$(jqv "$out" '.overlap | join(",")')" "1:registry.ts,src/a.ts"
+  printf 'x.ts\n' >"$TMP/seam-c.txt"
+  out="$(bash "$SCRIPTS/seam-overlap.sh" "$TMP/seam-a.txt" "$TMP/seam-c.txt")"; rc=$?
+  eq "seam: disjoint lists exit 0" "$rc:$(jqv "$out" .count)" "0:0"
+  R="$TMP/seam-repo"; newrepo "$R"
+  git -C "$R" switch -q -c wa; echo 1 >"$R/shared.ts"; echo 1 >"$R/only-a.ts"; git -C "$R" add -A; git -C "$R" commit -q -m a
+  git -C "$R" switch -q main; git -C "$R" switch -q -c wb; echo 2 >"$R/shared.ts"; echo 2 >"$R/only-b.ts"; git -C "$R" add -A; git -C "$R" commit -q -m b
+  out="$(bash "$SCRIPTS/seam-overlap.sh" --repo "$R" --trunk main --branch wa --branch wb)"; rc=$?
+  eq "seam: two branches overlap on the shared file" "$rc:$(jqv "$out" '.overlap | join(",")')" "1:shared.ts"
+  bash "$SCRIPTS/seam-overlap.sh" "$TMP/seam-a.txt" >/dev/null 2>&1; rc=$?
+  eq "seam: one list is a usage error" "$rc" 2
+}
+
+suite_promote() {
+  local O="$TMP/promote-origin.git" W="$TMP/promote-work" G="$TMP/gh-promote" out rc
+  mkdir -p "$G"
+  git init -q --bare -b main "$O"
+  git clone -q "$O" "$W" 2>/dev/null
+  git -C "$W" switch -q -c main 2>/dev/null || true
+  echo 0 >"$W/f"; git -C "$W" add -A; git -C "$W" commit -q -m "base"; git -C "$W" push -q origin main
+  git -C "$W" switch -q -c staging
+  echo 1 >"$W/f"; git -C "$W" commit -q -am "feat: ABC-1 first"
+  echo 2 >"$W/f"; git -C "$W" commit -q -am "fix: ABC-2 second (#3)"
+  echo 3 >"$W/f"; git -C "$W" commit -q -am "ABC-1 again"
+  git -C "$W" push -q origin staging
+  local S; S="$(git -C "$W" rev-parse origin/staging)"
+  export STUB_GH_DIR="$G"
+  pf() { (cd "$W" && bash "$SCRIPTS/promote-preflight.sh" --prod main --staging staging --workflow ci --ticket-prefix ABC "$@"); }
+
+  printf '[{"status":"completed","conclusion":"success","headSha":"%s","url":"https://ci/1"}]\n' "$S" >"$G/runlist.json"
+  : >"$STUB_LOG"
+  out="$(pf)"; rc=$?
+  eq "promote: green run for the head is ready (exit 0)" "$rc:$(jqv "$out" .status)" "0:ready"
+  eq "promote: counts and tickets" "$(jqv "$out" '(.promote_count | tostring) + ":" + (.drift_count | tostring) + ":" + (.tickets | join(","))')" "3:0:ABC-1,ABC-2"
+  eq "promote: only a CI read goes through gh" "$(grep -c '^gh ' "$STUB_LOG"):$(grep -c 'run list' "$STUB_LOG"):$(grep -c FORBIDDEN "$STUB_LOG")" "1:1:0"
+  out="$(pf --no-fetch | jq -r .status)"
+  eq "promote: --no-fetch still works" "$out" ready
+
+  printf '[{"status":"completed","conclusion":"success","headSha":"0000000000000000000000000000000000000000","url":"u"}]\n' >"$G/runlist.json"
+  out="$(pf)"; rc=$?
+  eq "promote: a green run of another commit is stale (exit 1)" "$rc:$(jqv "$out" .ci.state)" "1:stale"
+  printf '[{"status":"completed","conclusion":"failure","headSha":"%s","url":"u"}]\n' "$S" >"$G/runlist.json"
+  out="$(pf)"; eq "promote: a red run blocks" "$(jqv "$out" '.status + ":" + .ci.state')" "blocked:failed"
+  printf '[{"status":"in_progress","conclusion":null,"headSha":"%s","url":"u"}]\n' "$S" >"$G/runlist.json"
+  out="$(pf)"; eq "promote: a running CI blocks" "$(jqv "$out" .ci.state)" running
+  echo '[]' >"$G/runlist.json"
+  out="$(pf)"; eq "promote: no run blocks" "$(jqv "$out" .ci.state)" none
+
+  printf '[{"status":"completed","conclusion":"success","headSha":"%s","url":"u"}]\n' "$S" >"$G/runlist.json"
+  git -C "$W" switch -q main; echo hot >"$W/hot"; git -C "$W" add -A; git -C "$W" commit -q -m "hotfix on main"; git -C "$W" push -q origin main
+  out="$(pf)"; rc=$?
+  eq "promote: a feature commit on the release branch is drift (exit 1)" "$rc:$(jqv "$out" .drift_count)" "1:1"
+  out="$(cd "$W" && bash "$SCRIPTS/promote-preflight.sh" --prod main --staging staging --workflow ci)"
+  eq "promote: no ticket prefix skips the list" "$(jqv "$out" '.tickets_skipped | tostring')" true
+  (cd "$W" && bash "$SCRIPTS/promote-preflight.sh" --prod main --staging staging >/dev/null 2>&1); rc=$?
+  eq "promote: --workflow is required (exit 2)" "$rc" 2
+  if (PATH=/usr/bin:/bin; command -v gh >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1); then
+    echo "skip promote: gh-missing case (gh, or jq or git, is on the minimal PATH)"
+  else
+    out="$(cd "$W" && PATH=/usr/bin:/bin bash "$SCRIPTS/promote-preflight.sh" --prod main --staging staging --workflow ci)"; rc=$?
+    eq "promote: no gh is unsupported (exit 3)" "$rc:$(jqv "$out" .status)" "3:unsupported"
+  fi
+  unset STUB_GH_DIR
+}
+
+suite_poll() {
+  local G="$TMP/gh-poll" ST="$TMP/poll-state.md" out rc
+  mkdir -p "$G"
+  export STUB_GH_DIR="$G"
+  cat >"$G/inline.json" <<'EOS'
+[{"id":1,"user":{"login":"alice","type":"User"},"created_at":"2026-01-01T10:00:00Z","path":"a.ts","line":3,"body":"nit","html_url":"u1"},
+ {"id":2,"user":{"login":"cr[bot]","type":"Bot"},"created_at":"2026-01-01T11:00:00Z","path":"b.ts","line":null,"original_line":9,"body":"bot says","html_url":"u2"}]
+EOS
+  echo '[{"id":3,"user":{"login":"bob","type":"User"},"created_at":"2026-01-01T12:00:00Z","body":"hi","html_url":"u3"}]' >"$G/issue.json"
+  cat >"$G/reviews.json" <<'EOS'
+[{"id":4,"user":{"login":"alice","type":"User"},"submitted_at":"2026-01-01T13:00:00Z","state":"CHANGES_REQUESTED","body":"fix","html_url":"u4"},
+ {"id":5,"user":{"login":"bob","type":"User"},"submitted_at":"2026-01-01T09:00:00Z","state":"COMMENTED","body":"","html_url":"u5"}]
+EOS
+  echo '[{"name":"Build","bucket":"fail"},{"name":"Lint","bucket":"pass"}]' >"$G/checks.json"
+  cp "$SCRIPTS/../templates/auto-mode-state.md" "$ST"
+  : >"$STUB_LOG"
+  out="$(bash "$SCRIPTS/poll-pr.sh" 7 --state "$ST")"; rc=$?
+  eq "poll: the first cycle prints (exit 0)" "$rc" 0
+  eq "poll: four new items, the empty COMMENTED review skipped" "$(jqv "$out" '[.new_comments[] | .kind] | sort | join(",")')" "inline,inline,issue,review"
+  eq "poll: a bot is flagged and the line falls back to original_line" "$(jqv "$out" '.new_comments[] | select(.user == "cr[bot]") | (.bot | tostring) + ":" + (.line | tostring)')" "true:9"
+  eq "poll: checks changed, the failing one named" "$(jqv "$out" '(.checks.changed | tostring) + ":" + (.checks.failing | join(","))')" "true:Build"
+  eq "poll: not clean" "$(jqv "$out" '.clean | tostring')" false
+  eq "poll: the cursor moved to the newest item" "$(sed -n 's/^- PR #7 last-seen comment: //p' "$ST")" "2026-01-01T13:00:00Z"
+  has "poll: the checks signature is stored" "$(grep 'PR #7 last-seen checks' "$ST")" "last-seen checks: "
+  out="$(bash "$SCRIPTS/poll-pr.sh" 7 --state "$ST")"; rc=$?
+  eq "poll: a quiet cycle prints nothing (exit 1)" "$rc:${out:-empty}" "1:empty"
+  out="$(bash "$SCRIPTS/poll-pr.sh" 7 --state "$ST" --always)"; rc=$?
+  eq "poll: --always prints a quiet cycle" "$rc:$(jqv "$out" '.new_comments | length')" "0:0"
+  echo '[{"id":6,"user":{"login":"bob","type":"User"},"created_at":"2026-01-01T14:00:00Z","body":"later","html_url":"u6"}]' >"$G/issue.json"
+  before="$(cat "$ST")"
+  out="$(bash "$SCRIPTS/poll-pr.sh" 7 --state "$ST" --no-advance)"
+  eq "poll: --no-advance sees the new comment but keeps the cursor" "$(jqv "$out" '.new_comments | length'):$([ "$(cat "$ST")" = "$before" ] && echo same)" "1:same"
+  out="$(bash "$SCRIPTS/poll-pr.sh" 7 --state "$ST")"
+  eq "poll: only the new comment is printed, checks unchanged" "$(jqv "$out" '(.new_comments | length | tostring) + ":" + (.checks.changed | tostring)')" "1:false"
+  echo '[{"name":"Build","bucket":"pass"},{"name":"Lint","bucket":"pass"}]' >"$G/checks.json"
+  out="$(bash "$SCRIPTS/poll-pr.sh" 7 --state "$ST")"
+  eq "poll: green checks with nothing new are a clean cycle" "$(jqv "$out" '(.clean | tostring) + ":" + (.checks.all_green | tostring)')" "true:true"
+  out="$(STUB_GH_FAIL=1 bash "$SCRIPTS/poll-pr.sh" 7 --state "$ST" 2>&1)"; rc=$?
+  eq "poll: a gh failure is an error, not a quiet cycle (exit 2)" "$rc" 2
+  out="$(bash "$SCRIPTS/poll-pr.sh" 7 --state "$TMP/no-such-state.md")"
+  eq "poll: without a state file nothing persists" "$(jqv "$out" '.cursor.persisted | tostring')" false
+  eq "poll: gh only reads" "$(grep -c FORBIDDEN "$STUB_LOG")" 0
+  bash "$SCRIPTS/poll-pr.sh" x >/dev/null 2>&1; rc=$?
+  eq "poll: a bad PR number is a usage error" "$rc" 2
+  unset STUB_GH_DIR
+}
+
+suite_close_run() {
+  local W="$TMP/close" R O G out rc sp1 sp2 dead cond
+  R="$W/repo"; O="$W/origin.git"; G="$W/gh"
+  mkdir -p "$W/tmp" "$W/plugin/state" "$G" "$R/.claude/scripts/lib" "$R/.claude/auto-mode"
+  export STUB_GH_DIR="$G"
+  git init -q --bare -b main "$O"
+  git init -q -b main "$R"
+  printf '.claude/worktrees/\n.claude/evidence/\n.claude/auto-mode/\n' >"$R/.gitignore"
+  cp "$SCRIPTS/close-run.sh" "$SCRIPTS/remove-worktree.sh" "$SCRIPTS/sweep-codex-orphans.sh" "$SCRIPTS/clean-scratch.sh" "$SCRIPTS/codex-procs.sh" "$R/.claude/scripts/"
+  cp "$SCRIPTS/lib/proc-common.sh" "$R/.claude/scripts/lib/"
+  git -C "$R" add -A; git -C "$R" commit -q -m init
+  git -C "$R" remote add origin "$O"; git -C "$R" push -q origin main
+  for b in feat/a feat/b staging; do git -C "$R" push -q origin "main:refs/heads/$b"; done
+  git -C "$R" worktree add -q "$R/.claude/worktrees/w1" -b wave-w1 >/dev/null 2>&1
+  git -C "$R" push -q origin wave-w1
+
+  sleep 300 & sp1=$!
+  sleep 301 & sp2=$!
+  true & dead=$!; wait "$dead"
+  ls1="$(ps -o lstart= -p "$sp1" | tr -s ' ' | sed 's/^ //; s/ $//')"
+  cat >"$R/.claude/auto-mode/state.md" <<EOS
+# Auto-Mode State
+
+## Goal
+
+ship it
+
+## Status
+
+landing
+
+## Wave ledger
+
+| Wave | Ticket | Branch | PR → staging | State |
+| ---- | ------ | ------ | ------------ | ----- |
+| 1 | T-1 | feat/a | #11 | merged |
+| 2 | T-2 | feat/b | #12 | polling |
+| 3 | T-3 | staging | #13 | merged |
+
+## Harness self-improvement
+
+| Batch | Branch | Worktree | PR → staging | State |
+| ----- | ------ | -------- | ------------ | ----- |
+| 1 | wave-w1 | .claude/worktrees/w1 | #14 | merged |
+
+## Checkpoints
+
+- Cadence: 60m
+- Last checkpoint: none
+- Path: docs/cp.md
+- Schedule: cron-77
+
+## Processes started
+
+| pid | started (ps lstart) | command | why | stopped |
+| --- | --- | --- | --- | --- |
+| $sp1 | $ls1 | sleep 300 | preview | |
+| $sp2 | Mon Jan  1 00:00:00 2001 | sleep 301 | stale row | |
+| $dead | Mon Jan  1 00:00:00 2001 | gone | finished | |
+EOS
+  printf 'MERGED feat/a\n' >"$G/pr-11.txt"; printf 'OPEN feat/b\n' >"$G/pr-12.txt"
+  printf 'MERGED staging\n' >"$G/pr-13.txt"; printf 'MERGED wave-w1\n' >"$G/pr-14.txt"
+  printf 'MERGED closing\n' >"$G/pr-99.txt"; printf 'OPEN closing\n' >"$G/pr-98.txt"
+  mkdir -p "$W/tmp/autosmoke-run1" "$W/tmp/autosmoke-other"
+  echo x >"$W/tmp/autosmoke-run1/f"; echo x >"$W/tmp/autosmoke-other/f"
+  touch -t 202001010000 "$W/tmp/autosmoke-run1/f" "$W/tmp/autosmoke-run1" "$W/tmp/autosmoke-other/f" "$W/tmp/autosmoke-other"
+  cp "$R/.claude/auto-mode/state.md" "$W/state.orig"
+  cr() { (cd "$R" && env TMPDIR="$W/tmp" CLAUDE_PLUGIN_DATA="$W/plugin" bash "$R/.claude/scripts/close-run.sh" --trunk staging --prod main "$@"); }
+
+  : >"$STUB_LOG"
+  out="$(cr)"; rc=$?
+  eq "close-run: the plan lists what it would do" "$(jqv "$out" '.mode + ":" + ([.processes[].action] | sort | join(","))')" "plan:gone,reused-pid,would-stop"
+  eq "close-run: plan changes nothing" "$(cmp -s "$R/.claude/auto-mode/state.md" "$W/state.orig" && echo same):$(kill -0 "$sp1" 2>/dev/null && echo alive)" "same:alive"
+  eq "close-run: the plan marks merged PR branches, protects the trunk, skips an open PR" \
+    "$(jqv "$out" '[.branches[] | .subject + "=" + .action] | sort | join(",")')" "#11=would-delete,#12=skipped,#13=skipped,#14=would-delete"
+  eq "close-run: the plan only dry-runs the worktree" "$(jqv "$out" '.worktrees[0].action'):$([ -d "$R/.claude/worktrees/w1" ] && echo present)" "would-remove:present"
+  eq "close-run: the remote branches are untouched in a plan" "$(git -C "$O" branch --list | tr -d ' *\n')" "feat/afeat/bmainstagingwave-w1"
+  has "close-run: the schedule id is returned for CronDelete" "$(jqv "$out" '.manual | join("|")')" "cron-77"
+  eq "close-run: scratch is listed, not cleaned, in a plan" "$([ -d "$W/tmp/autosmoke-run1" ] && echo kept)" kept
+
+  out="$(cr --apply --scratch-pattern autosmoke-run1)"; rc=$?
+  eq "close-run: apply stops the matching process only" "$(kill -0 "$sp1" 2>/dev/null && echo alive || echo stopped):$(kill -0 "$sp2" 2>/dev/null && echo alive)" "stopped:alive"
+  eq "close-run: apply fills stopped for the stopped and the gone rows, not the reused pid" \
+    "$(grep -c '^| [0-9]* |.*| [0-9T:Z-]*\( (already gone)\)\? |$' "$R/.claude/auto-mode/state.md")" 2
+  eq "close-run: apply removes the worktree" "$([ -d "$R/.claude/worktrees/w1" ] && echo present || echo removed)" removed
+  eq "close-run: apply deletes only merged non-protected branches" "$(git -C "$O" branch --list | tr -d ' *\n')" "feat/bmainstaging"
+  if command -v lsof >/dev/null 2>&1; then
+    eq "close-run: apply cleans only the named scratch entry" "$([ -d "$W/tmp/autosmoke-run1" ] && echo run1)$([ -d "$W/tmp/autosmoke-other" ] && echo other)" other
+  else
+    echo "skip close-run: scratch cleanup (lsof is missing)"
+  fi
+  eq "close-run: a live reused-pid row is never signalled" "$(kill -0 "$sp2" 2>/dev/null && echo alive)" alive
+  eq "close-run: the reused pid is reported and the run is clean (exit 0)" "$(jqv "$out" '.processes[] | select(.action == "reused-pid") | .subject'):$rc" "$sp2:0"
+  eq "close-run: gh only reads" "$(grep -c FORBIDDEN "$STUB_LOG")" 0
+
+  # finalize: needs --apply, a MERGED closing PR, and no blocked step
+  kill "$sp2" 2>/dev/null; wait "$sp2" 2>/dev/null
+  out="$(cr --apply --skip worktrees --skip scratch --skip branches --finalize-state --closing-pr 98)"; rc=$?
+  eq "close-run: an unmerged closing PR leaves the state alone" "$rc:$(jqv "$out" '.finalize.applied | tostring'):$(grep -c 'Cadence: 60m' "$R/.claude/auto-mode/state.md")" "1:false:1"
+  out="$(cr --apply --skip worktrees --skip scratch --skip branches --finalize-state --closing-pr 99)"; rc=$?
+  cond="$(sed -n '/^## Status/,/^## Wave/p' "$R/.claude/auto-mode/state.md" | grep -c '^done$')"
+  eq "close-run: a merged closing PR finalises the state file" "$rc:$(jqv "$out" '.finalize.applied | tostring'):$cond:$(grep -c 'Cadence: none' "$R/.claude/auto-mode/state.md"):$(grep -c 'Schedule: none' "$R/.claude/auto-mode/state.md")" "0:true:1:1:1"
+  bash "$SCRIPTS/checkpoint-due.sh" "$SCRIPTS/../templates/auto-mode-state.md" >/dev/null 2>&1; rc=$?
+  eq "close-run: the state template parses (checkpoint-due exit 3 = no cadence)" "$rc" 3
+  unset STUB_GH_DIR
+}
+
 # ===================================================================== sections
 # SECTIONS-BEGIN
 suite_run_ci
@@ -466,6 +721,10 @@ suite_tech_debt
 suite_endpoints
 suite_copywrite
 suite_blind
+suite_seam
+suite_promote
+suite_poll
+suite_close_run
 # SECTIONS-END
 
 PATH="$ORIG_PATH"
