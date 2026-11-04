@@ -138,7 +138,7 @@ while IFS= read -r seg || [ -n "$seg" ]; do
       # Service-specific redirects fire FIRST (more useful reason than the generic deny below).
       # These name the ONE replacement tool — no routing index duplicated in the hook.
       if printf '%s' "$seg" | grep -qiE 'https?://([a-z0-9.-]+\.)?cloudflare\.com([:/ ]|$|"|'"'"')'; then
-        deny "Don't curl Cloudflare's API — use the wrangler CLI (deploy / R2 / D1 writes, headless) or the Cloudflare MCP (read-only account queries). See the /wrangler skill."
+        deny "Don't curl Cloudflare's API — use the wrangler CLI (deploy / R2 / D1 writes, headless) or the Cloudflare MCP (read-only account queries). See the cloudflare:wrangler skill and rules/object-lock.md."
       fi
       if printf '%s' "$seg" | grep -qiE 'https?://([a-z0-9.-]+\.)?sentry\.io([:/ ]|$|"|'"'"')'; then
         deny "Don't curl Sentry's API — use sentry-cli (releases / sourcemaps) or the Sentry MCP (issue lookup / Seer). See the /sentry-cli skill."
