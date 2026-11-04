@@ -3,6 +3,11 @@
 #
 # Usage: bash .claude/scripts/routing.sh <key>
 #   e.g. implementation, ui, review, planning, debug, audits, integration, heavy_concurrency
+#        bash .claude/scripts/routing.sh engines <role> [--have <engine>...]
+# `engines` resolves a role from omp_roles to one tab-separated row per omp engine (fields in
+# lib/routing-engines.mjs), applying cap state from $DIR/state/omp-caps.json and the high-stakes
+# reroute to omp:codex. It needs node. Unlike the legacy keys, an override replaces omp_engines by
+# engine id and omp_roles by role, not the whole top-level key. The legacy keys are unaffected.
 #
 # Prints the value on stdout (arrays space-separated), then
 # `source=<override|default> decision=<id>` on stderr (`decision=none` when the file that
@@ -26,11 +31,27 @@ set -u
 
 die() { echo "routing: $*" >&2; exit 2; }
 
-[ $# -eq 1 ] && [ -n "$1" ] || die "usage: routing.sh <key>"
-KEY="$1"
+ENGINES=0 ROLE='' HAVE=()
+if [ "${1:-}" = engines ]; then
+  [ $# -ge 2 ] && [ -n "$2" ] || die "usage: routing.sh engines <role> [--have <engine>...]"
+  ENGINES=1 ROLE="$2"
+  shift 2
+  while [ $# -gt 0 ]; do
+    [ "$1" = --have ] && [ $# -ge 2 ] && [ -n "$2" ] || die "usage: routing.sh engines <role> [--have <engine>...]"
+    HAVE+=(--have "$2")
+    shift 2
+  done
+  command -v node >/dev/null 2>&1 || die "engines needs node (not installed)"
+  KEY=engines
+else
+  [ $# -eq 1 ] && [ -n "$1" ] || die "usage: routing.sh <key>"
+  KEY="$1"
+fi
 
 # json_get <file> <key>: value on stdout; return 3 = key absent or null, 4 = unreadable/broken.
-if command -v jq >/dev/null 2>&1; then
+if [ "$ENGINES" -eq 1 ]; then
+  json_get() { return 4; } # engines reads its own files; no legacy lookup runs
+elif command -v jq >/dev/null 2>&1; then
   json_get() {
     jq -e 'type == "object"' "$1" >/dev/null 2>&1 || return 4
     [ "$(jq -r --arg k "$2" 'has($k) and .[$k] != null' "$1" 2>/dev/null)" = true ] || return 3
@@ -72,6 +93,12 @@ fi
 OVERRIDE="$DIR/auto-mode/routing.json"
 
 [ -r "$DEFAULT" ] || die "default routing file missing or unreadable: $DEFAULT"
+if [ "$ENGINES" -eq 1 ]; then
+  [ -e "$OVERRIDE" ] || OVERRIDE=-
+  CAPS="$DIR/state/omp-caps.json"
+  [ -e "$CAPS" ] || CAPS=-
+  exec node "$SCRIPT_DIR/lib/routing-engines.mjs" "$DEFAULT" "$OVERRIDE" "$CAPS" "$ROLE" ${HAVE[@]+"${HAVE[@]}"}
+fi
 DEFAULT_DECISION="$(json_get "$DEFAULT" decision)"
 case $? in
   0) ;;
