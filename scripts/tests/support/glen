@@ -4,12 +4,14 @@
 set -euo pipefail
 state="${FAKE_GLEN_STATE:?scratch fixture directory required}"
 argv=("$@")
+profile=''
 if [ "${1:-}" = --profile ]; then
-  [ "${2:-}" = glen-harness ] || exit 99
+  case "${2:-}" in glen-harness | glen-harness-codex | glen-harness-opencode) ;; *) exit 99 ;; esac
+  profile="$2"
   shift 2
 fi
 command="${1:-}"
-[ "$command" = send ] || [ "$command" = wait ] || exit 99
+[ "$command" = send ] || [ "$command" = wait ] || [ "$command" = model ] || exit 99
 mkdir -p "$GLEN_HOME"
 index=0
 [ ! -f "$state/count" ] || index="$(cat "$state/count")"
@@ -22,13 +24,20 @@ if [ "$command" = send ]; then
   [ "$1 $2 $3 $4" = 'send @new - --cwd' ] || exit 99
   [ -d "$5" ] && [ ! -e "$5/.git" ] || exit 99
   cat > "$state/prompt-$index.md"
+elif [ "$command" = model ]; then
+  [ "$1 $2" = 'model @new' ] || exit 99
 else
   expected="$(jq -r '.job // empty' "$step")"
   [ -z "$expected" ] || [ "$2" = "$expected" ] || exit 99
 fi
+# Env facts are recorded by name or presence only, never a credential value.
+has_key=false
+[ -z "${OPENCODE_API_KEY:-}" ] || has_key=true
 jq -cn --arg home "$GLEN_HOME" --arg policy "$PI_CONFIG_FILES" \
-  --arg timeout "$GLEN_JOB_TIMEOUT" --args \
-  '{argv:$ARGS.positional,glen_home:$home,policy:$policy,job_timeout:$timeout}' -- "${argv[@]}" >> "$state/calls.jsonl"
+  --arg timeout "$GLEN_JOB_TIMEOUT" --arg profile "$profile" --arg startup "${OMP_STARTUP_MODEL:-}" \
+  --arg no_tools "${OMP_NO_TOOLS:-}" --argjson has_key "$has_key" --args \
+  '{argv:$ARGS.positional,glen_home:$home,policy:$policy,job_timeout:$timeout,profile:$profile,
+    startup_model:$startup,no_tools:$no_tools,has_opencode_key:$has_key}' -- "${argv[@]}" >> "$state/calls.jsonl"
 
 advance="$(jq -r '.advance // 0' "$step")"
 if [ "$advance" -gt 0 ]; then

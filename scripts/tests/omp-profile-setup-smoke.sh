@@ -15,7 +15,7 @@ mkdir -p "$ENGINE_FIXTURE/.claude/scripts" "$ENGINE_FIXTURE/.claude/omp/skills/m
 cp "$REPO_ROOT/.claude/scripts/omp-profile-setup.sh" "$REPO_ROOT/.claude/scripts/omp-engine.sh" "$ENGINE_FIXTURE/.claude/scripts/"
 cp "$REPO_ROOT/.claude/omp/omp-sandboxed.sh" "$REPO_ROOT/.claude/omp/omp-sandboxed-linux.sh" \
   "$REPO_ROOT/.claude/omp/glen-harness.yml" "$REPO_ROOT/.claude/omp/mcp.json" \
-  "$REPO_ROOT/.claude/omp/model-ladder.sh" "$ENGINE_FIXTURE/.claude/omp/"
+  "$REPO_ROOT/.claude/omp/model-ladder.sh" "$REPO_ROOT/.claude/omp/profiles.sh" "$ENGINE_FIXTURE/.claude/omp/"
 cp "$REPO_ROOT/.claude/omp/skills/mnemosyne-glen/SKILL.md" "$ENGINE_FIXTURE/.claude/omp/skills/mnemosyne-glen/"
 git -C "$ENGINE_FIXTURE" init -q --initial-branch=main
 git -C "$ENGINE_FIXTURE" add .

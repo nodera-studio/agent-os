@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Isolated third review/debug engine. Policy/envcheck are internal smoke helpers.
+# Isolated read-only review/debug engine. Policy/envcheck are internal smoke helpers.
+# Without --engine it is the legacy glen-harness (Cursor) engine. With --engine omp:codex|omp:opencode
+# --slot S --role R it runs that profile, picks the model with select_model, and records provenance.
 set -euo pipefail
 umask 077
 # A signal trap can run while dispatch_env's stdout is redirected to response.raw.
@@ -8,7 +10,11 @@ exec 3>&1
 
 MODE="${1:-}"
 [ "$#" -eq 0 ] || shift
-PROFILE=glen-harness
+PROFILE=glen-harness EXPECT_PROVIDER=cursor LOGIN_CMD='login cursor' LOGIN_LABEL=Cursor
+# Engine mode (--engine): filled by engine_resolve from routing.sh engines and the profile registry.
+ENGINE='' SLOT='' ROLE='' HAVE_ARGS=() CONFIG_FILES='' STARTUP_MODEL='' NO_TOOLS=0 GLEN_MODEL_SPEC=''
+REQ_PROVIDER='' REQ_MODEL='' REQ_EFFORT='' FALLBACKS='' STAKES='' SUBST_FROM='' ROUTE_SOURCE='' ROUTE_DECISION=''
+DEGRADED='' REROUTE='' OBSERVED_MODEL='' FELL_BACK=0
 START="$(date +%s)"
 STATUS=failed REASON='engine command failed' EXIT_CODE=4
 MODEL='' THINKING_LEVEL='' PROVIDER='' SOURCE_FINGERPRINT='' POLICY_SOURCE='' LAUNCHER_SOURCE='' LAUNCHER_BIN='' HEAD='' MERGE_BASE='' SNAPSHOT_SHA256=''
@@ -18,6 +24,8 @@ OUTPUT_READY=0 JOB_ACTIVE=0 JOB_TIMEOUT_SECONDS=0
 USAGE='{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"totalTokens":0,"cost_total":0}'
 
 log() { printf 'omp-engine: %s\n' "$*" >&2; }
+# shellcheck source=../omp/profiles.sh
+. "$(cd "$(dirname "$0")/../omp" && pwd -P)/profiles.sh" 2>/dev/null || { log 'profile registry omp/profiles.sh missing'; exit 4; }
 stop() { STATUS="$1"; REASON="$2"; EXIT_CODE="$3"; exit "$EXIT_CODE"; }
 # shellcheck disable=SC2329 # Registered below for INT/TERM.
 interrupted() {
@@ -27,6 +35,7 @@ interrupted() {
 usage() {
   log 'usage: omp-engine.sh probe | review [--repo DIR] (--base REF | --uncommitted) --out FILE [--scope TEXT] [--deadline 15m] [--keep]'
   log '       omp-engine.sh debug [--repo DIR] --brief FILE --out FILE [--base REF] [--deadline 20m] [--keep]'
+  log '       review|debug|probe also take --engine omp:codex|omp:opencode [--slot S] --role R [--have ENGINE]'
   log '       omp-engine.sh snapshot SRC DEST | policy SRC | envcheck -- CMD...'
   stop failed 'usage error' 2
 }
@@ -54,6 +63,11 @@ launcher_dir_for() {
 }
 dispatch_env() {
   local engine_root agent_dir real_omp
+  local -a scrub=() assign=()
+  # Only the opencode engine may see the OpenCode key; model choice reaches the launcher by env.
+  [ -z "$ENGINE" ] || [ "$ENGINE" = omp:opencode ] || scrub+=(-u OPENCODE_API_KEY)
+  [ -z "$STARTUP_MODEL" ] || assign+=("OMP_STARTUP_MODEL=$STARTUP_MODEL")
+  [ "$NO_TOOLS" -eq 0 ] || assign+=(OMP_NO_TOOLS=1)
   engine_root="${ENGINE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)}"
   resolve_launcher "$engine_root" "$(launcher_dir_for)" || { log "$REASON"; stop failed "$REASON" 4; }
   agent_dir="$(profile_agent_dir)"
@@ -65,9 +79,10 @@ dispatch_env() {
     -u OMP_CODING_AGENT_DIR -u OMP_PROFILE -u PI_PROFILE \
     -u XDG_STATE_HOME -u XDG_DATA_HOME -u XDG_CACHE_HOME -u XDG_CONFIG_HOME \
     -u GLEN_OMP_BIN -u OMP_SANDBOX_RUN_ROOT -u OMP_REAL_BIN -u OMP_PROFILE_AGENT_DIR \
+    -u OMP_STARTUP_MODEL -u OMP_NO_TOOLS ${scrub[@]+"${scrub[@]}"} \
     GLEN_OMP_BIN="$LAUNCHER_BIN" OMP_REAL_BIN="$real_omp" \
     OMP_SANDBOX_RUN_ROOT="$RUN_DIR" OMP_PROFILE_AGENT_DIR="$agent_dir" \
-    GLEN_HOME="$RUN_GLEN_HOME" PI_CONFIG_FILES="$POLICY_PATH" \
+    GLEN_HOME="$RUN_GLEN_HOME" PI_CONFIG_FILES="${CONFIG_FILES:-$POLICY_PATH}" ${assign[@]+"${assign[@]}"} \
     GLEN_JOB_TIMEOUT="${JOB_TIMEOUT_SECONDS}s" "$@" 3>&-
 }
 
@@ -342,18 +357,26 @@ result_json() {
     --arg glen_home "$RUN_GLEN_HOME" --arg job "$JOB" --arg handle "$SESSION_HANDLE" \
     --arg path "$SESSION_PATH" --arg out "$OUT" --arg run_dir "$RUN_DIR" \
     --argjson elapsed_ms "$elapsed" --argjson usage "$USAGE" --argjson replies "$REPLIES" \
-    --argjson moved "$MOVED" --arg source_fingerprint "$SOURCE_FINGERPRINT" '
+    --argjson moved "$MOVED" --arg source_fingerprint "$SOURCE_FINGERPRINT" --arg profile "$PROFILE" \
+    --arg engine "$ENGINE" --arg slot "$SLOT" --arg req_provider "$REQ_PROVIDER" --arg req_model "$REQ_MODEL" \
+    --arg req_effort "$REQ_EFFORT" --arg obs_model "$OBSERVED_MODEL" --arg role "$ROLE" --arg route_source "$ROUTE_SOURCE" \
+    --arg route_decision "$ROUTE_DECISION" --arg substituted "$SUBST_FROM" --arg degraded "$DEGRADED" --arg reroute "$REROUTE" '
     def nullable: if . == "" then null else . end;
     if $mode == "snapshot" then
       {v:1,engine:"omp",mode:$mode,status:$status,reason:($reason|nullable),head:($head|nullable),
        snapshot_sha256:($snapshot_sha256|nullable),moved:$moved,source_fingerprint:($source_fingerprint|nullable)}
     else
-      {v:1,engine:"omp",mode:$mode,status:$status,reason:($reason|nullable),profile:"glen-harness",
+      {v:1,engine:"omp",mode:$mode,status:$status,reason:($reason|nullable),profile:$profile,
        model:($model|nullable),provider:($provider|nullable),policy_source:($policy_source|nullable),
        launcher_source:($launcher_source|nullable),
        head:($head|nullable),merge_base:($merge_base|nullable),snapshot_sha256:($snapshot_sha256|nullable),
        glen_home:($glen_home|nullable),job:($job|nullable),session:{handle:($handle|nullable),path:($path|nullable)},
        elapsed_ms:$elapsed_ms,usage:$usage,replies:$replies,out:($out|nullable),run_dir:($run_dir|nullable)}
+      + (if $engine == "" then {} else
+        {engine:$engine,slot:($slot|nullable),requested:{provider:($req_provider|nullable),model:($req_model|nullable),effort:($req_effort|nullable)},
+         observed:{provider:($provider|nullable),model:($obs_model|nullable)},
+         routing:{role:($role|nullable),source:($route_source|nullable),decision:($route_decision|nullable),substituted_from:($substituted|nullable)},
+         degraded:($degraded|nullable),reroute:($reroute|nullable)} end)
     end'
 }
 save_result() {
@@ -387,13 +410,20 @@ capture() {
       then .provider + "/" + .model else .model end')"
     [ -z "$transcript_model" ] || MODEL="$transcript_model"
     PROVIDER="$(printf '%s' "$meta" | jq -r .provider)"
+    OBSERVED_MODEL="$(printf '%s' "$meta" | jq -r --arg p "$PROVIDER" '.model | ltrimstr($p + "/")')"
     USAGE="$(printf '%s' "$meta" | jq -c .usage)"
   fi
   # Preserve timeout status: its tree must stay available to a possibly live job.
-  if [ "$STATUS" != timeout ] && [ -n "$PROVIDER" ] && [ "$PROVIDER" != cursor ]; then
-    STATUS=failed REASON="ran on $PROVIDER, not cursor" EXIT_CODE=4
+  if [ "$STATUS" != timeout ] && [ -n "$PROVIDER" ] && [ "$PROVIDER" != "$EXPECT_PROVIDER" ]; then
+    STATUS=failed REASON="ran on $PROVIDER, not $EXPECT_PROVIDER" EXIT_CODE=4
   elif [ "$STATUS" = ok ] && [ -z "$PROVIDER" ]; then
-    STATUS=failed REASON='ran on unknown, not cursor' EXIT_CODE=4
+    STATUS=failed REASON="ran on unknown, not $EXPECT_PROVIDER" EXIT_CODE=4
+  elif [ "$STATUS" = ok ] && [ -n "$ENGINE" ] && [ -n "$OBSERVED_MODEL" ]; then
+    # The requested model or one of the slot's own fallbacks; anything else is a silent engine change.
+    case ",$SUBST_FROM,$REQ_MODEL,$FALLBACKS," in
+      *",$OBSERVED_MODEL,"*) ;;
+      *) STATUS=failed REASON="ran model $OBSERVED_MODEL, requested $REQ_MODEL" EXIT_CODE=4 ;;
+    esac
   fi
   if [ "$STATUS" = ok ] && ! grep -q '[^[:space:]]' "$OUT"; then
     STATUS=failed REASON='omp returned no final answer' EXIT_CODE=4
@@ -571,7 +601,7 @@ probe_checks() {
   command -v omp >/dev/null 2>&1 || stop skipped 'omp not on PATH' 3
   command -v sandbox-exec >/dev/null 2>&1 || stop skipped 'sandbox-exec not on PATH; the omp sandbox requires it on macOS' 3
   [ -f "$(profile_agent_dir)/config.yml" ] || \
-    stop skipped 'glen-harness profile is not set up; run .claude/scripts/omp-profile-setup.sh' 3
+    stop skipped "$PROFILE profile is not set up; run .claude/scripts/omp-profile-setup.sh${ENGINE:+ --engine $ENGINE}" 3
   prepare_root || stop skipped "$REASON" 3
   # Probe cwd is also below ROOT; reject unsafe discovery ancestry before omp.
   validate_snapshot_ancestors "$ROOT/.probe"
@@ -583,12 +613,24 @@ probe_checks() {
   # file (fix cycle 5, LOW-3): no separate, unused copy into PROBE_DIR.
   resolve_launcher "$ENGINE_ROOT" "$(launcher_dir_for)" || stop skipped "$REASON" 3
   # Provisional login signal; Step 3 must confirm this after the owner's login.
-  if models="$(bounded_omp 9 models cursor --json)"; then rc=0; else rc="$?"; fi
+  if models="$(bounded_omp 9 models "$EXPECT_PROVIDER" --json)"; then rc=0; else rc="$?"; fi
   case "$rc" in
-    124 | 137 | 142) stop skipped 'Cursor login check timed out' 3 ;;
+    124 | 137 | 142) stop skipped "$LOGIN_LABEL login check timed out" 3 ;;
   esac
   if [ "$rc" -ne 0 ] || ! printf '%s' "$models" | jq -e '.models | type == "array" and length > 0' >/dev/null 2>&1; then
-    stop skipped 'omp --profile glen-harness not logged into Cursor (run: omp --profile glen-harness login cursor)' 3
+    stop skipped "omp --profile $PROFILE not logged into $LOGIN_LABEL (run: omp --profile $PROFILE $LOGIN_CMD)" 3
+  fi
+  if [ -n "$ENGINE" ]; then
+    # The model comes from routing data, not the profile's saved default: it must be in the catalog.
+    if [ -n "$REQ_MODEL" ]; then
+      printf '%s' "$models" | jq -e --arg s "$REQ_PROVIDER/$REQ_MODEL" \
+        'any(.models[]; (.selector // (.provider + "/" + .id)) == $s)' >/dev/null 2>&1 || \
+        stop skipped "model $REQ_PROVIDER/$REQ_MODEL is not listed by omp --profile $PROFILE" 3
+      MODEL="$REQ_PROVIDER/$REQ_MODEL"
+    fi
+    THINKING_LEVEL="$REQ_EFFORT"
+    STATUS=ready REASON='' EXIT_CODE=0
+    return 0
   fi
   if value="$(bounded_omp 4 config get modelRoles --json)"; then rc=0; else rc="$?"; fi
   case "$rc" in
@@ -749,8 +791,119 @@ snapshot_command() {
   STATUS=ok REASON='' EXIT_CODE=0
 }
 
+# engine_flag <flag> <value>: consume one of the engine-mode flags; status 1 if it is not one.
+engine_flag() {
+  case "$1" in
+    --engine) ENGINE="$2" ;;
+    --slot) SLOT="$2" ;;
+    --role) ROLE="$2" ;;
+    --have) HAVE_ARGS+=(--have "$2") ;;
+    *) return 1 ;;
+  esac
+}
+# error_text: the error text of the last envelope; an empty string when there is none.
+error_text() {
+  jq -r '[.error.message, .error.details.error.code, .error.details.error.message] | map(select(type == "string")) | join(" ")' "$ENVELOPE" 2>/dev/null || true
+}
+# engine_resolve: profile, provider and model for --engine/--slot/--role, then the unprobed gate (AC-026).
+engine_resolve() {
+  local routing rows err line capped_sel want base r_engine r_profile r_provider r_model r_effort r_tools r_fallbacks r_requested r_from r_stakes found=0
+  local probe_result="${OMP_PROBE_RESULT:-$SCRIPT_DIR/../omp/probe-result.json}" # the owner-run probe's output
+  [ "${GLEN_OMP_ENGINE:-}" != off ] || stop skipped 'disabled by GLEN_OMP_ENGINE=off' 3
+  case "$ENGINE" in omp:codex | omp:opencode) ;; *) usage ;; esac
+  if [ -n "$ROLE" ]; then :; elif [ "$MODE" != probe ] || [ -n "$SLOT" ] || [ "${#HAVE_ARGS[@]}" -gt 0 ]; then usage; fi
+  PROFILE="$(profile_for_engine "$ENGINE")" || stop failed "no profile registered for $ENGINE" 4
+  EXPECT_PROVIDER="$(profile_provider "$PROFILE")" LOGIN_CMD="$(profile_login_cmd "$PROFILE")" LOGIN_LABEL="$EXPECT_PROVIDER"
+  if [ -n "$ROLE" ]; then
+    routing="$(dirname "$0")/routing.sh"
+    err="$(mktemp)"
+    if rows="$(/bin/bash "$routing" engines "$ROLE" ${HAVE_ARGS[@]+"${HAVE_ARGS[@]}"} 2>"$err")"; then :; else
+      REASON="routing.sh engines failed: $(head -n 1 "$err")"
+      rm -f "$err"
+      stop failed "$REASON" 4
+    fi
+    line="$(grep -E '^source=' "$err" | head -n 1)"
+    capped_sel="$(sed -n 's/^capped=//p' "$err")"
+    ROUTE_SOURCE="$(printf '%s' "$line" | sed -n 's/.*source=\([^ ]*\).*/\1/p')"
+    ROUTE_DECISION="$(printf '%s' "$line" | sed -n 's/.*decision=\([^ ]*\).*/\1/p')"
+    DEGRADED="$(printf '%s' "$line" | sed -n 's/.*degraded=\([^ ]*\).*/\1/p')"
+    [ "$DEGRADED" != none ] || DEGRADED=''
+    rm -f "$err"
+    want="$ENGINE${SLOT:+/$SLOT}"
+    while IFS=$'\t' read -r r_engine r_profile r_provider r_model r_effort r_tools r_fallbacks r_requested r_from r_stakes; do
+      [ -n "$r_engine" ] || continue
+      base="$r_requested"
+      case "${base##*:}" in off | minimal | low | medium | high | xhigh | max) base="${base%:*}" ;; esac
+      [ "$base" = "$want" ] || continue
+      found=1
+      STAKES="$r_stakes"
+      if [ "$r_engine" != "$ENGINE" ]; then REROUTE="$r_engine"; stop skipped capped 3; fi
+      # Re-validate what the resolver printed: the registry's provider and a plain effort level.
+      [ "$r_profile" = "$PROFILE" ] || stop failed "routing gave profile $r_profile for $ENGINE, not $PROFILE" 4
+      [ "$r_provider" = "$EXPECT_PROVIDER" ] || stop failed "routing gave provider $r_provider for $ENGINE, not $EXPECT_PROVIDER" 4
+      case "$r_effort" in - | off | minimal | low | medium | high | xhigh | max) ;; *) stop failed "routing gave unknown effort $r_effort" 4 ;; esac
+      REQ_PROVIDER="$r_provider" REQ_MODEL="$r_model" REQ_EFFORT="$r_effort" FALLBACKS="$r_fallbacks"
+      [ "$REQ_EFFORT" != - ] || REQ_EFFORT=''
+      [ "$FALLBACKS" != - ] || FALLBACKS=''
+      [ "$r_from" = - ] || SUBST_FROM="$r_from"
+      [ "$r_tools" = true ] || NO_TOOLS=1
+      SLOT="${SLOT:-${ENGINE#omp:}}" # a single-slot selector (omp:codex) names no slot
+      break
+    done <<< "$rows"
+    if [ "$found" -eq 0 ]; then
+      case ",$capped_sel," in *",$want,"*) stop skipped capped 3 ;; esac
+      stop failed "role $ROLE does not select $want" 2
+    fi
+    if [ "$ENGINE" = omp:opencode ] && [ ! -f "$probe_result" ] && [ "${GLEN_OMP_UNPROBED_OK:-}" != 1 ]; then
+      log 'omp:opencode is unprobed: run scripts/omp-probe-keyed.sh once (needs OPENCODE_API_KEY)'
+      stop skipped unprobed 3
+    fi
+  fi
+  : "${OMP_MODEL_MECH:=$(jq -r '.launch_mechanism // empty | if . == "none" then "profile_per_slot" else . end' "$probe_result" 2>/dev/null || true)}"
+  : "${OMP_MODEL_MECH:=overlay}"
+  if [ "$OMP_MODEL_MECH" = profile_per_slot ]; then
+    PROFILE="$(profile_for_engine "$ENGINE/$SLOT")" || stop skipped "profile_per_slot: no profile registered for $ENGINE/$SLOT" 3
+  fi
+}
+# select_model: point this run at provider/model[:effort] without touching the shared profile.
+# The profile's saved default is never rewritten; the run-private overlay, a startup argument or the
+# glen subcommand carry the choice, whichever OMP_MODEL_MECH (default: the probe's finding, else overlay) names.
+select_model() {
+  local spec="$REQ_PROVIDER/$REQ_MODEL"
+  [ -z "$REQ_EFFORT" ] || spec="$spec:$REQ_EFFORT"
+  CONFIG_FILES='' STARTUP_MODEL='' GLEN_MODEL_SPEC=''
+  case "$OMP_MODEL_MECH" in
+    overlay)
+      printf 'modelRoles:\n  default: %s\n' "$spec" > "$RUN_DIR/model-overlay.yml"
+      CONFIG_FILES="$POLICY_PATH:$RUN_DIR/model-overlay.yml"
+      ;;
+    startup_arg) STARTUP_MODEL="$spec" ;;
+    glen_model) GLEN_MODEL_SPEC="$spec" ;;
+    profile_per_slot) ;;
+    *) stop failed "unknown OMP_MODEL_MECH: $OMP_MODEL_MECH" 4 ;;
+  esac
+}
+# mark_cap <signal>: record this slot's model capped for a while (the reset time is not reported; GLEN_OMP_CAP_HOLD).
+mark_cap() {
+  /bin/bash "$SCRIPT_DIR/omp-caps.sh" mark "$ENGINE" "$SLOT" "$REQ_MODEL" "${GLEN_OMP_CAP_HOLD:-+1h}" "$1" >&2 || log 'could not record the cap'
+}
+# rate_limited: omp usage reports this provider rate-limited (a status string anywhere in its JSON).
+rate_limited() {
+  local out
+  out="$(bounded_omp 20 usage --provider "$EXPECT_PROVIDER" --json 2>/dev/null)" || return 1
+  printf '%s' "$out" | jq -e 'any(.. | strings; . == "rate-limited")' >/dev/null 2>&1
+}
+
 case "$MODE" in
-  probe) [ "$#" -eq 0 ] || usage; probe_checks; exit 0 ;;
+  probe)
+    while [ "$#" -gt 0 ]; do
+      [ "$#" -ge 2 ] && [ -n "$2" ] && engine_flag "$1" "$2" || usage
+      shift 2
+    done
+    [ -z "$ENGINE" ] || engine_resolve
+    probe_checks
+    exit 0
+    ;;
   snapshot) [ "$#" -eq 2 ] || usage; snapshot_command "$1" "$2"; exit 0 ;;
   review | debug) ;;
   *) usage ;;
@@ -770,6 +923,11 @@ while [ "$#" -gt 0 ]; do
         --deadline) DEADLINE="$2" ;;
         --brief) [ "$MODE" = debug ] || usage; BRIEF="$2" ;;
       esac
+      shift 2
+      ;;
+    --engine | --slot | --role | --have)
+      [ "$#" -ge 2 ] && [ -n "$2" ] || usage
+      engine_flag "$1" "$2"
       shift 2
       ;;
     --uncommitted) [ "$MODE" = review ] || usage; UNCOMMITTED=1; shift ;;
@@ -794,6 +952,7 @@ fi
 mkdir -p "$(dirname "$OUT")"
 OUT="$(cd "$(dirname "$OUT")" && pwd -P)/$(basename "$OUT")"
 OUTPUT_READY=1
+if [ -n "$ENGINE" ]; then engine_resolve; elif [ -n "$SLOT$ROLE" ] || [ "${#HAVE_ARGS[@]}" -gt 0 ]; then usage; fi
 probe_checks
 STATUS=failed REASON='engine command failed' EXIT_CODE=4
 REPO="$(git -C "$REPO" rev-parse --show-toplevel)"
@@ -812,6 +971,7 @@ RUN_GLEN_HOME="$RUN_DIR/glen-home"
 POLICY_PATH="$RUN_DIR/policy.yml"
 TREE="$RUN_DIR/tree"
 policy "$ENGINE_ROOT" "$POLICY_PATH"
+[ -z "$ENGINE" ] || select_model
 
 # Invoke the same snapshot subcommand used by smoke tests; its JSON stays private.
 if env -u GLEN_OMP_ENGINE_TEST_MUTATE "$SCRIPT" snapshot "$REPO" "$TREE" > "$RUN_DIR/snapshot.json"; then SNAP_RC=0; else SNAP_RC="$?"; fi
@@ -893,6 +1053,10 @@ while :; do
   # Re-check immediately before every new omp cwd use, including capacity retry.
   validate_snapshot_ancestors "$TREE"
   JOB_ACTIVE=1
+  # glen_model mechanism (UNVERIFIED until the probe): choose the model right after @new, before the prompt.
+  if [ -n "$GLEN_MODEL_SPEC" ]; then
+    dispatch_env "$GLEN_BIN" --profile "$PROFILE" model @new "$GLEN_MODEL_SPEC" > /dev/null || stop failed 'glen model failed' 4
+  fi
   # Fix cycle 5, decision 7: omit --thinking entirely for an off-ladder
   # (explicit --model) configuration, rather than guessing a ladder level.
   # Bash 3.2 (macOS's default) treats "${arr[@]}" on a zero-element array as
@@ -910,7 +1074,11 @@ while :; do
     [ -n "$JOB" ] || stop failed 'running glen result has no job handle' 4
     # This deadline can only time out an already identified, recoverable job.
     remaining=$((DEADLINE_SECONDS + 75 - ($(date +%s) - FIRST_SEND)))
-    [ "$remaining" -gt 0 ] || stop timeout 'engine deadline exceeded' 5
+    if [ "$remaining" -le 0 ]; then
+      # A hung cap signal: the outer deadline fires, and omp usage may say why.
+      if [ -n "$ENGINE" ] && rate_limited; then mark_cap usage; fi
+      stop timeout 'engine deadline exceeded' 5
+    fi
     wait_seconds="$remaining"
     [ "$wait_seconds" -le 60 ] || wait_seconds=60
     [ "$wait_seconds" -ge 1 ] || wait_seconds=1
@@ -923,6 +1091,41 @@ while :; do
     stop timeout 'glen job deadline exceeded' 5
   fi
   remaining=$((DEADLINE_SECONDS - ($(date +%s) - FIRST_SEND)))
+  if [ "$RC" -eq 7 ] && [ -n "$ENGINE" ]; then
+    # A usage limit (GoUsageLimitError / 429, insufficient funds / 402, or omp usage "rate-limited") is a
+    # cap, not a transient capacity error: record it, skip the 60 s sleep, and never fall to Zen or native Codex.
+    CAP_SIGNAL=''
+    CAP_TEXT="$(error_text)"
+    case "$CAP_TEXT" in
+      *GoUsageLimitError*) CAP_SIGNAL=429 ;;
+      *[Ii]nsufficient\ account\ funds* | *[Ii]nsufficient\ funds*) CAP_SIGNAL=402 ;;
+    esac
+    if [ -z "$CAP_SIGNAL" ] && printf '%s' "$CAP_TEXT" | grep -Eiq '429|rate.?limit|quota' && rate_limited; then CAP_SIGNAL=usage; fi
+    if [ -n "$CAP_SIGNAL" ]; then
+      mark_cap "$CAP_SIGNAL"
+      if [ "$STAKES" = high ]; then
+        [ "$ENGINE" = omp:codex ] || REROUTE=omp:codex
+        stop skipped capped 3
+      fi
+      CAP_NEXT=''
+      IFS=, read -r -a CAP_FALLBACKS <<< "$FALLBACKS"
+      for candidate in ${CAP_FALLBACKS[@]+"${CAP_FALLBACKS[@]}"}; do
+        if ! /bin/bash "$SCRIPT_DIR/omp-caps.sh" status "$ENGINE" "$SLOT" "$candidate" >/dev/null 2>&1; then CAP_NEXT="$candidate"; break; fi
+      done
+      if [ -n "$CAP_NEXT" ] && [ "$FELL_BACK" -eq 0 ] && [ "$remaining" -ge 300 ]; then
+        log "usage limit on $REQ_MODEL; trying $CAP_NEXT from the same slot"
+        SUBST_FROM="${SUBST_FROM:-$REQ_MODEL}" REQ_MODEL="$CAP_NEXT" MODEL="$REQ_PROVIDER/$CAP_NEXT" FELL_BACK=1
+        select_model
+        JOB='' SESSION_HANDLE='' SESSION_PATH=''
+        STATUS=failed REASON='usage limit; retrying on the slot fallback' EXIT_CODE=4
+        rm -f "$ENVELOPE"
+        save_result || stop failed 'could not write result JSON' 4
+        JOB_TIMEOUT_SECONDS="$remaining"
+        continue
+      fi
+      stop skipped capped 3
+    fi
+  fi
   if [ "$RC" -eq 7 ] && [ "$RETRIED" -eq 0 ] && [ "$remaining" -ge 300 ] && \
     jq -e '[.error.message, .error.details.error.code, .error.details.error.message] |
       map(select(type == "string")) | join(" ") |

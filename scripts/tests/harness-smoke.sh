@@ -61,7 +61,7 @@ for s in $SUITES; do
     echo "ok   $s"
   else
     echo "FAIL $s"
-    { grep -a 'FAIL' "$TMP/out" | head -n 20; tail -n 8 "$TMP/out"; } | sed 's/^/     | /'
+    { grep -a -A1 'FAIL' "$TMP/out" | head -n 40; tail -n 8 "$TMP/out"; } | sed 's/^/     | /'
     FAILS=$((FAILS + 1))
   fi
 done
