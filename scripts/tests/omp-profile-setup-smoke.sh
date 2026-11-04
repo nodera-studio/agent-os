@@ -15,7 +15,8 @@ mkdir -p "$ENGINE_FIXTURE/.claude/scripts" "$ENGINE_FIXTURE/.claude/omp/skills/m
 cp "$REPO_ROOT/.claude/scripts/omp-profile-setup.sh" "$REPO_ROOT/.claude/scripts/omp-engine.sh" "$ENGINE_FIXTURE/.claude/scripts/"
 cp "$REPO_ROOT/.claude/omp/omp-sandboxed.sh" "$REPO_ROOT/.claude/omp/omp-sandboxed-linux.sh" \
   "$REPO_ROOT/.claude/omp/glen-harness.yml" "$REPO_ROOT/.claude/omp/mcp.json" \
-  "$REPO_ROOT/.claude/omp/model-ladder.sh" "$ENGINE_FIXTURE/.claude/omp/"
+  "$REPO_ROOT/.claude/omp/model-ladder.sh" "$REPO_ROOT/.claude/omp/profiles.sh" "$ENGINE_FIXTURE/.claude/omp/"
+cp "$REPO_ROOT/.claude/routing.json" "$ENGINE_FIXTURE/.claude/"
 cp "$REPO_ROOT/.claude/omp/skills/mnemosyne-glen/SKILL.md" "$ENGINE_FIXTURE/.claude/omp/skills/mnemosyne-glen/"
 git -C "$ENGINE_FIXTURE" init -q --initial-branch=main
 git -C "$ENGINE_FIXTURE" add .
@@ -34,18 +35,23 @@ set -eu
 if [ "${BUN_BE_BUN:-}" = 1 ]; then printf '0123456789abcdef'; exit 0; fi
 # Fix cycle 6: no omp call may inherit a native-cache override.
 [ -z "${PI_NATIVES_DIR:-}" ] || exit 95
-if [ "$*" = '--profile glen-harness toks glen-native-warmup --json' ]; then
-  [ "$HOME" = "$FAKE_OMP_TEST_HOME" ] || exit 99
-  [ "${FAKE_OMP_SANDBOX_ACTIVE:-0}" = 0 ] || exit 98
-  [ "${FAKE_OMP_PREWARM_FAIL:-0}" = 0 ] || exit 97
-  mkdir -p "$HOME/.omp/natives"
-  : > "$HOME/.omp/natives/prewarmed"
-  jq -cn --arg home "$HOME" --args '{home:$home,argv:$ARGS.positional}' -- "$@" >> "$FAKE_OMP_LOG"
-  printf '{}\n'
-  exit 0
-elif [ "$*" = '--profile glen-harness models cursor --json' ]; then
-  [ -f "$HOME/.omp/natives/prewarmed" ] || exit 96
-fi
+case "$*" in
+  '--profile glen-harness toks glen-native-warmup --json' | '--profile glen-harness-codex toks glen-native-warmup --json' | \
+    '--profile glen-harness-opencode toks glen-native-warmup --json')
+    [ "$HOME" = "$FAKE_OMP_TEST_HOME" ] || exit 99
+    [ "${FAKE_OMP_SANDBOX_ACTIVE:-0}" = 0 ] || exit 98
+    [ "${FAKE_OMP_PREWARM_FAIL:-0}" = 0 ] || exit 97
+    mkdir -p "$HOME/.omp/natives"
+    : > "$HOME/.omp/natives/prewarmed"
+    jq -cn --arg home "$HOME" --args '{home:$home,argv:$ARGS.positional}' -- "$@" >> "$FAKE_OMP_LOG"
+    printf '{}\n'
+    exit 0
+    ;;
+  '--profile glen-harness models cursor --json' | '--profile glen-harness-codex models openai-codex --json' | \
+    '--profile glen-harness-opencode models opencode-go --json')
+    [ -f "$HOME/.omp/natives/prewarmed" ] || exit 96
+    ;;
+esac
 exec "$SMOKE_OMP_BASE" "$@"
 EOF
 export PATH="$WORK/bin:$PATH"
@@ -89,8 +95,9 @@ set -eu
 printf 'glen %s\n' "$*" >> "$FAKE_TOOL_CALLS"
 case "$*" in
   --version) printf 'glen/fixture\n' ;;
-  '--profile glen-harness install-extension --json') printf '{}\n' ;;
-  '--profile glen-harness doctor --json')
+  '--profile glen-harness install-extension --json' | '--profile glen-harness-codex install-extension --json' | \
+    '--profile glen-harness-opencode install-extension --json') printf '{}\n' ;;
+  '--profile glen-harness doctor --json' | '--profile glen-harness-codex doctor --json' | '--profile glen-harness-opencode doctor --json')
     jq -cn --argjson current "${FAKE_GLEN_CURRENT:-true}" '{data:{extension:{state:"fixture",current:$current}}}'
     ;;
   *) exit 99 ;;
@@ -542,6 +549,88 @@ run env HOME="$TEST_HOME" TMPDIR="$CASE_DIR/tmp" PI_CONFIG_DIR="$TEST_CONFIG_DIR
 assert_exit 'setup with a caller PI_NATIVES_DIR override succeeds' 0
 assert 'setup warms the default native cache despite the override' test -f "$TEST_HOME/.omp/natives/prewarmed"
 assert 'setup never fills the override native cache' test ! -e "$CASE_DIR/custom-natives"
+
+# --- Engine profiles (--engine): codex and opencode, models from routing.json, bounded opencode retries ---
+engine_fixture() {
+  # engine_fixture <profile> <provider>: a fresh fixture whose settings know the engine-only keys.
+  new_fixture
+  TEST_AGENT="$TEST_ROOT/profiles/$1/agent"
+  export FAKE_OMP_AGENT_DIR="$TEST_AGENT"
+  ready_assets
+  jq -c '.modelRoles.default = "saved/old" | . + {disabledProviders:["agents"],"retry.maxRetries":10,"retry.maxDelayMs":300000,"retry.waitForUsageReset":false}' \
+    "$FAKE_OMP_STATE/settings.json" > "$CASE_DIR/s.json"
+  mv "$CASE_DIR/s.json" "$FAKE_OMP_STATE/settings.json"
+  jq -c '. + {disabledProviders:["agents"]}' "$FAKE_OMP_STATE/overlay.json" > "$CASE_DIR/o.json"
+  mv "$CASE_DIR/o.json" "$FAKE_OMP_STATE/overlay.json"
+  case "$2" in
+    openai-codex) printf '%s\n' '{"models":[{"selector":"openai-codex/gpt-6.1-sol"},{"selector":"openai-codex/gpt-6.1-terra"}]}' > "$FAKE_OMP_STATE/models.json" ;;
+    opencode-go) printf '%s\n' '{"models":[{"provider":"opencode-go","id":"gemini-4-argon"},{"selector":"opencode-go/glm-5.3"}]}' > "$FAKE_OMP_STATE/models.json" ;;
+  esac
+}
+scoped_to() {
+  jq -es --arg p "$1" 'length > 0 and all(.[]; .argv[0:2] == ["--profile",$p])' "$FAKE_OMP_LOG"
+}
+
+engine_fixture glen-harness-codex openai-codex
+setup_run "$SETUP" --engine omp:codex
+assert_exit 'codex engine setup succeeds' 0
+assert 'codex default model comes from routing.json with its effort' jq -e '.modelRoles.default == "openai-codex/gpt-6.1-sol:high"' "$FAKE_OMP_STATE/settings.json"
+assert 'codex setup keeps the other model roles' jq -e '.modelRoles.task == "cursor/task-model"' "$FAKE_OMP_STATE/settings.json"
+assert 'codex setup makes only codex-profile omp calls' scoped_to glen-harness-codex
+assert 'codex setup queried the codex catalog' jq -es 'any(.[]; .argv == ["--profile","glen-harness-codex","models","openai-codex","--json"])' "$FAKE_OMP_LAUNCH_LOG"
+assert 'codex setup pins no retry settings' jq -e '.["retry.maxRetries"] == 10 and .["retry.maxDelayMs"] == 300000' "$FAKE_OMP_STATE/settings.json"
+assert_contains 'codex setup says where the model came from' 'model: openai-codex/gpt-6.1-sol (routing.json)' "$STDOUT"
+assert 'codex setup installs the glen extension for its profile' grep -Fq 'glen --profile glen-harness-codex install-extension --json' "$FAKE_TOOL_CALLS"
+cp "$FAKE_OMP_STATE/settings.json" "$CASE_DIR/settings-after-first"
+: > "$FAKE_OMP_WRITES"
+setup_run "$SETUP" --engine omp:codex
+assert_exit 'codex engine setup is idempotent' 0
+assert 'a rerun changes no setting' test "$(grep -c 'config set' "$FAKE_OMP_WRITES" || true)" -eq 0
+assert 'a rerun leaves settings byte-identical' cmp -s "$CASE_DIR/settings-after-first" "$FAKE_OMP_STATE/settings.json"
+
+engine_fixture glen-harness-opencode opencode-go
+setup_run "$SETUP" --engine omp:opencode
+assert_exit 'opencode engine setup succeeds' 0
+assert 'opencode default is the first slot, without an effort suffix' jq -e '.modelRoles.default == "opencode-go/gemini-4-argon"' "$FAKE_OMP_STATE/settings.json"
+assert 'opencode retries are bounded (AC-027)' jq -e '.["retry.maxRetries"] <= 3 and .["retry.maxDelayMs"] <= 30000 and .["retry.waitForUsageReset"] == false' "$FAKE_OMP_STATE/settings.json"
+assert 'opencode retry values are the pinned ones' jq -e '.["retry.maxRetries"] == 2 and .["retry.maxDelayMs"] == 30000' "$FAKE_OMP_STATE/settings.json"
+assert 'opencode setup keeps its provider enabled' jq -e '.disabledProviders == ["agents"]' "$FAKE_OMP_STATE/settings.json"
+assert 'opencode setup makes only opencode-profile omp calls' scoped_to glen-harness-opencode
+: > "$FAKE_OMP_WRITES"
+setup_run "$SETUP" --engine omp:opencode --check
+assert_exit 'opencode --check passes on a configured profile' 0
+assert_contains 'check names the engine login' 'opencode-go login' "$STDOUT"
+jq -c '.["retry.maxRetries"] = 10' "$FAKE_OMP_STATE/settings.json" > "$CASE_DIR/d.json" && mv "$CASE_DIR/d.json" "$FAKE_OMP_STATE/settings.json"
+setup_run "$SETUP" --engine omp:opencode --check
+assert_exit 'opencode --check fails on retry drift' 1
+assert_contains 'check names the drifted key' 'would change retry.maxRetries' "$STDOUT"
+assert 'check wrote nothing' test "$(grep -c 'config set' "$FAKE_OMP_WRITES" || true)" -eq 0
+
+engine_fixture glen-harness-opencode opencode-go
+printf '%s\n' '{"models":[]}' > "$FAKE_OMP_STATE/models.json"
+setup_run "$SETUP" --engine omp:opencode
+assert_exit 'no live login exits 2' 2
+assert_contains 'the login hint names the profile and provider' "omp --profile glen-harness-opencode login opencode-go" "$STDOUT"
+engine_fixture glen-harness-opencode opencode-go
+printf '%s\n' '{"models":[{"selector":"opencode-go/glm-5.3"}]}' > "$FAKE_OMP_STATE/models.json"
+setup_run "$SETUP" --engine omp:opencode
+assert_exit 'a model missing from the catalog fails' 1
+assert_contains 'the failure names the model' 'model opencode-go/gemini-4-argon is not listed' "$STDERR"
+
+engine_fixture glen-harness-codex openai-codex
+setup_run "$SETUP" --engine omp:cursor
+assert_exit 'an unknown engine is refused' 1
+setup_run "$SETUP" --engine omp:codex --model openai-codex/gpt-6.1-terra
+assert_exit '--model with --engine is refused' 1
+assert_contains 'the refusal says why' 'engine models come from routing.json' "$STDERR"
+setup_run "$SETUP" --engine
+assert_exit '--engine without a value is refused' 1
+
+# --engine all runs each profile in turn, each scoped to its own profile.
+engine_fixture glen-harness-codex openai-codex
+printf '%s\n' '{"models":[{"selector":"openai-codex/gpt-6.1-sol"},{"selector":"opencode-go/gemini-4-argon"}]}' > "$FAKE_OMP_STATE/models.json"
+setup_run "$SETUP" --engine all --dry-run
+assert 'engine all touched both profiles' jq -es 'any(.[]; .argv[1] == "glen-harness-codex") and any(.[]; .argv[1] == "glen-harness-opencode")' "$FAKE_OMP_LOG"
 
 printf '%s assertions, %s failures\n' "$CASES" "$FAILURES"
 [ "$FAILURES" -eq 0 ]

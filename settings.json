@@ -20,6 +20,14 @@
       "mcp__exa__web_fetch_exa",
       "mcp__claude_ai_Context7__resolve-library-id",
       "mcp__claude_ai_Context7__query-docs",
+      "mcp__plugin_mnemosyne_memory__memory_search",
+      "mcp__plugin_mnemosyne_memory__memory_get",
+      "mcp__plugin_mnemosyne_memory__memory_get_recent",
+      "mcp__plugin_mnemosyne_memory__memory_get_entity",
+      "mcp__plugin_mnemosyne_memory__memory_list",
+      "mcp__plugin_mnemosyne_codebase__code_search",
+      "mcp__plugin_mnemosyne_codebase__code_get_file",
+      "mcp__plugin_mnemosyne_codebase__code_index_status",
       "Bash(bash .claude/scripts/clean-scratch.sh:*)"
     ],
     "deny": [
@@ -27,6 +35,8 @@
       "WebFetch",
       "mcp__secrets__secret_set",
       "mcp__secrets__secret_delete",
+      "mcp__plugin_mnemosyne_secrets__secret_set",
+      "mcp__plugin_mnemosyne_secrets__secret_delete",
       "Bash(rm -rf:*)",
       "Bash(sudo:*)",
       "Bash(chmod 777:*)",
@@ -65,7 +75,12 @@
           {
             "type": "command",
             "command": ".claude/hooks/session-start.sh"
-          },
+          }
+        ]
+      },
+      {
+        "matcher": "resume|compact",
+        "hooks": [
           {
             "type": "command",
             "command": ".claude/hooks/reinject-invariants.sh"
@@ -83,6 +98,10 @@
           },
           {
             "type": "command",
+            "command": ".claude/hooks/block-legacy-engines.sh"
+          },
+          {
+            "type": "command",
             "command": ".claude/hooks/steer-bash.sh"
           },
           {
@@ -97,6 +116,10 @@
           {
             "type": "command",
             "command": ".claude/hooks/block-old-codex.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/block-legacy-engines.sh"
           }
         ]
       },

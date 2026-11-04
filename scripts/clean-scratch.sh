@@ -58,8 +58,8 @@ case "$MIN_AGE" in '' | *[!0-9]*) die "--min-age takes whole minutes, not '$MIN_
 [ $# -ge 1 ] || die "$USAGE"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
-# shellcheck source-path=SCRIPTDIR source=codex-procs.sh
-. "$SCRIPT_DIR/codex-procs.sh"
+# shellcheck source-path=SCRIPTDIR source=lib/proc-common.sh
+. "$SCRIPT_DIR/lib/proc-common.sh"
 GCD="$(git -C "$SCRIPT_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" \
   || die "refuse: $SCRIPT_DIR is not in a git checkout"
 MAIN="$(cd "$GCD/.." && pwd -P)"

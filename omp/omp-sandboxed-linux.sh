@@ -14,6 +14,11 @@ RUN_ROOT_REAL="$(cd "$OMP_SANDBOX_RUN_ROOT" && pwd -P)" || die 'could not resolv
 RUN_CWD="$(pwd -P)" || die 'could not resolve working directory'
 PROFILE_AGENT_DIR="$(cd "${OMP_PROFILE_AGENT_DIR:-$REAL_HOME/.omp/profiles/glen-harness/agent}" && pwd -P)" || die 'could not resolve profile agent directory'
 PROFILE_ROOT="$(cd "$PROFILE_AGENT_DIR/.." && pwd -P)" || die 'could not resolve profile root'
+# Exact names, as in omp-sandboxed.sh and omp/profiles.sh.
+case "${PROFILE_ROOT##*/}" in
+  glen-harness | glen-harness-codex | glen-harness-opencode) ;;
+  *) die "profile name is not on the allowlist: ${PROFILE_ROOT##*/}" ;;
+esac
 
 # Resolve ancestor aliases and the executable's own symlink chain, as on macOS.
 # omp is self-contained; only its executable and system linking dependencies bind.
@@ -100,4 +105,9 @@ binds+=(--bind "$RUN_ROOT_REAL" "$RUN_ROOT_REAL")
 binds+=(--dev /dev --proc /proc --remount-ro / --chdir "$RUN_CWD")
 
 # Replace the wrapper; setup failure stays fatal, with no unsandboxed fallback.
+if [ -n "${OMP_STARTUP_MODEL:-}" ]; then
+  [[ "$OMP_STARTUP_MODEL" =~ ^[A-Za-z0-9._/:-]+$ ]] || die 'OMP_STARTUP_MODEL has unexpected characters'
+  set -- "$@" --model "$OMP_STARTUP_MODEL"
+fi
+[ "${OMP_NO_TOOLS:-}" != 1 ] || set -- "$@" --no-tools
 exec bwrap "${binds[@]}" -- "$OMP_REAL_BIN_RESOLVED" "$@"

@@ -16,30 +16,40 @@ CONFIG_ROOT="$REAL_HOME/${PI_CONFIG_DIR:-.omp}"
 double='//' single='/'
 while [[ "$CONFIG_ROOT" == *//* ]]; do CONFIG_ROOT="${CONFIG_ROOT//$double/$single}"; done
 CONFIG_ROOT="${CONFIG_ROOT%/}"
-[ ! -L "$CONFIG_ROOT" ] || die "refusing symlinked glen-harness profile path: $CONFIG_ROOT"
 # Repository callers pass the agent directory; legacy callers use glen-harness.
+# The profile name is checked here against an exact list, because this launcher runs from a cache
+# outside the checkout and cannot source omp/profiles.sh (omp-profiles-smoke.sh keeps the two in step).
+# A prefix glob would admit any such name, so there is none.
+profile_name_ok() {
+  case "$1" in glen-harness | glen-harness-codex | glen-harness-opencode) return 0 ;; esac
+  return 1
+}
+agent_arg="${OMP_PROFILE_AGENT_DIR:-$CONFIG_ROOT/profiles/glen-harness/agent}"
+while [ "${agent_arg%/}" != "$agent_arg" ]; do agent_arg="${agent_arg%/}"; done
+profile_name="${agent_arg%/agent}"
+profile_name="${profile_name##*/}"
+profile_name_ok "$profile_name" || die "profile name is not on the allowlist: $profile_name"
+[ ! -L "$CONFIG_ROOT" ] || die "refusing symlinked $profile_name profile path: $CONFIG_ROOT"
 # Fix cycle 7 (Codex P1): the agent directory must be <omp root>/profiles/
-# glen-harness/agent, and none of those four components may be a symlink.
+# <profile>/agent, and none of those four components may be a symlink.
 # A relocated profile would make this policy grant writes wherever it points
 # while the engine's launcher containment checks the ~/.omp spelling, so it
 # is refused, never followed; the lexical and physical paths then agree.
 # Ancestors above the omp root (/var -> /private/var) still resolve.
-agent_arg="${OMP_PROFILE_AGENT_DIR:-$CONFIG_ROOT/profiles/glen-harness/agent}"
-while [ "${agent_arg%/}" != "$agent_arg" ]; do agent_arg="${agent_arg%/}"; done
 case "$agent_arg" in
-  */*/profiles/glen-harness/agent) ;;
-  *) die 'profile agent directory must be <omp root>/profiles/glen-harness/agent' ;;
+  */*/profiles/"$profile_name"/agent) ;;
+  *) die "profile agent directory must be <omp root>/profiles/$profile_name/agent" ;;
 esac
-agent_rest="${agent_arg%/profiles/glen-harness/agent}"
+agent_rest="${agent_arg%/profiles/$profile_name/agent}"
 omp_root_name="${agent_rest##*/}"
 case "$omp_root_name" in '' | . | ..) die 'profile agent directory must name a real omp root' ;; esac
 omp_root_parent="${agent_rest%/*}"
 omp_root_parent="$(cd "${omp_root_parent:-/}" && pwd -P)" || die 'could not resolve profile agent directory'
 [ "$omp_root_parent" != / ] || omp_root_parent=''
 profile_path="$omp_root_parent"
-for part in "$omp_root_name" profiles glen-harness agent; do
+for part in "$omp_root_name" profiles "$profile_name" agent; do
   profile_path="$profile_path/$part"
-  [ ! -L "$profile_path" ] || die "refusing symlinked glen-harness profile path: $profile_path"
+  [ ! -L "$profile_path" ] || die "refusing symlinked $profile_name profile path: $profile_path"
   [ -d "$profile_path" ] || die 'could not resolve profile agent directory'
 done
 PROFILE_AGENT_DIR="$profile_path"
@@ -419,4 +429,11 @@ $mnemosyne_rule
 EOF
 
 # The run directory owns the generated policy's lifetime, including retained jobs.
+# The engine picks the model and tool set per run by env (UNVERIFIED until the keyed probe: omp must
+# accept these flags after glen's own arguments). Both values are validated, never interpreted.
+if [ -n "${OMP_STARTUP_MODEL:-}" ]; then
+  [[ "$OMP_STARTUP_MODEL" =~ ^[A-Za-z0-9._/:-]+$ ]] || die 'OMP_STARTUP_MODEL has unexpected characters'
+  set -- "$@" --model "$OMP_STARTUP_MODEL"
+fi
+[ "${OMP_NO_TOOLS:-}" != 1 ] || set -- "$@" --no-tools
 exec sandbox-exec -f "$profile" "$OMP_REAL_BIN_RESOLVED" "$@"

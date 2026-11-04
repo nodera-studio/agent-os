@@ -1,4 +1,29 @@
 {"implementation":"claude","ui":"impl-coder-ui",
  "review":["claude","codex"],"planning":["claude","codex"],"debug":["claude","codex"],
  "audits":["claude","codex"],"integration":"claude",
- "heavy_concurrency":8}
+ "heavy_concurrency":8,
+ "omp_engines":{
+  "omp:codex":{"profile":"glen-harness-codex","provider":"openai-codex","slots":[
+   {"slot":"codex","model":"gpt-6.1-sol","effort":"high","tools":true,"fallbacks":[],
+    "budget":{"window_hours":null,"max_calls":null,"max_usd":null}}]},
+  "omp:opencode":{"profile":"glen-harness-opencode","provider":"opencode-go","slots":[
+   {"slot":"argon","model":"gemini-4-argon","effort":null,"tools":true,"fallbacks":["qwen3.8-max"],
+    "budget":{"window_hours":null,"max_calls":null,"max_usd":null}},
+   {"slot":"glm","model":"glm-5.3","effort":"high","tools":true,"fallbacks":["kimi-k3.1-pro"],
+    "budget":{"window_hours":null,"max_calls":null,"max_usd":null}},
+   {"slot":"flash","model":"deepseek-v4.1-flash","effort":"low","tools":true,"fallbacks":["glm-5.3-flash"],
+    "budget":{"window_hours":null,"max_calls":null,"max_usd":null}}]}},
+ "omp_roles":{
+  "review":{"stakes":"high","select":["claude","omp:codex","omp:opencode/argon"]},
+  "planning":{"stakes":"normal","select":["claude","omp:codex","omp:opencode/argon"]},
+  "architect":{"stakes":"high","select":["claude","omp:codex"]},
+  "debug":{"stakes":"normal","select":["claude","omp:opencode/glm"]},
+  "security":{"stakes":"high","select":["claude","omp:opencode/argon","omp:opencode/flash"]},
+  "audits":{"stakes":"normal","select":["claude","omp:opencode/glm"]},
+  "explore":{"stakes":"normal","select":["omp:opencode/flash"]},
+  "research":{"stakes":"normal","select":["omp:opencode/flash"]},
+  "verify":{"stakes":"normal","select":["omp:opencode/flash"]},
+  "docs":{"stakes":"normal","select":["claude","omp:opencode/argon"]},
+  "tests_draft":{"stakes":"normal","select":["claude"]},
+  "triage":{"stakes":"normal","select":["claude"]}},
+ "omp_fallback":[]}

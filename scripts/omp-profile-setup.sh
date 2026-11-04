@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
 # Set up the isolated omp reviewer/debugger profile; reruns sync only differences.
 # Usage: omp-profile-setup.sh [--model cursor/<id>] [--check] [--dry-run]
+#        omp-profile-setup.sh --engine omp:codex|omp:opencode|all [--check] [--dry-run]
+# --engine sets up that engine's profile (omp/profiles.sh): its default model comes from routing.json, not
+# a ladder, and the opencode profile also gets bounded retry settings.
 set -euo pipefail
 
-PROFILE=glen-harness
+PROFILE=glen-harness PROVIDER=cursor LOGIN_CMD='login cursor' LOGIN_LABEL=Cursor ENGINE=''
 # $0, not BASH_SOURCE[0]: a test negative control runs this script's text
 # through `bash -c "$text" "$0_override" ...`, where BASH_SOURCE is unset.
 # shellcheck source=.claude/omp/model-ladder.sh
 . "$(cd "$(dirname "$0")/../omp" && pwd -P)/model-ladder.sh"
+# shellcheck source=.claude/omp/profiles.sh
+. "$(cd "$(dirname "$0")/../omp" && pwd -P)/profiles.sh"
 DEFAULT_MODEL_PREFERENCE=("${MODEL_LADDER[@]}")
 DEFAULT_THINKING_PREFERENCE=("${THINKING_LADDER[@]}")
 MODEL="${DEFAULT_MODEL_PREFERENCE[0]}"
@@ -26,13 +31,31 @@ while [ "$#" -gt 0 ]; do
       EXPLICIT_MODEL=1
       shift 2
       ;;
+    --engine)
+      [ "$#" -ge 2 ] || die '--engine needs omp:codex, omp:opencode or all'
+      ENGINE="$2"
+      shift 2
+      ;;
     --check) CHECK=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
-    --help | -h) sed -n '2,3s/^# //p' "$0"; exit 0 ;;
+    --help | -h) sed -n '2,4s/^# //p' "$0"; exit 0 ;;
     *) die "Unknown arg: $1 (use --help)" ;;
   esac
 done
-case "$MODEL" in cursor/?*) ;; *) die '--model must be cursor/<id>' ;; esac
+if [ "$ENGINE" = all ]; then
+  [ "$EXPLICIT_MODEL" -eq 0 ] || die '--model is for the legacy profile only'
+  child_args=()
+  [ "$CHECK" -eq 0 ] || child_args+=(--check)
+  [ "$DRY_RUN" -eq 0 ] || child_args+=(--dry-run)
+  rc=0
+  for engine in omp:codex omp:opencode; do
+    child=0
+    /bin/bash "$0" --engine "$engine" ${child_args[@]+"${child_args[@]}"} || child="$?"
+    [ "$child" -le "$rc" ] || rc="$child"
+  done
+  exit "$rc"
+fi
+[ -n "$ENGINE" ] || case "$MODEL" in cursor/?*) ;; *) die '--model must be cursor/<id>' ;; esac
 
 # HOME's ancestry may contain system aliases such as macOS /var -> /private/var.
 # Anchor both our baseline and child directory resolution to the same physical HOME;
@@ -43,6 +66,18 @@ OMP_ROOT="$PROFILE_HOME/${PI_CONFIG_DIR:-.omp}"
 for tool in omp jq shasum; do
   command -v "$tool" >/dev/null 2>&1 || die "Required tool missing: $tool"
 done
+MODEL_SOURCE='explicit --model'
+if [ -n "$ENGINE" ]; then
+  [ "$EXPLICIT_MODEL" -eq 0 ] || die '--model is for the legacy profile only; engine models come from routing.json'
+  PROFILE="$(profile_for_engine "$ENGINE")" || die "Unknown engine: $ENGINE (use omp:codex, omp:opencode or all)"
+  PROVIDER="$(profile_provider "$PROFILE")" LOGIN_CMD="$(profile_login_cmd "$PROFILE")" LOGIN_LABEL="$PROVIDER"
+  ROUTING_FILE="$(cd "$(dirname "$0")/.." && pwd -P)/routing.json"
+  # The profile's saved default is the engine's first slot; the other slots are chosen per run by the engine script.
+  SLOT_JSON="$(jq -ec --arg e "$ENGINE" '.omp_engines[$e].slots[0]' "$ROUTING_FILE")" || die "No slots for $ENGINE in $ROUTING_FILE"
+  MODEL="$PROVIDER/$(printf '%s' "$SLOT_JSON" | jq -r .model)"
+  THINKING="$(printf '%s' "$SLOT_JSON" | jq -r '.effort // empty')"
+  EXPLICIT_MODEL=1 MODEL_SOURCE='routing.json'
+fi
 # Match node:path.join's lexical normalization, including a leading slash in
 # PI_CONFIG_DIR (joined under HOME, never an absolute override).
 OMP_ROOT="$(jq -nr --arg path "$OMP_ROOT" '
@@ -80,7 +115,6 @@ profile_path_guard() {
 profile_path_guard
 
 ENGINE_ROOT="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
-MAIN="$(dirname "$(git -C "$ENGINE_ROOT" rev-parse --path-format=absolute --git-common-dir)")"
 OVERLAY="$ENGINE_ROOT/.claude/omp/glen-harness.yml"
 MCP_SOURCE="$ENGINE_ROOT/.claude/omp/mcp.json"
 SKILL_SOURCE="$ENGINE_ROOT/.claude/omp/skills/mnemosyne-glen/SKILL.md"
@@ -235,7 +269,7 @@ asset_guard "$SKILL_SOURCE" "$SKILL_TARGET" "$SKILL_MARKER"
 # --version returned without extraction on omp 18.14.0. commands/toks.ts imports
 # pi-natives and counts with embedded offline tokenizers; a tiny literal warms it.
 profile_omp profile toks glen-native-warmup --json >/dev/null
-MODELS="$(profile_omp sandbox models cursor --json)"
+MODELS="$(profile_omp sandbox models "$PROVIDER" --json)"
 MODEL_COUNT="$(printf '%s' "$MODELS" | jq -er '.models | length')"
 LOGIN=1
 [ "$MODEL_COUNT" -gt 0 ] || LOGIN=0
@@ -267,10 +301,10 @@ if [ "$LOGIN" -eq 1 ]; then
     say "ERROR: model $MODEL is not listed. Available ids:" >&2
     printf '%s' "$MODELS" | jq -r '.models[] | .selector // (.provider + "/" + .id)' >&2
   else
-    [ "$CHECK" -eq 1 ] || say "model: $MODEL (explicit --model)"
+    [ "$CHECK" -eq 1 ] || say "model: $MODEL ($MODEL_SOURCE)"
   fi
 elif [ "$EXPLICIT_MODEL" -eq 0 ] && [ "$CHECK" -eq 0 ]; then
-  say "no live Cursor login yet; preference list unvalidated (using $MODEL)"
+  say "no live $LOGIN_LABEL login yet; preference list unvalidated (using $MODEL)"
 fi
 
 # Item 10 (fix cycle 4): omp 18.14.0 honours a "<id>:<level>" suffix on a
@@ -281,11 +315,27 @@ fi
 # An explicit --model never gets a ladder level (matches SKILL.md): THINKING
 # only carries a real value along the ladder path.
 MODEL_ROLE_VALUE="$MODEL"
-[ "$EXPLICIT_MODEL" -eq 1 ] || MODEL_ROLE_VALUE="$MODEL:$THINKING"
+if [ -n "$ENGINE" ]; then
+  MODEL_ROLE_VALUE="$MODEL${THINKING:+:$THINKING}"
+elif [ "$EXPLICIT_MODEL" -eq 0 ]; then
+  MODEL_ROLE_VALUE="$MODEL:$THINKING"
+fi
 
 KEYS=(modelRoles tools.approvalMode tools.approval tools.xdev
   tools.restrictedFolders fetch.enabled web_search.enabled bash.enabled eval.py
   eval.js browser.enabled lsp.enabled mcp.enableProjectConfig mcp.startupTimeoutMs)
+# Engine profiles also keep their provider enabled (the shared policy's disabledProviders lists only
+# the agents discovery id), and the opencode profile fails fast on a spent quota instead of sleeping.
+[ -z "$ENGINE" ] || KEYS+=(disabledProviders)
+[ "$ENGINE" != omp:opencode ] || KEYS+=(retry.maxRetries retry.maxDelayMs retry.waitForUsageReset)
+# fixed_value <key>: a setting this script pins itself rather than reading from the shared policy.
+fixed_value() {
+  case "$ENGINE:$1" in
+    omp:opencode:retry.maxRetries) echo 2 ;;
+    omp:opencode:retry.maxDelayMs) echo 30000 ;;
+    omp:opencode:retry.waitForUsageReset) echo false ;;
+  esac
+}
 CURRENT=() DESIRED=()
 DIFFERENCES=0
 for key in "${KEYS[@]}"; do
@@ -296,6 +346,9 @@ for key in "${KEYS[@]}"; do
       if type == "object" then .default = $model else error("modelRoles must be a record") end')"
     current="$(printf '%s' "$current" | jq -cS .default)"
     desired="$(jq -cn --arg model "$MODEL_ROLE_VALUE" '$model')"
+  elif [ -n "$(fixed_value "$key")" ]; then
+    desired="$(fixed_value "$key")"
+    value_to_set="$desired"
   else
     desired="$(profile_omp overlay config get "$key" --json | jq -cS .value)"
     value_to_set="$desired"
@@ -351,7 +404,7 @@ if [ "$CHECK" -eq 0 ]; then
 fi
 
 if [ "$LOGIN" -eq 0 ]; then
-  say "Owner action: run 'omp --profile glen-harness login cursor', then rerun"
+  say "Owner action: run 'omp --profile $PROFILE $LOGIN_CMD', then rerun"
 fi
 
 if [ "$CHECK" -eq 1 ]; then
@@ -394,7 +447,7 @@ if [ "$CHECK" -eq 1 ]; then
     row 'extension status' unavailable
     FAILED=1
   fi
-  if [ "$LOGIN" -eq 1 ]; then row 'Cursor login' confirmed; else row 'Cursor login' 'missing/not confirmed'; fi
+  if [ "$LOGIN" -eq 1 ]; then row "$LOGIN_LABEL login" confirmed; else row "$LOGIN_LABEL login" 'missing/not confirmed'; fi
   [ "$DIFFERENCES" -eq 0 ] || FAILED=1
   [ "$MODEL_OK" -eq 1 ] || FAILED=1
   [ "$FAILED" -eq 0 ] || exit 1

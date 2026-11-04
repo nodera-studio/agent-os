@@ -163,5 +163,23 @@ else fail "(e) derived prefix: hook output '$H'"; fi
 H="$(hook_in "$REPO" 'rm -rf "$TMPDIR/other-build"')"
 if [ -z "$H" ]; then ok "(e) derived prefix: rm -rf \$TMPDIR/other-build -> no output"; else fail "(e) other-build -> '$H'"; fi
 
+# (i) the Codex helper is optional (AC-050): a copy of the script with only lib/proc-common.sh beside it
+# (no codex-procs.sh) still dry-runs and removes.
+NC="$WORK/nocodex"
+mkdir -p "$NC/.claude/scripts/lib" "$T/proj-nc/sub"
+git init -q "$NC"
+cp "$TEST_DIR/../clean-scratch.sh" "$NC/.claude/scripts/"
+cp "$TEST_DIR/../lib/proc-common.sh" "$NC/.claude/scripts/lib/"
+[ ! -e "$NC/.claude/scripts/codex-procs.sh" ] || { echo "FAIL setup: codex-procs.sh present" >&2; exit 1; }
+find "$T/proj-nc" -exec touch -t 202610300000 {} +
+RC=0
+OUT="$(env TMPDIR="$T" HARNESS_CLEAN_REPO="$REPO" /bin/bash "$NC/.claude/scripts/clean-scratch.sh" --dry-run --min-age 0 proj-nc 2>&1)" || RC=$?
+if [ "$RC" = 0 ] && has "would remove $T/proj-nc " && [ -d "$T/proj-nc" ]; then ok "(i) no codex-procs.sh: dry run lists proj-nc"
+else fail "(i) dry run: rc $RC: $OUT"; fi
+RC=0
+OUT="$(env TMPDIR="$T" HARNESS_CLEAN_REPO="$REPO" /bin/bash "$NC/.claude/scripts/clean-scratch.sh" --min-age 0 proj-nc 2>&1)" || RC=$?
+if [ "$RC" = 0 ] && [ ! -e "$T/proj-nc" ]; then ok "(i) no codex-procs.sh: proj-nc removed"
+else fail "(i) removal: rc $RC: $OUT"; fi
+
 if [ "$FAILS" -gt 0 ]; then echo "$FAILS case(s) failed"; exit 1; fi
 echo "all cases passed"
