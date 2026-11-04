@@ -50,6 +50,16 @@ expect 'authentic cap sample recognised' test "$(field "$d" .cap_signal)" = imme
 expect 'evidence file written' grep -Fq 'omp:opencode probe' "$d/probe.md"
 expect 'the key is nowhere in the output' sh -c "! grep -rFq -- '$SECRET' '$d'"
 
+# Outside an installed .claude/ project the launcher cannot be found: env passthrough is unmeasured, not false.
+mkdir -p "$WORK/stubroot/scripts"
+cp "$PROBE" "$WORK/stubroot/scripts/omp-probe-keyed.sh"
+printf '#!/bin/sh\necho "omp-engine: sandbox launcher unavailable on main and in worktree"\nexit 4\n' > "$WORK/stubroot/scripts/omp-engine.sh"
+d="$(scenario nolayout)"
+env PATH="$WORK/bin:$PATH" HOME="$WORK/home" FAKE_STATE="$d" OPENCODE_API_KEY="$SECRET" \
+  /bin/bash "$WORK/stubroot/scripts/omp-probe-keyed.sh" --out "$d/result.json" --evidence "$d/probe.md" > "$d/stdout" 2> "$d/stderr"
+expect 'unavailable launcher leaves env passthrough null' jq -e '.env_passthrough == null' "$d/result.json"
+expect 'null passthrough is explained in the evidence' grep -Fq 'env passthrough not measured' "$d/probe.md"
+
 d="$(scenario startup startup_arg)"
 run_probe "$d"
 expect 'falls through to --model' test "$(field "$d" .launch_mechanism)" = startup_arg

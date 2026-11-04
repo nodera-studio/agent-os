@@ -102,9 +102,16 @@ fi
 
 # 3. Does the key survive the engine's environment scrub, and does the stored login stand alone.
 ENV_PASS=false LOGIN_OK=false
-if [ -n "${OPENCODE_API_KEY:-}" ] && /bin/bash "$ROOT/scripts/omp-engine.sh" envcheck -- \
-  /bin/sh -c 'test -n "${OPENCODE_API_KEY:-}"' >/dev/null 2>&1; then
-  ENV_PASS=true
+if [ -n "${OPENCODE_API_KEY:-}" ]; then
+  envcheck_out="$WORK/envcheck.out"
+  if /bin/bash "$ROOT/scripts/omp-engine.sh" envcheck -- \
+    /bin/sh -c 'test -n "${OPENCODE_API_KEY:-}"' > "$envcheck_out" 2>&1; then
+    ENV_PASS=true
+  elif grep -Fq 'launcher unavailable' "$envcheck_out"; then
+    # The launcher is read from main in an installed .claude/ project; outside one, nothing was measured.
+    ENV_PASS=null
+    note 'env passthrough not measured: run the probe from an installed .claude/ project'
+  fi
 fi
 DROP_KEY=1
 if [ -n "$FIRST" ] && trial "$FIRST" --model "opencode-go/$FIRST"; then LOGIN_OK=true; fi
