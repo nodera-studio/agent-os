@@ -3,7 +3,7 @@
 #
 # Usage: /bin/bash .claude/scripts/tests/remove-worktree-preserve-smoke.sh
 # Bash 3.2, no network, no real companion: a temp repo carries copies of remove-worktree.sh and
-# codex-procs.sh, and every run uses CLAUDE_PLUGIN_DATA and TMPDIR under the mktemp work dir with
+# codex-procs.sh and lib/proc-common.sh, and every run uses CLAUDE_PLUGIN_DATA and TMPDIR under the mktemp work dir with
 # --force-no-state. Case (d) adds a local bare origin for the branch-deletion check. Prints ok/FAIL
 # per case; exit 1 on any FAIL.
 set -euo pipefail
@@ -15,12 +15,13 @@ WORK="$(cd "$WORK" && pwd -P)"
 trap 'rm -rf "$WORK"' EXIT
 
 REPO="$WORK/repo"
-mkdir -p "$WORK/tmp" "$REPO/.claude/scripts"
+mkdir -p "$WORK/tmp" "$REPO/.claude/scripts/lib"
 G() { git -C "$REPO" -c user.name=smoke -c user.email=smoke@example.invalid \
   -c core.hooksPath=/dev/null -c commit.gpgsign=false "$@"; }
 git init -q "$REPO"
 printf '%s\n' .claude/worktrees/ .claude/evidence/ .claude/plans/ target/ >"$REPO/.gitignore"
 cp "$SCRIPTS/remove-worktree.sh" "$SCRIPTS/codex-procs.sh" "$REPO/.claude/scripts/"
+cp "$SCRIPTS/lib/proc-common.sh" "$REPO/.claude/scripts/lib/"
 G add -A
 G commit -q -m init
 G worktree add -q "$REPO/.claude/worktrees/w1" -b t1 >/dev/null 2>&1
@@ -125,6 +126,24 @@ run_b "staging" "$W3" t3
 if [ "$RC" = 0 ] && [ ! -e "$W3" ] && has "its tip is in freshly fetched origin/staging" \
   && ! G rev-parse -q --verify refs/heads/t3 >/dev/null; then ok "(d) t3 merged into origin/staging: worktree and branch removed"
 else fail "(d) merged t3: rc $RC: $OUT"; fi
+
+# (e) codex-procs.sh is optional (AC-050): with it, no companion state store refuses the removal; without
+# it there is no companion to ask, so the same run (no --force-no-state) removes the worktree.
+G worktree add -q "$REPO/.claude/worktrees/w5" -b t5 >/dev/null 2>&1
+W5="$REPO/.claude/worktrees/w5"
+run_nf() { # run_nf ARGS...: like run, without --force-no-state
+  RC=0
+  OUT="$(cd "$REPO" && env CLAUDE_PLUGIN_DATA="$WORK/none" TMPDIR="$WORK/tmp" \
+    /bin/bash "$REPO/.claude/scripts/remove-worktree.sh" "$@" 2>&1)" || RC=$?
+}
+run_nf "$W5"
+if [ "$RC" = 1 ] && has "no companion state store exists" && [ -d "$W5" ]; then ok "(e) with the helper, no state store refuses"
+else fail "(e) with helper: rc $RC: $OUT"; fi
+rm -f "$REPO/.claude/scripts/codex-procs.sh"
+run_nf "$W5" t5
+if [ "$RC" = 0 ] && [ ! -e "$W5" ] && ! has "companion" && ! G rev-parse -q --verify refs/heads/t5 >/dev/null; then
+  ok "(e) without the helper, the worktree and its branch are removed"
+else fail "(e) without helper: rc $RC: $OUT"; fi
 
 if [ "$FAILS" -gt 0 ]; then echo "$FAILS case(s) failed"; exit 1; fi
 echo "all cases passed"

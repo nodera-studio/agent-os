@@ -65,8 +65,24 @@ case "$ARG" in /*) ;; *) die "refuse: path must be absolute: $ARG" ;; esac
 case "$BRANCH" in main | master | HEAD | -*) die "refuse: will not delete branch $BRANCH" ;; esac
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
-# shellcheck source-path=SCRIPTDIR source=codex-procs.sh
-. "$SCRIPT_DIR/codex-procs.sh"
+# shellcheck source-path=SCRIPTDIR source=lib/proc-common.sh
+. "$SCRIPT_DIR/lib/proc-common.sh"
+# The Codex job and broker checks need codex-procs.sh, which ships only with the Codex pack. Without
+# it there is no companion to ask, so the checks below become no-ops.
+if [ -f "$SCRIPT_DIR/codex-procs.sh" ]; then
+  HAVE_CODEX_PROCS=1
+  # shellcheck source-path=SCRIPTDIR source=codex-procs.sh
+  . "$SCRIPT_DIR/codex-procs.sh"
+else
+  HAVE_CODEX_PROCS=0
+  STATE_ROOTS=()
+  codex_procs() { :; }
+  codex_jobs() { :; }
+  load_roots() { :; }
+  live_jobs_at() { :; }
+  tasks_at() { :; }
+  cancel_hint() { :; }
+fi
 GCD="$(git -C "$SCRIPT_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" \
   || die "refuse: $SCRIPT_DIR is not in a git checkout"
 MAIN="$(cd "$GCD/.." && pwd -P)"
@@ -144,7 +160,7 @@ TMP="$(mktemp -d "${TMPDIR:-/tmp}/remove-worktree.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
 SNAP="$TMP/snap" PROCS="$TMP/procs" JOBS="$TMP/jobs"
 load_roots
-if [ ${#STATE_ROOTS[@]} -eq 0 ] && [ "$NOSTATE" = 0 ]; then
+if [ "$HAVE_CODEX_PROCS" = 1 ] && [ ${#STATE_ROOTS[@]} -eq 0 ] && [ "$NOSTATE" = 0 ]; then
   die "refuse: no companion state store exists, so live jobs cannot be checked (--force-no-state to go on without them)"
 fi
 snapshot_procs
