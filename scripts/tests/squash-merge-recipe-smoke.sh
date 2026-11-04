@@ -1,10 +1,11 @@
 #!/bin/bash
 # squash-merge-recipe-smoke.sh — the "Squash-merged base" recipe in
-# .claude/skills/auto-mode/references/loop-procedures.md (step 7) against a temp repo. The temp
-# repo's `main` stands in for the integration branch the wave PRs squash-merge into.
+# .claude/skills/auto-mode/references/loop-procedures.md (step 7), run through merge-trunk.sh, against
+# a temp repo. The temp repo's `main` stands in for the integration branch the wave PRs squash-merge
+# into.
 #
 # Usage: /bin/bash .claude/scripts/tests/squash-merge-recipe-smoke.sh
-# Bash 3.2, no network. The temp repos ignore the global and system git config, so no hook,
+# Bash 3.2, no network (merge-trunk.sh gets the wave A tip and squash commit directly, no gh). Needs jq. The temp repos ignore the global and system git config, so no hook,
 # signing key or alias of the owner's runs. History built per repo:
 #   main:  seq 1 30 > f
 #   waveA: line 5 -> A5 (this commit is CUT)
@@ -13,6 +14,9 @@
 # Cases: (a) the plain base conflicts; (b) the cut base merges clean (tree T); (c) the graft recipe
 # merges to T with the ordinary parents and leaves refs/replace empty; (d) a real conflict left
 # by the cut base exits 1 with only f conflicted, and refs/replace is still empty.
+# Further cases for merge-trunk.sh itself: (e) no sibling wave = a plain merge; (f) a dirty worktree
+# is refused; (g) a failing hook leaves an error and no graft; (h) TERM mid-merge still removes the
+# graft; (i) an already merged trunk is "up-to-date"; (j) a bad squash commit is an error.
 # Prints ok/FAIL per case; exit 1 on any FAIL.
 set -euo pipefail
 
@@ -56,14 +60,13 @@ build() {
 
 replace_refs() { git -C "$1" for-each-ref refs/replace | wc -l | tr -d ' '; }
 
-# recipe <repo dir>: the loop-procedures.md recipe, with main standing in for the fetched
-# integration branch; sets RC.
+# recipe <repo dir>: merge-trunk.sh with main standing in for the fetched integration branch and
+# waveA's last tip for headRefOid; sets RC and OUT (its JSON).
+HERE="$(cd "$(dirname "$0")" && pwd -P)"
+MERGE_TRUNK="$HERE/../merge-trunk.sh"
+command -v jq >/dev/null 2>&1 || { echo "FAIL: jq not installed"; exit 1; }
 recipe() {
-  local wt="$1" cut
-  cut="$(git -C "$wt" merge-base HEAD waveA)"   # waveA's last tip stands in for headRefOid
-  git -C "$wt" replace --graft "$SQ" "$SQ^" "$cut"
-  RC=0; git -C "$wt" merge -q --no-edit main >/dev/null 2>&1 || RC=$?   # the documented form, under set -e
-  git -C "$wt" replace -d "$SQ" >/dev/null
+  RC=0; OUT="$(bash "$MERGE_TRUNK" --worktree "$1" --trunk main --a-tip waveA --sq "$SQ")" || RC=$?
 }
 
 # --- clean variant: cases (a)-(c) ---
@@ -90,6 +93,9 @@ recipe "$R"
 if [ "$RC" -ne 0 ]; then
   fail "(c) graft recipe merge exited $RC, expected 0"
 else
+  expect "(c) JSON says merged on the cut base" "(c) JSON: $OUT" "$(echo "$OUT" | jq -r '.status + ":" + .base')" = merged:cut
+  expect "(c) the preview shows the plain base conflicting and the cut base clean" "(c) preview: $OUT" \
+    "$(echo "$OUT" | jq -r '(.preview.plain.clean | tostring) + ":" + (.preview.cut.clean | tostring)')" = false:true
   tree="$(git -C "$R" rev-parse 'HEAD^{tree}')"
   parents="$(git -C "$R" rev-list --parents -n 1 HEAD | cut -d' ' -f2-)"
   want="$OLD_HEAD $MAIN_TIP"
@@ -110,11 +116,65 @@ recipe "$R"
 if [ "$RC" -eq 1 ]; then ok "(d) recipe exits 1 on a real conflict"; else fail "(d) recipe exited $RC, expected 1"; fi
 conflicted="$(git -C "$R" diff --name-only --diff-filter=U)"
 expect "(d) only f is conflicted" "(d) conflicted files: '$conflicted'" "$conflicted" = f
+expect "(d) JSON says conflict, base cut, f" "(d) JSON: $OUT" "$(echo "$OUT" | jq -r '.status + ":" + .base + ":" + (.conflicts | join(","))')" = conflict:cut:f
 if grep -q '^<<<<<<<' "$R/f" && ! grep -qx A5 "$R/f" && grep -qx B5 "$R/f"; then
   ok "(d) the conflict is line 25 only (line 5 resolved to B5)"
 else
   fail "(d) unexpected conflict content: $(tr '\n' ' ' <"$R/f")"
 fi
 expect "(d) refs/replace is empty" "(d) refs/replace not empty" "$(replace_refs "$R")" = 0
+
+# --- (e) no sibling wave: a plain merge ---
+R="$WORK/plain"
+build "$R" 0
+RC=0; OUT="$(bash "$MERGE_TRUNK" --worktree "$R" --trunk main)" || RC=$?
+expect "(e) a plain merge conflicts like the plain base (exit 1)" "(e) exit $RC, $OUT" "$RC:$(echo "$OUT" | jq -r '.status + ":" + .base')" = 1:conflict:plain
+git -C "$R" merge --abort
+expect "(e) refs/replace is empty" "(e) refs/replace not empty" "$(replace_refs "$R")" = 0
+
+# --- (f) a dirty worktree is refused ---
+R="$WORK/dirty"
+build "$R" 0
+head0="$(git -C "$R" rev-parse HEAD)"
+echo extra >>"$R/f"
+recipe "$R"
+expect "(f) exit 2 on uncommitted changes" "(f) exit $RC, $OUT" "$RC:$(echo "$OUT" | jq -r .status)" = 2:error
+expect "(f) HEAD unchanged and no graft" "(f) moved or grafted" "$(git -C "$R" rev-parse HEAD):$(replace_refs "$R")" = "$head0:0"
+
+# --- (g) a failing hook stops the merge: an error, and the graft is gone ---
+R="$WORK/hook"
+build "$R" 0
+mkdir -p "$R/.git/hooks"
+printf '#!/bin/sh\nexit 1\n' >"$R/.git/hooks/pre-merge-commit" && chmod +x "$R/.git/hooks/pre-merge-commit"
+recipe "$R"
+expect "(g) a stopped merge is an error (exit 2), not a conflict" "(g) exit $RC, $OUT" "$RC:$(echo "$OUT" | jq -r .status)" = 2:error
+expect "(g) refs/replace is empty" "(g) refs/replace not empty" "$(replace_refs "$R")" = 0
+
+# --- (h) TERM during the merge still removes the graft ---
+R="$WORK/term"
+build "$R" 0
+printf '#!/bin/sh\nsleep 2\n' >"$R/.git/hooks/pre-merge-commit" && chmod +x "$R/.git/hooks/pre-merge-commit"
+bash "$MERGE_TRUNK" --worktree "$R" --trunk main --a-tip waveA --sq "$SQ" >/dev/null 2>&1 &
+mt=$!
+n=0; while [ "$(replace_refs "$R")" = 0 ] && [ "$n" -lt 40 ]; do sleep 0.1; n=$((n + 1)); done
+saw="$(replace_refs "$R")"
+kill -TERM "$mt" 2>/dev/null; wait "$mt" 2>/dev/null || true
+expect "(h) the graft existed during the merge" "(h) no graft seen" "$saw" = 1
+expect "(h) refs/replace is empty after TERM" "(h) refs/replace not empty" "$(replace_refs "$R")" = 0
+git -C "$R" merge --abort 2>/dev/null || true
+
+# --- (i) a merged trunk is up to date ---
+R="$WORK/clean2"
+build "$R" 0
+recipe "$R"
+recipe "$R"
+expect "(i) merging again is up-to-date (exit 0)" "(i) exit $RC, $OUT" "$RC:$(echo "$OUT" | jq -r .status)" = 0:up-to-date
+
+# --- (j) a bad squash commit is an error before any graft ---
+R="$WORK/badsq"
+build "$R" 0
+RC=0; OUT="$(bash "$MERGE_TRUNK" --worktree "$R" --trunk main --a-tip waveA --sq deadbeef)" || RC=$?
+expect "(j) exit 2" "(j) exit $RC, $OUT" "$RC" = 2
+expect "(j) refs/replace is empty" "(j) refs/replace not empty" "$(replace_refs "$R")" = 0
 
 if [ "$FAILS" -gt 0 ]; then echo "$FAILS case(s) failed"; exit 1; fi
