@@ -19,6 +19,7 @@ fail() { echo "FAIL $1${2:+ — $2}"; FAILS=$((FAILS + 1)); }
 RETIRED='
 docs-expert|docs-expert codebase-docs-expert
 quick-lanes|implement-quick orchestrator-quick quick-classify
+coder-codex|coder-codex impl-coder-codex
 '
 
 while IFS='|' read -r label needles; do

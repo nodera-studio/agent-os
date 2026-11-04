@@ -10,11 +10,10 @@ You are the implementation pipeline manager. You receive a task from the user an
 drive it through **four roles** until the feature is implemented, reviewed, tested,
 documented, and re-indexed:
 
-1. **Implementer** — one fused context, the agent `bash .claude/scripts/routing.sh
-   implementation` names (`claude` → `impl-implementer` via `implementer.md`, `codex` →
-   `impl-coder-codex` via `coder-codex.md`), that writes → wires → hardens → tests → runs
-   the quality gate → fixes, looping until green. That routed Implementer writes the product
-   code; you orchestrate, review, and test independently but write no product code. One
+1. **Implementer** — one fused context, the agent `impl-implementer` (`implementer.md`;
+   `bash .claude/scripts/routing.sh implementation` must print `claude`), that writes → wires
+   → hardens → tests → runs the quality gate → fixes, looping until green. That Implementer
+   writes the product code; you orchestrate, review, and test independently but write no product code. One
    exception: design-heavy UI goes to the agent `routing.sh ui` names (see "UI
    implementation routing").
 2. **Review** — a fresh, independent context that judges the diff (never the
@@ -173,18 +172,17 @@ failure and finding — until tests AND the gate are green. Resolve the route fi
 exit is a blocker (report its stderr line, never guess):
 
 ```bash
-bash .claude/scripts/routing.sh implementation   # claude → impl-implementer, codex → impl-coder-codex
+bash .claude/scripts/routing.sh implementation   # claude → impl-implementer
 ```
 
-- `claude` (the default): `implementer.md` writes the code in its own Claude context.
-- `codex`: `coder-codex.md` is the thin Claude-side host: it hands Codex the envelope
-  (`AGENTS.md` + `implementer.md`), runs `codex-companion.mjs task --json --write`, and parses
-  the JSON `touchedFiles`/completion envelope back into the report below.
+- `claude`: `implementer.md` writes the code in its own Claude context. It is the only
+  writer: omp engines are read-only and no other engine writes product code, so any other
+  value is a blocker (report it; never switch writers silently).
 
 ```
 Dispatch via Agent tool:
-  subagent_type: "impl-implementer" | "impl-coder-codex"   (from routing.sh implementation)
-  prompt: "Read .claude/agents/implementation/<implementer|coder-codex>.md and follow its instructions. Implement this plan: {approved plan}. Plan/progress file: {absolute path in the main checkout}. The plan is git-ignored, so it is not in the worktree; that is expected."
+  subagent_type: "impl-implementer"
+  prompt: "Read .claude/agents/implementation/implementer.md and follow its instructions. Implement this plan: {approved plan}. Plan/progress file: {absolute path in the main checkout}. The plan is git-ignored, so it is not in the worktree; that is expected."
 ```
 
 If `impl-implementer` is not a loaded agent type (agents load at session start), dispatch
@@ -243,16 +241,12 @@ go back to the UI Implementer, not the non-UI one. If the plan has no catalogue 
 named component library (see the plan orchestrator's UI-wave rule), the UI Implementer does
 that survey first and reports it before choosing components.
 
-**Failed Implementer attempts (`implementation=codex`).** The Codex Implementer reports each
-failed Codex attempt to you by SendMessage, with the error text, before it retries; it makes at
-most 2 attempts, then stops with a suggested smaller delta (`coder-codex.md` → Step 4 →
-"Failed attempts"). Act on those messages; do not rely on polling `codex-companion status` (a
-wave once lost about 2 h to two silent stalled attempts). If SendMessage failed, the reports
-lead its final message instead. After the second failure, confirm the worktree has stopped
-changing (`git -C "$WT" status --short` unchanged 30 s apart; if not, run `coder-codex.md` →
-"Cancelling a run"), then dispatch one fresh Implementer with the smaller delta, as a
-line-range brief when it is a targeted fix (Role 2 → "Line-range fix briefs"). Allow at most
-one such smaller-delta re-dispatch: if it also fails twice, stop and report to the user.
+**Failed Implementer attempts.** An Implementer that reports it could not finish (a Not done
+item it cannot clear, or a gate it cannot get green) stops with a suggested smaller delta.
+Confirm its worktree has stopped changing (`git -C "$WT" status --short` unchanged 30 s
+apart), then dispatch one fresh Implementer with the smaller delta, as a line-range brief when
+it is a targeted fix (Role 2 → "Line-range fix briefs"). Allow at most one such smaller-delta
+re-dispatch: if it also fails, stop and report to the user.
 
 **Check before stopping an Implementer.** An Implementer that looks stuck may be done: one was
 stopped with its fix cycle finished and only the commit left, and its edits sat in tagged git
@@ -261,19 +255,16 @@ stashes that had to be restored by SHA. Before you stop one:
 1. Look at the worktree (`WT` = its absolute path):
 
    ```bash
-   COMPANION="$(ls -d ~/.claude/plugins/cache/openai-codex/codex/*/ 2>/dev/null | sort -V | tail -1)scripts/codex-companion.mjs"
    git -C "$WT" status --short
    git -C "$WT" stash list --format='%H %gs'      # stashes are repo-wide: match the wave's tags
-   env -u CODEX_COMPANION_SESSION_ID node "$COMPANION" status --cwd "$WT" --json   # every session's jobs (Codex route)
    ```
 
-2. SendMessage the agent asking for its status (step, attempt, Codex job state, uncommitted
-   files, stashes) and wait one reply cycle. A foreground Codex call blocks it, so it reads
-   and answers (by SendMessage) only when its current tool call returns: wait up to 5 min. If
-   no reply comes, decide from step 1's evidence, re-run about 60 s later: if the worktree is
-   still changing or the companion job is still running, it is working, so leave it; stop it
-   only when the job is gone and the worktree is static.
-3. Only then stop it (TaskStop), run the cancel path below, and recover every stash tagged for
+2. SendMessage the agent asking for its status (step, attempt, uncommitted files, stashes)
+   and wait one reply cycle. It reads and answers (by SendMessage) only when its current tool
+   call returns: wait up to 5 min. If no reply comes, decide from step 1's evidence, re-run
+   about 60 s later: if the worktree is still changing, it is working, so leave it; stop it
+   only when the worktree is static.
+3. Only then stop it (TaskStop), and recover every stash tagged for
    the wave by SHA: `git -C "$WT" stash apply <sha>` (never by a `stash@{n}` index you noted
    earlier, which shifts as other worktrees stash) and check the result. Drop that entry only
    after its work is committed, looking up its current index by SHA at that moment:
@@ -285,11 +276,10 @@ stashes that had to be restored by SHA. Before you stop one:
 
    Say in the Report what was recovered.
 
-**Stopping a Codex-backed agent (`implementation=codex`, or any Codex pass).** TaskStop on
-`impl-coder-codex` (or any agent that ran `codex-companion.mjs`) does NOT stop Codex: the
-companion job, its broker, the app-server and the sandbox keep running and keep editing the
-worktree. Whenever you stop such an agent (after the check above), run the cancel path in
-`coder-codex.md` → "Cancelling a run" (companion `cancel`, then kill the worktree's
+**Stopping a Codex pass (`codex:codex-rescue`).** TaskStop on an agent that ran
+`codex-companion.mjs` does NOT stop Codex: the companion job, its broker, the app-server and
+the sandbox keep running in the worktree. Whenever you stop such an agent, run the cancel
+recipe of the codex skill (companion `cancel`, then kill the worktree's
 `app-server-broker.mjs serve --cwd <worktree>` tree if anything survives) and confirm the
 worktree has stopped changing before dispatching anything else into it.
 
@@ -306,8 +296,8 @@ harness worktree (after its merge, or when abandoning it), from the main checkou
 --git-common-dir)/.." && pwd -P)"`); run both scripts from there, never from inside `$WT`. The
 scripts signal brokers only: they never cancel a job or signal a task or task-worker.
 
-1. **Cancel the worktree's jobs first, with the companion** (`coder-codex.md` → "Cancelling a
-   run", steps 0–1, which unset `CODEX_COMPANION_SESSION_ID` so every session's jobs show).
+1. **Cancel the worktree's jobs first, with the companion** (the codex skill's cancel
+   recipe, steps 0–1, which unset `CODEX_COMPANION_SESSION_ID` so every session's jobs show).
    Stop a leftover `task` / `task-worker` process of `$WT` only after checking it is that
    worktree's and its job is finished or cancelled.
 2. `bash "$MAIN/.claude/scripts/remove-worktree.sh" "$WT" [<branch>]` (`--dry-run` lists and
@@ -331,34 +321,22 @@ scripts signal brokers only: they never cancel a job or signal a task or task-wo
 again at wave close after the merge), run step 3 even when no worktree is removed, and act on
 its task report: a `task` process can outlive its finished job in a worktree that still exists.
 
-**Host re-verification (`implementation=codex`; never trust Codex's red or green).** The
-Codex Implementer's sandbox reports failures that are not real: `EPERM` on Unix-socket
-bind/connect (socket tests "fail"), a denied `.git/worktrees/<wt>/index.lock` (no `git add`,
-no commit), no network (no Mnemosyne writes, no installs). `coder-codex.md` → Step 6 owns the
-protocol: its Claude host re-runs the gate and tests outside the sandbox, classifies each Codex
-failure, and is the **single committer** of Codex's work (it stages exactly the files Codex
-reported and commits on its behalf). You do not commit Implementer output; you verify it.
+**Re-verification (never trust the Implementer's red or green).** You verify the Implementer's
+output; you do not commit it.
 - **Deliberate second check.** Before Role 2, in the same worktree, re-run
   `bash scripts/quality-gate.sh` and `bash .claude/scripts/suite-lock.sh {{TEST_CMD}}`
   yourself, only after the Implementer has returned (never while an agent runs in that
   worktree: two suites against one build directory break each other, `implementer.md` →
-  Rules). It is cheap, and it checks the host's report the way the host checks Codex's. Run
-  this check for a Claude Implementer too: its report is a claim like any other.
+  Rules). It is cheap, and its report is a claim like any other.
 - **Stress is not correctness.** A stress or N-run green (a flake-check script, a repeat-run
   CI job) is evidence of non-flakiness only, never that a fix is right. Before Role 2, ask for
   a red → green test per fix: the test that failed on the old code and passes on the new,
   named with its commit.
-- A Codex failure is a sandbox artifact only when it is one of those sandbox-only shapes AND
-  the host re-run is green. Anything else, any failure the host or you reproduce, and Codex
-  or host green with your re-run red, is real: send it to a fresh Implementer as a fix.
-- If the host reports green but did not commit, or committed files beyond what Codex
-  reported, treat it as a deviation and resume the Implementer to fix it; do not commit for it.
-- The host diagnoses but never writes code or tests (`coder-codex.md` → Step 6 → item 3); a
-  host-written fix (beyond `git add`/`git commit` and a network-only dependency install) is a
-  deviation: name it in the Report and send it back to Codex as a delta. Expect one
-  `wip: <wave> steps N–M` commit per step group of at most about 4 plan steps.
-- List every sandbox-vs-host discrepancy in the Report (the host's lines plus any of yours),
-  one line each: Codex said / host showed / verdict.
+- Any failure you reproduce is real, and so is a green report with your re-run red: send it
+  to a fresh Implementer as a fix. Expect one `wip: <wave> steps N–M` commit per step group of
+  at most about 4 plan steps, made by the Implementer itself.
+- List every discrepancy between the Implementer's report and your re-run in the Report, one
+  line each: Implementer said / re-run showed / verdict.
 
 **Network pre-flight.** The Implementer's sandbox may have no network. If the plan has network
 steps ({{PACKAGE_MANAGER}} installs, CLI scaffolds, browser downloads), the planner lists them
@@ -423,9 +401,8 @@ dispatch separate coder / wiring / error-handling / test-writer / test-runner / 
 implementation` names. The single most important property of this pipeline is that the context
 which reads a test/gate failure is the same one that wrote the code — that context is the
 routed Implementer's; splitting the loop is what we deliberately removed. `implementer.md` is
-the canonical envelope; `coder-codex.md` forwards it to Codex. If the routed
-engine is unavailable, Role 1 stops and reports; switching engines is an owner routing change
-(`routing.json`), never a silent fallback. Product code outside the routed Implementer has two
+the canonical envelope. If the Implementer is unavailable, Role 1 stops and reports;
+switching engines is an owner routing change (`routing.json`), never a silent fallback. Product code outside the routed Implementer has two
 exceptions only: design-heavy UI under "UI implementation routing" above, and integrating two
 already-reviewed parallel waves (merging one wave's branch into the other), which goes to the
 agent `routing.sh integration` names (it prints an engine, not an agent type: for `claude`
@@ -526,8 +503,7 @@ stop and report to the user.
 **Line-range fix briefs.** For a small or targeted fix (review, conformance or visual
 findings), give each finding its exact `path:start-end` range, and say: "Read only these
 ranges (plus ~30 lines of context); do not read any file in full beyond them; skip Mnemosyne
-recall." The Codex Implementer stalls on the 180 s watchdog when it reads a very long file in
-full before editing; `coder-codex.md` → Step 3 carries the ranges into Codex's prompt, and
+recall." A very long file read in full before a targeted edit burns the Implementer's budget;
 `implementer.md` → Step 1 reads only those ranges.
 
 ### Fix cycles
@@ -757,29 +733,26 @@ Plans are **kept after implementation** — they accumulate as project history. 
 
 <rules>
 
-- **Four roles, not eighteen steps.** Implementer (fused; the agent `bash
-  .claude/scripts/routing.sh implementation` names: `impl-implementer` via `implementer.md`
-  or `impl-coder-codex` via `coder-codex.md`, read before every dispatch) → Review (fresh) →
+- **Four roles, not eighteen steps.** Implementer (fused; the agent `impl-implementer` via
+  `implementer.md`; `bash .claude/scripts/routing.sh implementation` must print `claude`, read before every dispatch) → Review (fresh) →
   AC source check → tail (docs ‖ conformance ‖ optional project-specific domain-rubric gate)
   → re-index. The routed Implementer owns write+wire+harden+test+gate; you write no product
   code (design-heavy UI goes to the agent `routing.sh ui` names, and integrating two
   already-reviewed parallel waves to `routing.sh integration`, a recorded routing deviation
   followed by gate + tests + a scoped Claude ‖ Codex review) and do not re-introduce separate
   coder/wiring/error-handling/test/verifier dispatches.
-- Before stopping an Implementer, check its worktree, stashes and Codex job, ask it for a
+- Before stopping an Implementer, check its worktree and stashes, ask it for a
   status and wait one reply cycle (up to 5 min); after stopping, recover its tagged stashes by
-  SHA. Act on an Implementer's completion notification, never on a guess; failed Codex
-  attempts reach you by SendMessage (at most 2, then at most one smaller-delta re-dispatch).
+  SHA. Act on an Implementer's completion notification, never on a guess; a failed Implementer
+  gets at most one smaller-delta re-dispatch.
   Small or targeted fix briefs carry exact line ranges, forbid full-file reads beyond them and
   skip Mnemosyne recall.
-- Stopping a Codex-backed agent always runs the `coder-codex.md` cancel path; TaskStop
-  alone leaves Codex editing the worktree. Removing a worktree goes through
+- Stopping an agent that ran a Codex pass always runs the codex skill's cancel recipe; TaskStop
+  alone leaves Codex running in the worktree. Removing a worktree goes through
   `.claude/scripts/remove-worktree.sh`, then `sweep-codex-orphans.sh` (brokers only; tasks are
   report-only); the sweep also runs at every wave end (Role 1 → "Removing a worktree").
 - Never trust the Implementer's red or green: you re-run the gate and tests once more before
-  review as a deliberate check and never commit Implementer output yourself. With
-  `implementation=codex`, its host re-runs them first and is the single committer of Codex's
-  work; a sandbox-only failure is an artifact only when the host re-run is green; report every
+  review as a deliberate check and never commit Implementer output yourself; report every
   discrepancy. A stress or N-run green proves non-flakiness only: ask for a red → green test
   per fix.
 - Every fix cycle merges `origin/{{STAGING_BRANCH}}` first (never a rebase). A diff touching
@@ -797,8 +770,8 @@ Plans are **kept after implementation** — they accumulate as project history. 
   single-engine verdict.
 - **Generative loop in ONE context (the routed Implementer's); discriminative checks in fresh
   Claude ones.** Never feed the Implementer's transcript to the reviewer — only the diff +
-  spec. Split large work at slice boundaries (a fresh Implementer; for Codex via `--fresh`),
-  never mid write→test→fix loop; Codex rework resumes via `--resume-last`.
+  spec. Split large work at slice boundaries (a fresh Implementer),
+  never mid write→test→fix loop.
 - Every brief that needs the plan names it by absolute main-checkout path; take the file
   snapshot before each Implementer dispatch and restore anything it removed.
 - The AC source check runs between Role 2 and Role 3 and settles every row that is not

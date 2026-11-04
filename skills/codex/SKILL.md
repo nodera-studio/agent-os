@@ -3,9 +3,9 @@ name: codex
 description: >
   Dispatch a task to OpenAI Codex through the installed `codex:codex-rescue` plugin
   agent. Use when the user wants a second-opinion review, a deep-dive on a hard
-  bug, an independent implementation pass, or any time they type `/second-opinion <prompt>`.
+  bug, an independent analysis pass, or any time they type `/second-opinion <prompt>`.
   Also use proactively when Claude is stuck on a substantial debugging or
-  implementation problem and a different model's perspective is likely to help.
+  design problem and a different model's perspective is likely to help.
   Triggers on: "ask codex", "second opinion", "have codex look at this", "fire
   codex", "/second-opinion", being stuck on a multi-step bug, wanting parallel investigation,
   review-implementation orchestrators needing the Codex engine.
@@ -20,7 +20,8 @@ argument-hint: '<task or question to dispatch to Codex>'
 Who does each kind of work is set by `.claude/routing.json`, read through
 `bash .claude/scripts/routing.sh <key>` (an owner-confirmed override in
 `.claude/auto-mode/routing.json` wins). By default `implementation` is `claude`: the Claude
-Implementer (`implementer.md`) writes product code, and Codex reviews it. `review`,
+Implementer (`implementer.md`) writes product code, and Codex reviews it; Codex never
+writes product code in this harness. `review`,
 `planning`, `debug` and `audits` include `codex`. Design-heavy web UI (landing pages, visual
 components) goes to the agent `routing.sh ui` names, and Codex reviews it
 (`implementation/orchestrator.md` → UI implementation routing). Codex fills these roles:
@@ -37,15 +38,9 @@ components) goes to the agent `routing.sh ui` names, and Codex reviews it
 3. **Planning, debug and audit engine** — the second engine of the dual-engine architect and
    planner (`/plan-implementation`), the `/deep-debug` investigator pair and the audit
    orchestrators, via `codex:codex-rescue`.
-4. **Implementer, only when `routing.sh implementation` prints `codex`** — the fused
-   write → wire → harden → test → gate → fix loop for `/implement` (Role 1), run in Codex's own context via the **`coder-codex.md`** agent
-   (`codex-companion.mjs task --json --write`). Codex reads its conventions from the
-   repo-root `AGENTS.md`. This is not the thin `codex:codex-rescue` forwarder — it owns the
-   `touchedFiles`/completion-report contract the orchestrator needs. When routing prints
-   anything else, `coder-codex.md` stops at its Step 0 and `impl-implementer` runs instead.
 
 `codex exec` is never used — Codex is invoked only through the plugin runtime
-(`coder-codex.md` → `codex-companion.mjs`, `codex:codex-rescue`, or `codex review`).
+(`codex:codex-rescue` or `codex review`).
 
 Hand a task to OpenAI Codex through the `codex:codex-rescue` plugin subagent. This
 skill is a procedural guide — it tells you HOW to invoke Codex, not what Codex
@@ -56,8 +51,6 @@ should do.
 - **Second opinion / dual-engine review** — you want a different model to look at
   the same diff, design, or root-cause hypothesis.
 - **Stuck on a hard bug** — Claude has tried 2+ approaches and isn't converging.
-- **Substantial implementation handoff** — a multi-step coding task the user asks
-  Codex to take. Harness implementation follows `routing.sh implementation`, not this skill.
 - **Parallel passes** — review-implementation needs N Codex passes alongside N
   Claude passes (see Multi-pass section).
 
@@ -83,7 +76,7 @@ flags the user may include and that you should preserve in the prompt text:
 - `--background` / `--wait` — execution mode (default: foreground for small tasks)
 - `--model gpt-5.4` | `gpt-5.3-codex` | `gpt-5.3-codex-spark` (or `spark`)
 - `--effort high` | `medium` | `low` (default: leave unset)
-- `--write` / read-only (default: write-capable unless user wants review only)
+- `--write` / read-only (harness briefs are read-only analysis and never pass `--write`)
 - `--resume` / `--fresh` (default: fresh; `--resume` continues prior Codex work)
 
 ### Foreground by default for agent briefs
@@ -107,28 +100,40 @@ a worktree). A planner told to write its plan into the main checkout's
 produces an artifact (planner, architect, reviewer, auditor, advisor) says "do NOT write any
 file; return the full artifact as your final message text", and never names an output path
 outside Codex's cwd (in practice: names none). The orchestrator saves the returned text where
-it belongs. This does not apply to the Implementer (`coder-codex.md`), whose job is writing
-product code inside the worktree it runs in.
+it belongs.
 
 ### Cancelling a Codex job (TaskStop is not enough)
 
-Stopping the Claude agent that launched Codex (TaskStop on `impl-coder-codex`, or a
-`codex:codex-rescue` agent with `--write`) does not stop Codex. The companion job, its
+Stopping the Claude agent that launched Codex (TaskStop on a `codex:codex-rescue` agent) does
+not stop Codex. The companion job, its
 `app-server-broker.mjs serve --cwd <worktree>` broker, the `codex app-server` and its sandbox
 processes keep running and keep editing the worktree. Whenever you stop a Codex-backed agent:
 
 0. Guard first: `<worktree>` must be set, absolute, a worktree root (`git -C <worktree>
    rev-parse --show-toplevel` equals it) and not the main checkout. The companion turns an
-   empty `--cwd` into its own cwd, so an unset path would cancel the main checkout's jobs. The
-   guard is step 0 of the recipe in `coder-codex.md`.
+   empty `--cwd` into its own cwd, so an unset path would cancel the main checkout's jobs.
 1. `env -u CODEX_COMPANION_SESSION_ID node "$COMPANION" status --cwd <worktree> --json`
    (every session's jobs), then for each id in `.running[]`:
    `env -u CODEX_COMPANION_SESSION_ID node "$COMPANION" cancel <id> --cwd <worktree> --json`
    (interrupts the turn and kills the job's process tree). `COMPANION` is resolved below.
-2. If the worktree still changes, kill that worktree's broker tree only. The exact recipe
-   matches only a node process running `app-server-broker.mjs serve`, then `--cwd <worktree>
-   --pid-file` as a fixed string, so neither your own shell nor other worktrees' brokers are
-   hit. It is in `.claude/agents/implementation/coder-codex.md` → "Cancelling a run".
+2. If the worktree still changes, kill that worktree's broker tree only, matching a node
+   process running `app-server-broker.mjs serve` and then `--cwd <worktree> --pid-file` as a
+   fixed string, so neither your own shell nor other worktrees' brokers are hit:
+
+   ```bash
+   : "${WT:?set WT to the absolute worktree path}"
+   case "$WT" in /*) ;; *) echo "refuse: WT must be absolute" >&2; exit 1 ;; esac
+   [ "$(git -C "$WT" rev-parse --show-toplevel 2>/dev/null)" = "$WT" ] \
+     || { echo "refuse: $WT is not a git worktree root" >&2; exit 1; }
+   MAIN="$(cd "$(git -C "$WT" rev-parse --path-format=absolute --git-common-dir)/.." && pwd -P)"
+   [ "$(cd "$WT" && pwd -P)" != "$MAIN" ] || { echo "refuse: $WT is the main checkout" >&2; exit 1; }
+   kill_tree() { local c; for c in $(pgrep -P "$1"); do kill_tree "$c"; done; kill -TERM "$1" 2>/dev/null; }
+   ps -axo pid=,command= \
+     | grep -E '^ *[0-9]+ +([^ ]*/)?node [^ ]*/app-server-broker\.mjs serve ' \
+     | grep -F -- "--cwd $WT --pid-file" \
+     | awk -v self="$$" -v parent="$PPID" '$1 != self && $1 != parent {print $1}' \
+     | while read -r pid; do kill_tree "$pid"; done
+   ```
 3. Confirm `git -C <worktree> status --short` is unchanged 30 s later before reusing it.
 
 The broker also survives a run that ended normally and the removal of its worktree, and a
@@ -141,7 +146,7 @@ then removes it), then run
 orphan tasks without stopping them):
 `implementation/orchestrator.md` → Role 1 → "Removing a worktree".
 
-Resolve `COMPANION` as in `coder-codex.md` Step 2:
+Resolve `COMPANION`:
 
 ```bash
 CODEX_ROOT="$(ls -d ~/.claude/plugins/cache/openai-codex/codex/*/ 2>/dev/null | sort -V | tail -1)"
@@ -161,10 +166,7 @@ nothing for that long ends with "Codex app-server produced no activity for 180s 
 stalled" and exit 1. Long, high-effort final answers (a big plan after many file reads) trip
 it. Ask for a COMPACT result (about 120 lines at most) and, when the context is already local,
 no web search; that avoids the stall. After two stalls on the same task, stop retrying:
-degrade to the Claude engine alone and say so in the report. The Codex Implementer (when
-routing names it) stalls the same way when it reads a very long file in full before editing;
-small fixes go to it as line-range briefs, and it reports each failed attempt and stops after
-two (`coder-codex.md` → Steps 3 and 4).
+degrade to the Claude engine alone and say so in the report.
 
 ### Capacity and rate errors
 
@@ -173,9 +175,7 @@ is transient: retry the same call once after a short wait (about 60 s; `sleep 60
 If the retry fails too, record Codex as unavailable for that step and go on with the
 single-engine (Claude) verdict, saying in the report that Codex was unavailable and why.
 Never drop the engine silently, and never report a dual-engine result when only one ran.
-This applies to every Codex path: `codex:codex-rescue`, `codex review` and the Implementer's
-`codex-companion.mjs` (where "go on" means STOP and report the blocker: the routed
-Implementer writes product code, and a host never takes over).
+This applies to every Codex path: `codex:codex-rescue` and `codex review`.
 
 ### Example — single dispatch
 

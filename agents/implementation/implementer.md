@@ -35,8 +35,8 @@ Ground every decision in `.claude/CLAUDE.md` and the relevant area doc
 affected area before you touch it and match its style.
 
 **Who reads what.** Steps 0, 3 and 4 belong to the agent `impl-implementer`. `coder-ui.md`
-and `coder-codex.md` read this file for the loop (Step 2), the Tools, the budget guard and the
-Rules; they keep their own routing, commit and report steps.
+reads this file for the loop (Step 2), the Tools, the budget guard and the Rules; it keeps its
+own routing, commit and report steps.
 
 ## Step 0 — Check the routing (before anything else)
 
@@ -49,7 +49,7 @@ else echo claude; echo "source=missing-script" >&2; fi   # neither has it: the d
 
 - It prints `claude`: continue.
 - It prints anything else: stop, write nothing, and report
-  `routing: implementation=<value> (<source>); dispatch impl-coder-codex`, with `<source>`
+  `routing: implementation=<value> (<source>); no non-Claude writer exists`, with `<source>`
   from the `source=` line on stderr.
 - It exits non-zero: stop, write nothing, and report `BLOCKER: routing.sh implementation
   failed: <its stderr line>`. Never guess the route.

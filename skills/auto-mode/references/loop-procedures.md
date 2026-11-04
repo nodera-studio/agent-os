@@ -151,8 +151,7 @@ autonomy is the point of this mode.
    `/plan-implementation` scoped to this wave. Plan-doc/fresh-plan → plan exists,
    skip re-planning.
 3. **Implement.** Invoke `/implement` for the wave. Let it own its internal gates: the
-   loop of the Implementer `bash .claude/scripts/routing.sh implementation` names
-   (`impl-implementer` or `impl-coder-codex`) and `scripts/quality-gate.sh`, the local
+   loop of the Implementer (`impl-implementer`) and `scripts/quality-gate.sh`, the local
    lean `/review-implementation --lean` gate (1 Claude ‖ 1 Codex pass, 2-vote), the conformance tail and the docs
    updater.
    - **File names.** Saved review or plan files per engine are named `<engine>-review.md` /
@@ -170,11 +169,11 @@ autonomy is the point of this mode.
      (`implementation/orchestrator.md` → UI implementation routing).
    - **Live smoke.** A wave that builds a test harness driving a real TUI, agent CLI or network
      service runs it live once before the PR (`implementation/orchestrator.md` → Live smoke).
-   - **Stopping a Codex-backed agent** (e.g. to re-brief it) first runs the check in
+   - **Stopping an Implementer** (e.g. to re-brief it) first runs the check in
      `implementation/orchestrator.md` → Role 1 → "Check before stopping an Implementer"
-     (worktree status, stashes, Codex job; ask the agent and wait one reply cycle), then the
-     cancel path in `implementation/coder-codex.md` → "Cancelling a run"; TaskStop alone leaves
-     Codex editing the worktree.
+     (worktree status, stashes; ask the agent and wait one reply cycle). An agent that ran a
+     Codex pass also needs the codex skill's cancel recipe: TaskStop alone leaves Codex
+     running.
 4. **Pre-push check.** Run your local CI-check command (e.g. `make ci-check`); fix red
    before pushing (a pre-push hook should block otherwise, since a failed CI cycle
    typically costs several minutes of round-trip). Run test suites through
@@ -437,8 +436,7 @@ For each wave, fix or harness worktree you remove, follow `implementation/orches
 Role 1 → "Removing a worktree" with `WT` = its absolute path, from the main checkout
 (`MAIN="$(cd "$(git rev-parse --path-format=absolute --git-common-dir)/.." && pwd -P)"`):
 
-1. Cancel `$WT`'s jobs with the companion first (`implementation/coder-codex.md` →
-   "Cancelling a run", steps 0–1). The scripts never cancel jobs or signal tasks.
+1. Cancel `$WT`'s jobs with the companion first (the codex skill's cancel recipe, steps 0–1). The scripts never cancel jobs or signal tasks.
 2. `bash "$MAIN/.claude/scripts/remove-worktree.sh" "$WT" [<branch>]` (`--dry-run` first if in
    doubt). It refuses unless `$WT` is a registered worktree directly under `.claude/worktrees/`
    and your cwd is outside it; with `<branch>`, unless that branch is checked out there and its

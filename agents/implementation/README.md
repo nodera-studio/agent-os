@@ -7,7 +7,7 @@ re-indexed code. Four roles, not eighteen steps.
 
 ```mermaid
 flowchart LR
-    P["planner<br/>(plan/planner.md,<br/>single mode)"] --> I["Implementer<br/>write → wire → harden →<br/>test → gate → fix<br/>(fused loop, implementer.md<br/>or coder-codex.md by routing)"]
+    P["planner<br/>(plan/planner.md,<br/>single mode)"] --> I["Implementer<br/>write → wire → harden →<br/>test → gate → fix<br/>(fused loop, implementer.md)"]
     I --> RV["Review<br/>(fresh context —<br/>see review-implementation/)"]
     RV --> TAIL
 
@@ -25,11 +25,9 @@ flowchart LR
    every layer, hardens error paths, writes unit + integration tests, runs them, runs the
    deterministic quality gate (`scripts/quality-gate.sh`), and fixes every failure and
    finding — looping until tests AND the gate are green. `bash .claude/scripts/routing.sh
-   implementation` picks the engine: `claude` (the default) dispatches **`implementer.md`**
-   (agent `impl-implementer`, `model: inherit`); `codex` dispatches **`coder-codex.md`** (agent
-   `impl-coder-codex`, `codex-companion.mjs task --json --write`). Either way the context
-   reading a failure is the one that wrote the code. `implementer.md` is the canonical
-   envelope: `impl-implementer` is that file, `coder-codex.md` forwards it to Codex.
+   implementation` must print `claude`, which dispatches **`implementer.md`** (agent
+   `impl-implementer`, `model: inherit`). The context reading a failure is the one that wrote
+   the code. `implementer.md` is the canonical envelope.
    **UI Implementer** (`coder-ui.md`, agent `impl-coder-ui`, Opus) takes design-heavy web UI
    when `routing.sh ui` names it: same fused loop with the frontend's build/test commands,
    the frontend-design skill, and a required browser check against the named design
@@ -58,9 +56,8 @@ pages, visual components) goes to the agent `routing.sh ui` names, a Claude Opus
 already-reviewed parallel waves goes to the engine `routing.sh integration` names, followed
 by the gate, tests and a scoped Claude ‖ Codex review (`orchestrator.md` → Role 1;
 `loop-procedures.md` → "Shared seams"). The fused write→wire→harden→test→gate→fix loop runs
-in **Claude** via `implementer.md` by default, or in **Codex** via `coder-codex.md`
-(`codex-companion.mjs task --json --write`) when routing says `codex`; both carry the
-`implementer.md` envelope + the repo-root `AGENTS.md` conventions. The
+in **Claude** via `implementer.md`, the only writer (omp and Codex engines are
+read-only). The
 former per-concern agents (`coder.md`, `wiring.md`, `error-handling.md`,
 `test-writer.md`, `test-runner.md`, `verifier.md`, `code-simplifier.md`) were fused
 into that single loop and **deleted** — do not re-create them.
@@ -77,8 +74,7 @@ handoff is `progress.md` + the plan's `<task>` XML, never a transcript.
 ## Engines
 
 Roles come from `.claude/routing.json` through `.claude/scripts/routing.sh`. By default
-Role 1 runs in Claude (`implementer.md`); it runs in Codex (`coder-codex.md`) only when
-`routing.sh implementation` prints `codex`. Codex is one engine of the Review gate
+Role 1 runs in Claude (`implementer.md`); no other engine writes product code. Codex is one engine of the Review gate
 (`codex review` / `codex:codex-rescue`, see `.claude/skills/codex/SKILL.md`). The planner,
 Review synthesizer, the parallel tail (docs-updater ‖ conformance-test-writer), and re-index
 are Claude subagents on the main-loop model (Fable 5, then Opus). Only the routed
