@@ -41,11 +41,12 @@ trap 'rm -rf "$TMP"' EXIT
 PROJECT="$TMP/project"
 mkdir -p "$PROJECT/.claude"
 
-# Tracked plus untracked-not-ignored files, skipping paths deleted in the working tree.
+# Tracked plus untracked-not-ignored files, skipping paths deleted in the working tree (dangling links are kept).
 (cd "$SRC" && git ls-files -co --exclude-standard) | while IFS= read -r f; do
-  [ -f "$SRC/$f" ] || continue
+  [ -f "$SRC/$f" ] || [ -L "$SRC/$f" ] || continue
   mkdir -p "$PROJECT/.claude/$(dirname "$f")"
-  cp -p "$SRC/$f" "$PROJECT/.claude/$f"
+  # A symlink (the plugin directory is all symlinks) is copied as a symlink, not followed.
+  cp -pP "$SRC/$f" "$PROJECT/.claude/$f"
 done
 
 git -C "$PROJECT" init -q --initial-branch=main
