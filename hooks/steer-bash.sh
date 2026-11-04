@@ -13,7 +13,7 @@
 #   - recursive `rm` of this project's scratch (<prefix>* under $TMPDIR, /tmp or
 #     /var/folders) -> scripts/clean-scratch.sh, which refuses anything still in use.
 #     <prefix> is HARNESS_SCRATCH_PREFIX, else the main checkout's directory name plus `-`.
-#   - `omp` with a profile other than glen-harness (`--profile`, OMP_PROFILE, PI_PROFILE), and
+#   - `omp` with a profile not in omp/profiles.sh (`--profile`, OMP_PROFILE, PI_PROFILE), and
 #     `mkdir`/`cp`/`mv`/`rsync`/`ln` into another ~/.omp/profiles/<name> -> HOME="$(mktemp -d)"
 # Does NOT touch grep/rg (agentic search is good in-loop — routed via CLAUDE.md)
 # or codex (block-old-codex.sh). Fails open on any error. Project-specific
@@ -32,9 +32,28 @@ deny() {
 
 # omp probes: omp joins PI_CONFIG_DIR onto $HOME, and a named profile ignores
 # PI_CODING_AGENT_DIR, so the only isolation is a throwaway HOME or the approved profile.
-OMP_OK_PROFILE='glen-harness'
+# The allowlist is exact names from omp/profiles.sh next to this hook. If that file is missing or
+# does not load, a hardcoded copy of the names applies: the guard never falls open.
+OMP_PROFILES_OK=0
+_self="${BASH_SOURCE[0]}"
+while [ -L "$_self" ]; do
+  _dir=$(cd "$(dirname "$_self")" && pwd -P)
+  _self=$(readlink "$_self")
+  case "$_self" in /*) ;; *) _self="$_dir/$_self" ;; esac
+done
+_reg="$(cd "$(dirname "$_self")/.." 2>/dev/null && pwd -P)/omp/profiles.sh"
+# shellcheck source=../omp/profiles.sh
+if [ -f "$_reg" ] && . "$_reg" >/dev/null 2>&1 && type profile_known >/dev/null 2>&1; then
+  OMP_PROFILES_OK=1
+fi
+# omp_profile_ok NAME: NAME is an approved profile (exact match, never a prefix or glob).
+omp_profile_ok() {
+  if [ "$OMP_PROFILES_OK" = 1 ]; then profile_known "$1"; return; fi
+  case "$1" in glen-harness-codex | glen-harness-opencode | glen-harness) return 0 ;; esac
+  return 1
+}
 # shellcheck disable=SC2016 # the $(mktemp -d) and $HOME are literal advice text
-OMP_PROFILE_REASON='omp probes use a throwaway home: HOME="$(mktemp -d)" omp … (omp joins PI_CONFIG_DIR onto $HOME, so an absolute PI_CONFIG_DIR still writes under ~), or the approved glen-harness profile. Never create another ~/.omp/profiles/<name> (harness rule).'
+OMP_PROFILE_REASON='omp probes use a throwaway home: HOME="$(mktemp -d)" omp … (omp joins PI_CONFIG_DIR onto $HOME, so an absolute PI_CONFIG_DIR still writes under ~), or an approved profile (omp/profiles.sh). Never create another ~/.omp/profiles/<name> (harness rule).'
 # a profile name with surrounding quotes (and a subshell's closing paren) removed
 unquote() { printf '%s' "$1" | tr -d "\"')"; }
 REAL_HOME="${HOME:-}"
@@ -56,14 +75,14 @@ cmd_word() {
   }'
 }
 # omp_profile_check SEG: deny a --profile in SEG, or OMP_PROFILE= / PI_PROFILE= anywhere in the
-# command (an `export` earlier in the chain counts), other than glen-harness. Empty = default.
+# command (an `export` earlier in the chain counts), that is not an approved profile. Empty = default.
 omp_profile_check() {
   local names name
   names=$( { printf '%s' "$1" | grep -oE -- '--profile[= ]+[^[:space:]]+' | sed -E 's/^--profile[= ]+//'
              printf '%s' "$CMD" | grep -oE '(^|[^A-Za-z0-9_])(OMP|PI)_PROFILE=[^[:space:];&|]*' | sed -E 's/^.*_PROFILE=//'; } 2>/dev/null)
   while IFS= read -r name; do
     name=$(unquote "$name")
-    if [ -n "$name" ] && [ "$name" != "$OMP_OK_PROFILE" ]; then
+    if [ -n "$name" ] && ! omp_profile_ok "$name"; then
       deny "$OMP_PROFILE_REASON"
     fi
   done <<< "$names"
@@ -162,7 +181,7 @@ while IFS= read -r seg || [ -n "$seg" ]; do
         | grep -oE '(~|\$HOME|\$\{HOME\})"?/\.omp/profiles/[^/[:space:]]+' | sed -E 's#^.*\.omp/profiles/##' 2>/dev/null)
       while IFS= read -r name; do
         name=$(unquote "$name")
-        if [ -n "$name" ] && [ "$name" != "$OMP_OK_PROFILE" ]; then
+        if [ -n "$name" ] && ! omp_profile_ok "$name"; then
           deny "$OMP_PROFILE_REASON"
         fi
       done <<< "$names"

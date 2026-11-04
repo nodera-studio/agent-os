@@ -9,8 +9,9 @@ HOOK="$(cd "$TEST_DIR/../.." && pwd -P)/hooks/steer-bash.sh"
 command -v jq >/dev/null 2>&1 || { echo "FAIL jq is required" >&2; exit 1; }
 CASES=0 FAILURES=0
 
+# HOOK_UNDER_TEST lets the fallback cases run a copy of the hook that has no omp/profiles.sh beside it
 decision() {
-  jq -n --arg c "$1" '{tool_name:"Bash",tool_input:{command:$c}}' | /bin/bash "$HOOK" \
+  jq -n --arg c "$1" '{tool_name:"Bash",tool_input:{command:$c}}' | /bin/bash "${HOOK_UNDER_TEST:-$HOOK}" \
     | jq -r '.hookSpecificOutput.permissionDecision // "allow"' 2>/dev/null || true
 }
 
@@ -61,7 +62,37 @@ expect() {
   expect deny  'mkdir -p "$HOME/.omp/profiles/foo"'
   expect deny  'mkdir -p "${HOME}"/.omp/profiles/foo'
   expect deny  "mkdir -p $HOME/.omp/profiles/foo"
+  # exact-name allowlist from omp/profiles.sh (Step 8)
+  expect allow 'omp --profile glen-harness-codex models'
+  expect allow 'omp --profile=glen-harness-opencode models'
+  expect allow 'OMP_PROFILE=glen-harness-codex omp models'
+  expect deny  'omp --profile glen-harness-evil models'
+  expect deny  'omp --profile glen-harness-codex-2 models'
+  expect deny  'omp --profile glen-harness-probe models'
+  expect deny  'PI_PROFILE=glen-harness-evil omp models'
+  expect allow 'mkdir -p ~/.omp/profiles/glen-harness-codex/agent'
+  expect allow 'cp -R x ~/.omp/profiles/glen-harness-opencode'
+  expect deny  'mkdir -p ~/.omp/profiles/glen-harness-evil'
+  expect deny  'cp -R ~/.omp/profiles/glen-harness-codex ~/.omp/profiles/glen-harness-probe'
 }
+
+# registry missing: the hardcoded list applies and an unlisted name is still denied (never fail open)
+FALLBACK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/steer-fallback.XXXXXX")"
+trap 'rm -rf "$FALLBACK_DIR"' EXIT
+mkdir -p "$FALLBACK_DIR/hooks"
+cp "$HOOK" "$FALLBACK_DIR/hooks/steer-bash.sh"
+HOOK_UNDER_TEST="$FALLBACK_DIR/hooks/steer-bash.sh"
+expect allow 'omp --profile glen-harness-codex models'
+expect allow 'omp --profile glen-harness-opencode models'
+expect allow 'omp --profile glen-harness models'
+expect deny  'omp --profile glen-harness-evil models'
+expect deny  'omp --profile glen-harness-probe models'
+expect deny  'mkdir -p ~/.omp/profiles/glen-harness-evil'
+# a registry that does not load also falls back
+mkdir -p "$FALLBACK_DIR/omp"
+printf 'this is ( not valid bash\n' >"$FALLBACK_DIR/omp/profiles.sh"
+expect deny  'omp --profile glen-harness-evil models'
+expect allow 'omp --profile glen-harness-codex models'
 
 printf '%d cases, %d failures\n' "$CASES" "$FAILURES"
 [ "$FAILURES" -eq 0 ]
