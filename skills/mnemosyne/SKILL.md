@@ -53,7 +53,7 @@ stays clean):
 
 - `memory_search` `{query, type?, limit?}` → top-k `{id, title, type, snippet}`.
 - `memory_get` `{id}` → full text for a search hit.
-- `memory_get_recent` → latest memories (session-start orientation).
+- `memory_get_recent` → latest memories (orientation at session start).
 
 **You rarely write by hand.** The Stop hook `.claude/hooks/mnemosyne-capture.sh` (opt-in
 `MNEMOSYNE_CAPTURE=1`) captures episodic fixes, and the nightly distiller

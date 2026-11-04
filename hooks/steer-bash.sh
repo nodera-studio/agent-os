@@ -19,7 +19,7 @@
 # Does NOT touch grep/rg (agentic search is good in-loop — routed via CLAUDE.md)
 # or codex (block-old-codex.sh). Fails open on any error. Project-specific
 # steering (e.g. a dev-tool wrapper hook) can be layered in separately — see
-# hooks/README-optional-hooks.md.
+# hooks/README.md ("Custom hooks for your project").
 set -uo pipefail
 command -v jq >/dev/null 2>&1 || exit 0
 INPUT=$(cat 2>/dev/null) || exit 0

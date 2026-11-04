@@ -74,15 +74,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/session-start.sh"
-          }
-        ]
-      },
-      {
-        "matcher": "resume|compact",
-        "hooks": [
-          {
-            "type": "command",
             "command": ".claude/hooks/reinject-invariants.sh"
           }
         ]
@@ -139,11 +130,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/prettier-on-edit.sh"
-          },
-          {
-            "type": "command",
-            "command": ".claude/hooks/shellcheck-on-edit.sh"
+            "command": ".claude/hooks/post-edit-lint.sh"
           }
         ]
       }

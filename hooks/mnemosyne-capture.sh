@@ -5,7 +5,7 @@
 # records one `episodic_fix` rule_findings row per changed source area, so the
 # nightly distiller has raw evidence of what the agent actually touched.
 #
-# Posture (mirrors prettier-on-edit.sh — warn-don't-block):
+# Posture (mirrors post-edit-lint.sh — warn-don't-block):
 #   - ALWAYS exit 0. Capture must NEVER gate the turn. It runs BEFORE any
 #     blocking Stop-hook test gate you may add to the Stop array, and its
 #     exit 0 can't suppress that gate's exit 2.
