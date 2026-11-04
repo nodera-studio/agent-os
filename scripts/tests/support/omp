@@ -3,11 +3,14 @@
 set -euo pipefail
 [ "$HOME" = "$FAKE_OMP_TEST_HOME" ] || exit 99
 jq -cn --arg home "$HOME" --args '{home:$home,argv:$ARGS.positional}' -- "$@" >> "$FAKE_OMP_LOG"
-if [ "${1:-}" != --profile ] || [ "${2:-}" != glen-harness ]; then
+case "${2:-}" in glen-harness | glen-harness-codex | glen-harness-opencode) profile="$2" ;; *) profile='' ;; esac
+if [ "${1:-}" != --profile ] || [ -z "$profile" ]; then
   printf 'unscoped omp invocation refused\n' >&2
   exit 42
 fi
 shift 2
+# One fixture directory serves every profile: swap the profile name in its path.
+agent_dir="${FAKE_OMP_AGENT_DIR%/profiles/*}/profiles/$profile/agent"
 
 case "${1:-}" in
   --version) printf '%s\n' "${FAKE_OMP_VERSION:-omp/18.14.0}" ;;
@@ -15,10 +18,10 @@ case "${1:-}" in
     action="${2:-}" key="${3:-}"
     # Real config path calls Settings.init(), which may write before printing.
     if [ "$action" = path ]; then
-      mkdir -p "$FAKE_OMP_AGENT_DIR"
+      mkdir -p "$agent_dir"
       printf 'settings init\n' >> "$FAKE_OMP_WRITES"
-      : > "$FAKE_OMP_AGENT_DIR/initialized"
-      printf '%s\n' "${FAKE_OMP_REPORTED_DIR:-$FAKE_OMP_AGENT_DIR}"
+      : > "$agent_dir/initialized"
+      printf '%s\n' "${FAKE_OMP_REPORTED_DIR:-$agent_dir}"
       exit 0
     fi
     if [ "$key" = modelRoles.default ] || [ "$key" = "${FAKE_OMP_REJECT_KEY:-}" ]; then
@@ -53,7 +56,7 @@ case "${1:-}" in
     esac
     ;;
   models)
-    [ "$*" = 'models cursor --json' ] || exit 44
+    case "$*" in 'models cursor --json' | 'models openai-codex --json' | 'models opencode-go --json') ;; *) exit 44 ;; esac
     # Deliberate default-profile mutation for the component diagnostics tests.
     root="$HOME/${PI_CONFIG_DIR:-.omp}"
     case "${FAKE_OMP_MUTATE:-}" in
