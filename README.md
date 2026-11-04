@@ -131,7 +131,7 @@ flowchart TD
     CODE -->|"gh pr create"| PR["Pull request"]
     PR -->|"CI + review bots green"| SHIP["Merged — shipped"]
 
-    IDEA -.->|"or: declare the whole thing as one goal"| GOAL["/goal + /auto-mode"]
+    IDEA -.->|"or: declare the whole thing as one goal"| GOAL["/auto-mode &lt;goal&gt;"]
     GOAL -.->|"wave loop: plan → implement → PR →<br/>poll → fix → merge, no gate between waves"| SHIP
 ```
 

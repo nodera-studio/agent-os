@@ -8,7 +8,7 @@ description: >
   your staging trunk → poll CI + code-review bots → fix every finding → merge → next wave;
   promote staging → release with a merge commit only when the goal targets prod.
 
-  Use this skill whenever the user runs /auto-mode or /goal, or asks to "ship
+  Use this skill whenever the user runs /auto-mode, or asks to "ship
   {{TICKET_PREFIX}}-XXX autonomously", "run the loop until <goal> on the main/staging
   branch", "keep implementing waves until done", "auto-pilot this ticket", "work through
   all the sub-issues by yourself", or otherwise asks Claude to carry a multi-wave feature
@@ -39,15 +39,16 @@ the long form.
 
 ## The goal contract (shared state file)
 
-`/auto-mode` and `/goal` cooperate through one state file: `.claude/auto-mode/state.md`
-— the single source of truth so the loop survives context compaction. (Template in
-the references file.)
+`/auto-mode [goal]` keeps its run in one state file: `.claude/auto-mode/state.md` — the
+single source of truth so the loop survives context compaction. (Template in
+`templates/auto-mode-state.md`; the shapes the scripts read are in the references file.)
 
-- `/goal <objective>` writes/overwrites the **Goal** section, sets status `goal-set`,
-  confirms in one line, and stops. It declares intent only — never starts the loop.
-- `/auto-mode [args]`: read the state file; if args carry an inline goal persist it as
-  a `/goal` write first; if no goal is set, ask for one and stop (a loop with no finish
-  line is the one thing not to start); if a goal exists, resume or begin the loop.
+- `/auto-mode <goal>` parses the goal and writes the state file itself: the **Goal**
+  section, status `goal-set`, the base branch under **Resolved goal**. It keeps an
+  existing wave ledger only if the ledger still matches the goal.
+- `/auto-mode` with no args: read the state file; if no goal is set, ask for one and stop
+  (a loop with no finish line is the one thing not to start); if a goal exists, resume or
+  begin the loop.
 
 ## Branch scope — staging is the trunk
 

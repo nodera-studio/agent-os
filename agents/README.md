@@ -130,7 +130,7 @@ flowchart TD
     PR -.->|"optional standalone pass"| DEEPREV["/review-implementation<br/>(Claude ‖ Codex ‖ 3rd engine, + optional omp → synthesizer)"]
     PR -->|"CI + review bots green"| SHIP["Merged — shipped"]
 
-    IDEA -.->|"or: declare the whole thing as one goal"| GOAL["/goal + /auto-mode"]
+    IDEA -.->|"or: declare the whole thing as one goal"| GOAL["/auto-mode &lt;goal&gt;"]
     GOAL -.->|"wave loop: plan → implement → PR →<br/>poll → fix → merge, no gate between waves"| SHIP
 
     CODE -.->|"something's broken instead"| DEBUG["/deep-debug<br/>investigator ⇄ adversary"]

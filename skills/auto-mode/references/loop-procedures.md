@@ -58,6 +58,7 @@ treat it like `progress.txt`):
 ## Poll cursors
 
 - PR #NN last-seen comment: <ISO timestamp>
+- PR #NN last-seen checks: <signature written by poll-pr.sh>
 
 ## Checkpoints
 
@@ -80,6 +81,13 @@ treat it like `progress.txt`):
 - <date> <decision taken autonomously + basis (research/architect/codebase ref)>
 - <date> <fix-cycle decision> — Governing AC: AC-<id> "<verbatim>" | none (basis <path:line>) — <basis>
 ```
+
+**Poll cursors** hold two lines per polled PR, both owned by `poll-pr.sh` (never hand-edit
+the checks line). `last-seen comment` is the ISO timestamp after which a comment or review
+counts as new. `last-seen checks` is a signature of every check's name and bucket; checks
+carry no timestamp, so they are reported again only when the signature changed. The script
+adds a missing line itself and rewrites both on each cycle unless run with `--no-advance`.
+The canonical copy of this template is `templates/auto-mode-state.md`.
 
 Times in the state file are UTC ISO from `date -u +%Y-%m-%dT%H:%M:%SZ`. Under **Checkpoints**,
 `Last checkpoint: none` with a cadence is due at once, and the next checkpoint number is the
@@ -179,7 +187,8 @@ autonomy is the point of this mode.
    surface behind a flag.
 6. **Poll continuously.** Wake ~270s apart (under a typical 5-min prompt-cache window).
    Each cycle: `gh pr checks` + fetch new inline review-comments, issue-comments,
-   and reviews since the recorded last-seen timestamp; update the poll cursor.
+   and reviews since the recorded last-seen cursors (`poll-pr.sh --state` reads and advances
+   both lines under **Poll cursors**).
    If you run an AI code-review bot (CodeRabbit or similar), it typically re-reviews
    every push; a bot like Cursor Bugbot posts a status check.
 

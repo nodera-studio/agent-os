@@ -19,8 +19,7 @@ drives.
 
 | Command | Dispatches | What it does |
 | --- | --- | --- |
-| `/goal` | (writes `.claude/auto-mode/state.md`) | Declare or update the auto-mode objective + base branch — intent only, doesn't start the loop |
-| `/auto-mode` | `skills/auto-mode/SKILL.md` | Drive a declared goal to merged completion, wave by wave, with no user gate in between — see the diagram below |
+| `/auto-mode [goal]` | `skills/auto-mode/SKILL.md` | Declare the goal (written to `.claude/auto-mode/state.md`) and drive it to merged completion, wave by wave, with no user gate in between — see the diagram below |
 
 ## Explore, research, brainstorm
 
@@ -86,8 +85,8 @@ goal asked for).
 
 ```mermaid
 flowchart TD
-    G["/goal &lt;objective&gt;"] --> ST[".claude/auto-mode/state.md<br/>(shared state — survives compaction)"]
-    ST --> AM["/auto-mode"]
+    G["/auto-mode &lt;goal&gt;"] --> ST[".claude/auto-mode/state.md<br/>(shared state — survives compaction)"]
+    ST --> AM["wave loop"]
 
     AM --> RESOLVE{{"Resolve waves:<br/>tracker sub-issues first,<br/>plan-doc fallback,<br/>else run /plan-implementation"}}
 
