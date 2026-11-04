@@ -11,7 +11,7 @@ workflow below) once to adapt the templated files to that project's actual stack
 - **Claude + Codex** (dual-engine; omp optional as a third reviewer/investigator when its probe is ready) for review comprehensive passes, debug agents, and codebase audits — multi-pass voting with cross-model consensus catches issues a single model misses
 - **Claude only** for planning, orchestrators, testing, error handling, docs, and all implementation stages EXCEPT the lean code-review gate inside `/implement` (1 Claude + 1 Codex pass, 2-vote)
 - Codebase audits use dual-engine (Claude + Codex) per group. Security audit additionally uses checklist perturbation.
-- **Model rides the session, not a hardcoded tier.** Every frontier role — orchestrators, planner/architect, the Implementer, reviewers, security/error finders, the debug investigator + adversary, research, and copywrite voice — is `model: inherit`, so it runs on whatever the session runs. Never pin a frontier agent to a model that won't follow the session: the Implementer (`impl-implementer`) is `inherit` too (the old `opus` pin of the Claude-only coder is gone with the merge); the one remaining exception is `impl-coder-ui`, pinned `opus`. Mechanical / summarization roles (test-runner, verifier, docs-updater, light audits, plan explorer/researcher, line/microcopy/consistency editors) stay pinned `sonnet` — they don't need frontier compute. Effort: `high` is the default; `xhigh` is reserved for the Implementer, planner, and orchestrators on hard waves.
+- **Model rides the session, not a hardcoded tier.** Every frontier role — orchestrators, planner/architect, the Implementer, reviewers, security/error finders, the debug investigator + adversary, research, and copywrite voice — is `model: inherit`, so it runs on whatever the session runs. Never pin a frontier agent to a model that won't follow the session: the Implementer (`impl-implementer`) is `inherit` too (the old `opus` pin of the Claude-only coder is gone with the merge); the one remaining exception is `impl-coder-ui`, pinned `opus`. Mechanical / summarization roles (test-runner, verifier, docs-updater, light audits, plan explorer, line/microcopy/consistency editors) stay pinned `sonnet` — they don't need frontier compute. Effort: `high` is the default; `xhigh` is reserved for the Implementer, planner, and orchestrators on hard waves.
 
 **Core principle:** Specialist agents do the heavy lifting (research, code, review) but never touch git or external systems. The orchestrator (the main session) owns those actions: it commits and pushes as `/implement` and `/auto-mode` describe, and every outward action (opening or merging a PR, ticket updates, releases) follows the user's authorisation for the run.
 
@@ -30,7 +30,7 @@ workflow below) once to adapt the templated files to that project's actual stack
 │   └── orchestrator.md              # Explore → research → confirm with user → fill in {{TOKEN}}s → report follow-ups
 │
 ├── research/                        # Standalone research (user-facing, not pipeline)
-│   └── agent.md                     # Context7 + web search + Playwright — saves to .claude/research/
+│   └── agent.md                     # Research agent: `mode: sub-question` (default, /research fan-out) | `mode: plan` (plan pipeline researcher: Libraries / Pitfalls / Recommended patterns). Exa + Context7
 ├── local-ci.md                      # Full CI pipeline (format, lint, typecheck, build, test)
 ├── respond-to-review.md             # PR review response — verify claims, draft responses
 │
@@ -46,7 +46,6 @@ workflow below) once to adapt the templated files to that project's actual stack
 ├── plan/                            # Workflow: Explore, research, architect, plan
 │   ├── orchestrator.md              # Discovery triage → explore/research → dual-engine architect+judge → dual-engine plan+judge
 │   ├── explorer.md                  # Deep codebase scan for related code and patterns
-│   ├── researcher.md                # Context7 + web search for best practices and pitfalls
 │   ├── architect.md                 # One of two parallel architects — synthesizes into 2-3 approaches with trade-offs
 │   ├── judge-selector.md            # Select-then-graft: picks the stronger of two architect/planner passes
 │   └── planner.md                   # Detailed plan with backward verification + wave splitting

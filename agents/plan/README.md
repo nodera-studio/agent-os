@@ -69,10 +69,11 @@ human between waves.
 | --- | --- |
 | `orchestrator.md` | Pipeline manager — triage, dispatch, gates, save |
 | `explorer.md` | Deep codebase scan for related code, patterns, existing conventions |
-| `researcher.md` | Context7 + web search for best practices, library docs, pitfalls |
 | `architect.md` | One of two (or three) independent architects — 2-3 approaches with trade-offs |
 | `judge-selector.md` | Select-then-graft: picks the stronger of two parallel passes, grafts separable improvements — used twice (architecture, then plan) |
 | `planner.md` | Turns the chosen approach into an ordered, verifiable step plan |
+
+The researcher is `../research/agent.md` run with `mode: plan` (Libraries, Best practices, Pitfalls, Recommended patterns).
 
 ## Entry point
 
@@ -81,7 +82,7 @@ per-wave pipeline. Read `orchestrator.md` directly for the full step-by-step pro
 
 ## Engines
 
-Explorer, researcher, single-mode planner, and the judge-selector are Claude subagents.
+Explorer, researcher (`research/agent.md`, `mode: plan`), single-mode planner, and the judge-selector are Claude subagents.
 The architecture step is **always** dual-engine (Claude + Codex, +Gemini for high-stakes
 specs if available) regardless of triage depth — it's the highest-leverage decision in
 the pipeline. The plan-detail step is dual-engine only for standard/deep-triage tasks;

@@ -53,7 +53,7 @@ about.
 
 ## WHEN to reach for it
 
-- Research fan-out: Exa is the primary engine behind `.claude/agents/plan/researcher.md` and the
+- Research fan-out: Exa is the primary engine behind `.claude/agents/research/agent.md` and the
   `/research` command. Reach for it directly for any in-loop web lookup too — don't try native
   WebSearch (it's denied) or `curl` (it's steered off).
 

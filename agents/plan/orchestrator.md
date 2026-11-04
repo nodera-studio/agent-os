@@ -76,8 +76,8 @@ Dispatch via Agent tool (parallel):
 ```
 ```
 Dispatch via Agent tool (parallel):
-  prompt: "Read .claude/agents/plan/researcher.md and follow its instructions.
-           Task: {task description}"
+  prompt: "Read .claude/agents/research/agent.md and follow its instructions.
+           mode: plan. Task: {task description}"
 ```
 
 **Deep:** Explorer + researcher (expanded scope) in parallel.
@@ -88,8 +88,8 @@ Dispatch via Agent tool (parallel):
 ```
 ```
 Dispatch via Agent tool (parallel):
-  prompt: "Read .claude/agents/plan/researcher.md and follow its instructions.
-           This is a DEEP research task. Expand your search beyond immediate needs —
+  prompt: "Read .claude/agents/research/agent.md and follow its instructions.
+           mode: plan. This is a DEEP research task. Expand your search beyond immediate needs —
            investigate alternative libraries, known pitfalls from the community,
            migration guides, and compatibility concerns.
            Task: {task description}"
@@ -98,7 +98,7 @@ Dispatch via Agent tool (parallel):
 **UI waves: survey the catalogue before anyone picks components.** For a wave with
 design-heavy UI (`{{FRONTEND_DIR}}`, landing pages, visual components) that names a
 component library or design reference (triaged at least standard, Step 2), the researcher
-brief adds: "Survey the WHOLE catalogue of {library}: list every
+brief adds (the agent's `research/agent.md` → "UI waves: survey the catalogue"): "Survey the WHOLE catalogue of {library}: list every
 component with a fit rating for this page (use / maybe / no) and a one-line reason, and inventory
 the design reference(s) — tokens (type scale, colours, spacing, radii, motion) and signature
 patterns — with `path:line` or URL + selector citations." A plan that picks components without
