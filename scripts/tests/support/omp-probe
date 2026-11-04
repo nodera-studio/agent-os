@@ -1,0 +1,42 @@
+#!/bin/bash
+# Offline omp peer for omp-probe-keyed-smoke: scenario files live in $FAKE_STATE. It echoes no env value.
+#   models.json / usage.json   canned catalog and usage output (absent file = failure)
+#   mech                       overlay | startup_arg | none: which model-selection route this omp honours
+#   needs-key                  present: print mode fails without OPENCODE_API_KEY (no stored login)
+#   bad-tools                  model id whose tool use fails (thought_signature)
+set -euo pipefail
+state="${FAKE_STATE:?scenario directory required}"
+if [ "${1:-}" = --version ]; then echo omp/18.14.0; exit 0; fi
+if [ "${1:-}" = --help ]; then printf 'FLAGS\n      --no-tools   Disable all built-in tools\n'; exit 0; fi
+[ "${1:-}" = --profile ] && [ "${2:-}" = glen-harness-opencode ] || exit 99
+shift 2
+case "${1:-}" in
+  models) [ -f "$state/models.json" ] && cat "$state/models.json" || exit 1; exit 0 ;;
+  usage) [ -f "$state/usage.json" ] && cat "$state/usage.json" || exit 1; exit 0 ;;
+esac
+model='opencode-go/unset' explicit='' no_tools=0 prompt='' mech="$(cat "$state/mech")"
+if [ -n "${PI_CONFIG_FILES:-}" ] && [ "$mech" = overlay ]; then
+  model="$(sed -n 's/^  default: //p' "$PI_CONFIG_FILES")"
+fi
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --model) explicit="$2"; [ "$mech" != startup_arg ] || model="$2"; shift 2 ;;
+    --no-tools) no_tools=1; shift ;;
+    --tools | --mode) shift 2 ;;
+    --no-session) shift ;;
+    -p) prompt="$2"; shift 2 ;;
+    *) exit 98 ;;
+  esac
+done
+if [ -f "$state/needs-key" ] && [ -z "${OPENCODE_API_KEY:-}" ]; then echo 'not logged in' >&2; exit 1; fi
+case "$prompt" in
+  *probe.txt*)
+    [ -z "$explicit" ] || model="$explicit"
+    if [ "$no_tools" -eq 1 ]; then echo '{"text":"I cannot read files"}'; exit 0; fi
+    if [ -f "$state/bad-tools" ] && [ "$model" = "opencode-go/$(cat "$state/bad-tools")" ]; then
+      echo 'thought_signature missing' >&2; exit 1
+    fi
+    jq -cn --arg m "$model" --rawfile t probe.txt '{model:$m,text:$t}'
+    ;;
+  *) jq -cn --arg m "$model" '{model:$m,text:"PROBE-OK"}' ;;
+esac
