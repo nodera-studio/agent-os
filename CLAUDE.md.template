@@ -36,10 +36,20 @@ that gate `git push`) and how to bypass it deliberately (`--no-verify`) when jus
 
 ## Branching & release model
 
+- Staging (integration) branch: `{{STAGING_BRANCH}}`
+- Production branch: `{{PROD_BRANCH}}`
+- Ticket prefix: `{{TICKET_PREFIX}}`
+
 Document your branching model here — trunk name, release-branch name (if any), PR
 target, squash vs merge-commit policy, and any branch-protection rulesets. If you use
 the `/branching-model` skill pattern from this harness, describe day-to-day branch/PR
 rules there and keep this section to the summary.
+
+## Language mode
+
+`LANGUAGE_MODE`: `{{LANGUAGE_MODE}}` (`en` is the default; `ro` is opt-in). Under `ro`, chat replies, reports and
+review summaries are Romanian with full diacritics; code, identifiers, commit messages, PR titles and every
+engine brief stay English. The full rule is `.claude/rules/language-mode.md`.
 
 ## `.claude/` Directory Structure
 

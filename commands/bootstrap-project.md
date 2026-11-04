@@ -24,13 +24,13 @@ dispatching.
    target, and any existing `CLAUDE.md` or agent config to preserve rather than overwrite.
 2. **Fill in tokens.** Substitute this harness's `{{TOKEN}}` placeholders across
    `CLAUDE.md.template`, `settings.json`, and any optional hooks with values learned in step 1.
-   Representative tokens (the orchestrator's own token list is authoritative — this is
-   illustrative, not exhaustive):
+   The full token set is declared once, in the orchestrator (`agents/bootstrap/orchestrator.md`,
+   "The token set") and is authoritative. Representative tokens:
    - `{{PROJECT_NAME}}` — the project's name
-   - `{{STACK_SUMMARY}}` — one-paragraph stack description
+   - `{{PROJECT_DESCRIPTION}}` — one-paragraph description of the project
    - `{{PACKAGE_MANAGER}}` — npm/pnpm/yarn/cargo/pip/etc.
-   - `{{DEV_COMMAND}}` / `{{TEST_COMMAND}}` / `{{LINT_COMMAND}}` / `{{BUILD_COMMAND}}`
-   - `{{BRANCH_MODEL}}` — trunk name + release branch, if any
+   - `{{DEV_CMD}}` / `{{TEST_CMD}}` / `{{LINT_CMD}}` / `{{BUILD_CMD}}`
+   - `{{STAGING_BRANCH}}` / `{{PROD_BRANCH}}` — the branching model's integration and production branches
    - `{{PRIMARY_LANGUAGE}}` — main language/framework for tool-routing defaults
 3. **Quality-check.** Rather than inventing its own bar for the written `CLAUDE.md`, the
    orchestrator defers to Anthropic's own `claude-md-management` plugin (install via

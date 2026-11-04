@@ -31,7 +31,15 @@ list doesn't cover):
 `{{PROJECT_NAME}}`, `{{PACKAGE_MANAGER}}`, `{{DEV_CMD}}`, `{{BUILD_CMD}}`,
 `{{TEST_CMD}}`, `{{TYPECHECK_CMD}}`, `{{LINT_CMD}}`, `{{FORMAT_CMD}}`, `{{MONOREPO}}`,
 `{{PRIMARY_LANGUAGE}}`, `{{FRAMEWORK}}`, `{{VCS_DEFAULT_BRANCH}}`, `{{DOCKER}}`,
-`{{FRONTEND_DIR}}`, `{{BACKEND_DIR}}`, `{{SHARED_DIR}}`.
+`{{FRONTEND_DIR}}`, `{{BACKEND_DIR}}`, `{{SHARED_DIR}}`, `{{PROJECT_DESCRIPTION}}`,
+`{{FRONTEND_STACK}}`, `{{BACKEND_STACK}}`, `{{DATABASE_STACK}}`, `{{HOSTING_STACK}}`,
+`{{STAGING_BRANCH}}`, `{{PROD_BRANCH}}`, `{{TICKET_PREFIX}}`, `{{LANGUAGE_MODE}}`.
+
+STAGING_BRANCH and PROD_BRANCH are the integration and production branches of the branching model (equal
+when there is no staging branch); TICKET_PREFIX is the issue-key prefix, empty when the project has none.
+LANGUAGE_MODE is `en` (default) or `ro` (opt-in; today only nodex): ask for it once, write it into the
+project's `CLAUDE.md`, and see `rules/language-mode.md`. This list is the one place the tokens are declared;
+`commands/bootstrap-project.md` and `CLAUDE.md.template` follow it.
 
 ## Pipeline
 
