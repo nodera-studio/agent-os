@@ -5,14 +5,15 @@
 #
 # Scope (deliberately narrow — over-blocking traps the agent in retry loops):
 #   - `sed -i` editing a file        -> Edit tool / LSP rename
-#   - `cat`/`head`/`tail` of a CODE file (not heredocs, not logs) -> Read tool
+#   - `cat`/`head`/`tail` of a CODE file (ts/js/css/sql; not heredocs, docs, config or logs) -> Read tool
 #   - shell reads of `.env`/secret files (not `.env.example`)     -> secrets MCP
 #   - `curl`/`wget` to an EXTERNAL url -> Exa MCP (web) / a service SDK-CLI (APIs).
 #     Loopback stays allowed (local API, MCP servers, health checks). Every URL in the
 #     whole command must be on the allow-list.
 #   - recursive `rm` of this project's scratch (<prefix>* under $TMPDIR, /tmp or
 #     /var/folders) -> scripts/clean-scratch.sh, which refuses anything still in use.
-#     <prefix> is HARNESS_SCRATCH_PREFIX, else the main checkout's directory name plus `-`.
+#     <prefix> is HARNESS_SCRATCH_PREFIX, else the main checkout's directory name plus `-`;
+#     the helper's path in the advice is HARNESS_CLEAN_SCRATCH, else .claude/scripts/clean-scratch.sh.
 #   - `omp` with a profile not in omp/profiles.sh (`--profile`, OMP_PROFILE, PI_PROFILE), and
 #     `mkdir`/`cp`/`mv`/`rsync`/`ln` into another ~/.omp/profiles/<name> -> HOME="$(mktemp -d)"
 # Does NOT touch grep/rg (agentic search is good in-loop — routed via CLAUDE.md)
@@ -127,9 +128,9 @@ while IFS= read -r seg || [ -n "$seg" ]; do
       fi
       ;;
     cat|head|tail)
-      # allow heredocs (cat <<EOF) and non-code reads (logs etc.); block reads of code files
+      # allow heredocs (cat <<EOF) and non-code reads (docs, config, logs); block reads of code files
       if ! printf '%s' "$seg" | grep -qE '<<' \
-         && printf '%s' "$seg" | grep -qE '\.(ts|tsx|js|jsx|mjs|cjs|json|md|mdx|css|scss|sql|ya?ml|toml|env)([[:space:]]|$|"|'"'"')'; then
+         && printf '%s' "$seg" | grep -qE '\.(ts|tsx|js|jsx|mjs|cjs|css|scss|sql)([[:space:]]|$|"|'"'"')'; then
         deny "Don't read files with $base. Use the Read tool — cacheable, structured, supports offset/limit."
       fi
       ;;
@@ -196,7 +197,7 @@ while IFS= read -r seg || [ -n "$seg" ]; do
         # shellcheck disable=SC2016 # $TMPDIR / ${TMPDIR} are matched literally in the command text
         if [ -n "$prefix" ] \
            && printf '%s' "$seg" | grep -qE '(\$TMPDIR|\$\{TMPDIR[^}]*\}|/tmp/|/private/tmp/|/var/folders/|/private/var/folders/)[^[:space:]]*'"$prefix_re"; then
-          deny "Delete scratch with the helper: bash .claude/scripts/clean-scratch.sh [--dry-run] '${prefix}<name or glob>' (it refuses anything a worktree or process still uses). rm -rf stays denied."
+          deny "Delete scratch with the helper: bash ${HARNESS_CLEAN_SCRATCH:-.claude/scripts/clean-scratch.sh} [--dry-run] '${prefix}<name or glob>' (it refuses anything a worktree or process still uses). rm -rf stays denied."
         fi
       fi
       ;;
