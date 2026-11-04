@@ -11,7 +11,7 @@ workflow below) once to adapt the templated files to that project's actual stack
 - **Claude + Codex** (dual-engine; omp optional as a third reviewer/investigator when its probe is ready) for review comprehensive passes, debug agents, and codebase audits — multi-pass voting with cross-model consensus catches issues a single model misses
 - **Claude only** for planning, orchestrators, testing, error handling, docs, and all implementation stages EXCEPT the lean code-review gate inside `/implement` (1 Claude + 1 Codex pass, 2-vote)
 - Codebase audits use dual-engine (Claude + Codex) per group. Security audit additionally uses checklist perturbation.
-- **Model rides the session, not a hardcoded tier.** Every frontier role — orchestrators, planner/architect, the Implementer, reviewers, security/error finders, the debug investigator + adversary, research, and copywrite voice — is `model: inherit`, so it runs on whatever the session runs. Never pin a frontier agent to a model that won't follow the session. Mechanical / summarization roles (test-runner, verifier, docs-updater, light audits, plan explorer/researcher, line/microcopy/consistency editors) stay pinned `sonnet` — they don't need frontier compute. Effort: `high` is the default; `xhigh` is reserved for the Implementer, planner, and orchestrators on hard waves.
+- **Model rides the session, not a hardcoded tier.** Every frontier role — orchestrators, planner/architect, the Implementer, reviewers, security/error finders, the debug investigator + adversary, research, and copywrite voice — is `model: inherit`, so it runs on whatever the session runs. Never pin a frontier agent to a model that won't follow the session: the Implementer (`impl-implementer`) is `inherit` too (the old `opus` pin of the Claude-only coder is gone with the merge); the one remaining exception is `impl-coder-ui`, pinned `opus`. Mechanical / summarization roles (test-runner, verifier, docs-updater, light audits, plan explorer/researcher, line/microcopy/consistency editors) stay pinned `sonnet` — they don't need frontier compute. Effort: `high` is the default; `xhigh` is reserved for the Implementer, planner, and orchestrators on hard waves.
 
 **Core principle:** Specialist agents do the heavy lifting (research, code, review) but never touch git or external systems. The orchestrator (the main session) owns those actions: it commits and pushes as `/implement` and `/auto-mode` describe, and every outward action (opening or merging a PR, ticket updates, releases) follows the user's authorisation for the run.
 
@@ -37,10 +37,9 @@ workflow below) once to adapt the templated files to that project's actual stack
 ├── implementation/                  # Workflow: Build a feature/fix (4 roles)
 │   ├── orchestrator.md              # Pipeline manager: routed Implementer → Review → tail → re-index
 │   ├── orchestrator-quick.md        # Fast path for small/low-risk changes — fewer gates, same quality bar
-│   ├── coder-claude.md              # Role 1 — the fused Implementer, run in Claude (the default: `routing.sh implementation` prints `claude`)
 │   ├── coder-codex.md               # Role 1 — the fused Implementer, run in Codex (task --json --write), only when `routing.sh implementation` prints `codex`; routing picks one of the two
 │   ├── coder-ui.md                  # Role 1 for design-heavy web UI — Claude UI Implementer, frontend-design skill, browser check vs the design reference (`routing.sh ui`)
-│   ├── implementer.md               # Canonical fused-loop envelope both coders follow (coder-codex.md forwards it to Codex)
+│   ├── implementer.md               # Role 1 — the fused Implementer (agent `impl-implementer`), run in Claude (the default: `routing.sh implementation` prints `claude`); also the canonical loop envelope (coder-codex.md forwards it to Codex)
 │   ├── code-review.md               # Role 2 — Claude reviewer (‖ Codex via codex:codex-rescue), 2-vote
 │   ├── docs-updater.md              # Role 3 (tail) — updates docs after implementation
 │   └── conformance-test-writer.md   # Role 3 (tail) — author-blind, plan-derived conformance gate

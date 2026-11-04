@@ -144,7 +144,7 @@ autonomy is the point of this mode.
    skip re-planning.
 3. **Implement.** Invoke `/implement` for the wave. Let it own its internal gates: the
    loop of the Implementer `bash .claude/scripts/routing.sh implementation` names
-   (`impl-coder-claude` or `impl-coder-codex`) and `scripts/quality-gate.sh`, the local
+   (`impl-implementer` or `impl-coder-codex`) and `scripts/quality-gate.sh`, the local
    `/code-review` gate (1 Claude ‖ 1 Codex pass, 2-vote), the conformance tail and the docs
    updater.
    - **File names.** Saved review or plan files per engine are named `<engine>-review.md` /
@@ -347,7 +347,7 @@ what to do>` or `> REVOKED <ISO>: <decision> — <replacement>`, before any mess
 agent and the integrator record `shasum -a 256 <plan file>` when they start and re-hash it
 before each commit and merge, applying every new REVISED or REVOKED line first (and stopping to
 report when one contradicts work already committed). Group agents never read this file, so each
-group brief carries that instruction itself, or names `coder-claude.md` → Step 3, item 3. A batch
+group brief carries that instruction itself, or names `implementer.md` → Step 3, item 3. A batch
 acceptance check that names an open branch carries "once that branch is merged, run it against
 `origin/{{STAGING_BRANCH}}`" (a check bound to a branch goes stale once it squash-merges).
 

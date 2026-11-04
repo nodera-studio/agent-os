@@ -11,7 +11,7 @@ drive it through **four roles** until the feature is implemented, reviewed, test
 documented, and re-indexed:
 
 1. **Implementer** — one fused context, the agent `bash .claude/scripts/routing.sh
-   implementation` names (`claude` → `impl-coder-claude` via `coder-claude.md`, `codex` →
+   implementation` names (`claude` → `impl-implementer` via `implementer.md`, `codex` →
    `impl-coder-codex` via `coder-codex.md`), that writes → wires → hardens → tests → runs
    the quality gate → fixes, looping until green. That routed Implementer writes the product
    code; you orchestrate, review, and test independently but write no product code. One
@@ -173,23 +173,23 @@ failure and finding — until tests AND the gate are green. Resolve the route fi
 exit is a blocker (report its stderr line, never guess):
 
 ```bash
-bash .claude/scripts/routing.sh implementation   # claude → impl-coder-claude, codex → impl-coder-codex
+bash .claude/scripts/routing.sh implementation   # claude → impl-implementer, codex → impl-coder-codex
 ```
 
-- `claude` (the default): `coder-claude.md` writes the code in its own Claude context.
+- `claude` (the default): `implementer.md` writes the code in its own Claude context.
 - `codex`: `coder-codex.md` is the thin Claude-side host: it hands Codex the envelope
   (`AGENTS.md` + `implementer.md`), runs `codex-companion.mjs task --json --write`, and parses
   the JSON `touchedFiles`/completion envelope back into the report below.
 
 ```
 Dispatch via Agent tool:
-  subagent_type: "impl-coder-claude" | "impl-coder-codex"   (from routing.sh implementation)
-  prompt: "Read .claude/agents/implementation/coder-<claude|codex>.md and follow its instructions. Implement this plan: {approved plan}. Plan/progress file: {absolute path in the main checkout}. The plan is git-ignored, so it is not in the worktree; that is expected."
+  subagent_type: "impl-implementer" | "impl-coder-codex"   (from routing.sh implementation)
+  prompt: "Read .claude/agents/implementation/<implementer|coder-codex>.md and follow its instructions. Implement this plan: {approved plan}. Plan/progress file: {absolute path in the main checkout}. The plan is git-ignored, so it is not in the worktree; that is expected."
 ```
 
-If `impl-coder-claude` is not a loaded agent type (agents load at session start), dispatch
+If `impl-implementer` is not a loaded agent type (agents load at session start), dispatch
 `subagent_type: "general-purpose"` with `model: "opus"` and the same prompt
-(`coder-claude.md` → "Dispatch fallback").
+(`implementer.md` → "Dispatch fallback").
 
 Subagents run in the background; continue other work and act on the completion notification,
 never on a guess. That is also what lets the Implementer reach `main` by SendMessage to report
@@ -213,7 +213,7 @@ section, as `> REVISED <date -u +%Y-%m-%dT%H:%M:%SZ>: <what changed and what to 
 can receive it. Every committer records `shasum -a 256 <brief file>` when it starts, re-hashes
 right before every commit (and before an integration merge), and on a change re-reads its
 section and applies every REVISED or REVOKED line before committing; if a revision contradicts
-work already committed, it stops and reports (`coder-claude.md` → Step 3). A parallel group
+work already committed, it stops and reports (`implementer.md` → Step 3). A parallel group
 once coded a revoked decision, and the integrator caught it only because it re-read the brief.
 
 **UI implementation routing.** Design-heavy UI (`{{FRONTEND_DIR}}`, landing pages, visual
@@ -403,7 +403,7 @@ nobody owned them until four blind conformance tests failed. So after every Impl
   ## Not-done ledger
   | Item | From | Owner | Fix cycle | State | Record |
   | --- | --- | --- | --- | --- | --- |
-  | Step 21 AC source check | Implementer report 2026-01-31T18:02Z | impl-coder-claude | fix 1 | open | |
+  | Step 21 AC source check | Implementer report 2026-01-31T18:02Z | impl-implementer | fix 1 | open | |
   ```
 
   State is `open`, `fixed <sha>` or `deferred`.
@@ -423,7 +423,7 @@ dispatch separate coder / wiring / error-handling / test-writer / test-runner / 
 implementation` names. The single most important property of this pipeline is that the context
 which reads a test/gate failure is the same one that wrote the code — that context is the
 routed Implementer's; splitting the loop is what we deliberately removed. `implementer.md` is
-the canonical envelope both `coder-claude.md` and `coder-codex.md` follow. If the routed
+the canonical envelope; `coder-codex.md` forwards it to Codex. If the routed
 engine is unavailable, Role 1 stops and reports; switching engines is an owner routing change
 (`routing.json`), never a silent fallback. Product code outside the routed Implementer has two
 exceptions only: design-heavy UI under "UI implementation routing" above, and integrating two
@@ -529,7 +529,7 @@ findings), give each finding its exact `path:start-end` range, and say: "Read on
 ranges (plus ~30 lines of context); do not read any file in full beyond them; skip Mnemosyne
 recall." The Codex Implementer stalls on the 180 s watchdog when it reads a very long file in
 full before editing; `coder-codex.md` → Step 3 carries the ranges into Codex's prompt, and
-`coder-claude.md` → Step 1 reads only those ranges.
+`implementer.md` → Step 1 reads only those ranges.
 
 ### Fix cycles
 
@@ -759,7 +759,7 @@ Plans are **kept after implementation** — they accumulate as project history. 
 <rules>
 
 - **Four roles, not eighteen steps.** Implementer (fused; the agent `bash
-  .claude/scripts/routing.sh implementation` names: `impl-coder-claude` via `coder-claude.md`
+  .claude/scripts/routing.sh implementation` names: `impl-implementer` via `implementer.md`
   or `impl-coder-codex` via `coder-codex.md`, read before every dispatch) → Review (fresh) →
   AC source check → tail (docs ‖ conformance ‖ optional project-specific domain-rubric gate)
   → re-index. The routed Implementer owns write+wire+harden+test+gate; you write no product

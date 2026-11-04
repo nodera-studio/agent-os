@@ -1,6 +1,6 @@
 ---
 name: impl-coder-codex
-description: The fused Implementer, run in OpenAI Codex. Runs when `routing.sh implementation` prints `codex`; then Codex writes the product code (implementation + wiring + error-handling + inline dev tests) via codex-companion.mjs task --json --write, and this host emits the orchestrator's completion report. When routing prints `claude`, impl-coder-claude runs instead; design-heavy web UI goes to the agent `routing.sh ui` names.
+description: The fused Implementer, run in OpenAI Codex. Runs when `routing.sh implementation` prints `codex`; then Codex writes the product code (implementation + wiring + error-handling + inline dev tests) via codex-companion.mjs task --json --write, and this host emits the orchestrator's completion report. When routing prints `claude`, impl-implementer runs instead; design-heavy web UI goes to the agent `routing.sh ui` names.
 tools: Bash, Read, Grep, Glob, SendMessage
 model: claude-sonnet-5
 effort: low
@@ -37,7 +37,7 @@ else echo claude; echo "source=missing-script" >&2; fi   # neither has it: the d
 ```
 
 When it prints anything other than `codex`, stop, write nothing, and report
-`routing: implementation=<value> (<source>); dispatch impl-coder-claude`, with `<source>` from
+`routing: implementation=<value> (<source>); dispatch impl-implementer`, with `<source>` from
 the `source=` line on stderr. When it exits non-zero, stop, write nothing, and report
 `BLOCKER: routing.sh implementation failed: <its stderr line>`. Never guess the route.
 
@@ -71,7 +71,7 @@ fi
 **Fail closed.** If that check exits non-zero, your report to the orchestrator MUST
 lead with `BLOCKER: Codex unavailable` and claim zero progress — never a
 success-shaped report. Do NOT fall back to writing the code yourself (on this route the
-host never writes product code; switching to impl-coder-claude is an owner routing change,
+host never writes product code; switching to impl-implementer is an owner routing change,
 not a fallback) and do NOT use `codex exec`.
 
 ## Step 3 — Assemble the Codex prompt (the envelope Codex must obey)
@@ -308,7 +308,7 @@ same worktree and outside the sandbox:
    `<wave label>: <slice summary>`), each with the project's trailer. A file in
    `git status` that Codex did not report is not staged; list it as a deviation. Right before
    each commit, re-hash the plan and brief files (`shasum -a 256`); a change that is only
-   Codex's `status=` flips needs no re-read (`coder-claude.md` → Step 3, item 3, keep a copy
+   Codex's `status=` flips needs no re-read (`implementer.md` → Step 3, item 3, keep a copy
    and `diff`). On any other change, re-read your section for `> REVISED <ISO>: …` and
    `> REVOKED <ISO>: <decision> — <replacement>` lines: one that changes the code goes back to
    Codex as a `--resume-last` delta prompt before you commit (you never write the code); one

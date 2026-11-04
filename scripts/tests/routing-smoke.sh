@@ -75,8 +75,8 @@ for engine in jq node; do
 
   # (c) override for one key only: other keys still come from the default.
   d="$(setup "$engine-onekey")"
-  printf '%s\n' '{"ui":"impl-coder-claude","decision":"def67890"}' >"$d/auto-mode/routing.json"
-  check "$engine: one-key override, that key" "$P" "$d" ui 0 impl-coder-claude "source=override decision=def67890"
+  printf '%s\n' '{"ui":"impl-implementer","decision":"def67890"}' >"$d/auto-mode/routing.json"
+  check "$engine: one-key override, that key" "$P" "$d" ui 0 impl-implementer "source=override decision=def67890"
   check "$engine: one-key override, other key" "$P" "$d" implementation 0 claude "source=default decision=0a1b2c3d"
 
   # (d) unknown key: exit 2, nothing on stdout.

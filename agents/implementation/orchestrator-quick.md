@@ -57,7 +57,7 @@ You write no product code: dispatch the Implementer routing names, even on the q
 Resolve it first (a non-zero exit is a blocker: report its stderr line, never guess):
 
 ```bash
-bash .claude/scripts/routing.sh implementation   # claude → impl-coder-claude, codex → impl-coder-codex
+bash .claude/scripts/routing.sh implementation   # claude → impl-implementer, codex → impl-coder-codex
 bash .claude/scripts/routing.sh ui               # the agent for a design-heavy UI change
 # No .claude/scripts/routing.sh in this checkout (a worktree cut before it existed): run the main
 # checkout's, "$(git rev-parse --path-format=absolute --git-common-dir)/../.claude/scripts/routing.sh";
@@ -69,11 +69,11 @@ implementation routing); everything else to the routed Implementer:
 
 ```
 Agent tool:
-  subagent_type: "impl-coder-claude" | "impl-coder-codex"   (from routing.sh implementation)
+  subagent_type: "impl-implementer" | "impl-coder-codex"   (from routing.sh implementation)
   prompt: "Read .claude/agents/implementation/coder-<claude|codex>.md and follow its instructions. Implement this small change (--fresh): {the user's task + the pattern file it copies}."
 ```
 
-If `impl-coder-claude` is not a loaded agent type (agents load at session start), dispatch
+If `impl-implementer` is not a loaded agent type (agents load at session start), dispatch
 `subagent_type: "general-purpose"` with `model: "opus"` and the same prompt.
 
 Subagents run in the background; continue other work and act on the completion notification,

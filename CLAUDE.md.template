@@ -87,7 +87,7 @@ per-project filling-in needed, see `agents/orchestrator/README.md`.
 
 Roles come from `.claude/routing.json`, read through `bash .claude/scripts/routing.sh <key>`
 (an owner-confirmed override in `.claude/auto-mode/routing.json` wins). By default Claude
-implements (`impl-coder-claude`) and Codex reviews, plans, debugs and audits. Dispatch Codex
+implements (`impl-implementer`) and Codex reviews, plans, debugs and audits. Dispatch Codex
 only through the `codex:codex-rescue` agent, `codex-companion.mjs` (the Implementer, only when
 `routing.sh implementation` prints `codex`) or `codex review`; never `codex exec`. omp is an optional read-only third review/debug
 engine, run only through `bash .claude/scripts/omp-engine.sh` (see `.claude/skills/omp/SKILL.md`;

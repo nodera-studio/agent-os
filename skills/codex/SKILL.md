@@ -20,7 +20,7 @@ argument-hint: '<task or question to dispatch to Codex>'
 Who does each kind of work is set by `.claude/routing.json`, read through
 `bash .claude/scripts/routing.sh <key>` (an owner-confirmed override in
 `.claude/auto-mode/routing.json` wins). By default `implementation` is `claude`: the Claude
-Implementer (`coder-claude.md`) writes product code, and Codex reviews it. `review`,
+Implementer (`implementer.md`) writes product code, and Codex reviews it. `review`,
 `planning`, `debug` and `audits` include `codex`. Design-heavy web UI (landing pages, visual
 components) goes to the agent `routing.sh ui` names, and Codex reviews it
 (`implementation/orchestrator.md` → UI implementation routing). Codex fills these roles:
@@ -43,7 +43,7 @@ components) goes to the agent `routing.sh ui` names, and Codex reviews it
    (`codex-companion.mjs task --json --write`). Codex reads its conventions from the
    repo-root `AGENTS.md`. This is not the thin `codex:codex-rescue` forwarder — it owns the
    `touchedFiles`/completion-report contract the orchestrator needs. When routing prints
-   anything else, `coder-codex.md` stops at its Step 0 and `impl-coder-claude` runs instead.
+   anything else, `coder-codex.md` stops at its Step 0 and `impl-implementer` runs instead.
 
 `codex exec` is never used — Codex is invoked only through the plugin runtime
 (`coder-codex.md` → `codex-companion.mjs`, `codex:codex-rescue`, or `codex review`).
