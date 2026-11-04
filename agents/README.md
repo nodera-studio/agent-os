@@ -37,7 +37,6 @@ workflow below) once to adapt the templated files to that project's actual stack
 ├── implementation/                  # Workflow: Build a feature/fix (4 roles)
 │   ├── orchestrator.md              # Pipeline manager: routed Implementer → Review → tail → re-index
 │   ├── orchestrator-quick.md        # Fast path for small/low-risk changes — fewer gates, same quality bar
-│   ├── planner.md                   # Codebase analysis, step ordering, backward verification
 │   ├── coder-claude.md              # Role 1 — the fused Implementer, run in Claude (the default: `routing.sh implementation` prints `claude`)
 │   ├── coder-codex.md               # Role 1 — the fused Implementer, run in Codex (task --json --write), only when `routing.sh implementation` prints `codex`; routing picks one of the two
 │   ├── coder-ui.md                  # Role 1 for design-heavy web UI — Claude UI Implementer, frontend-design skill, browser check vs the design reference (`routing.sh ui`)

@@ -102,7 +102,7 @@ Under `/auto-mode`: use the plan and proceed to Role 1; announce the plan path a
 may still say "If wave 4 is merged…". Check each such conditional against the repo now
 (`git log origin/{{STAGING_BRANCH}}`, `gh pr view <N> --json state`, `rg`), rewrite it as an
 unconditional instruction in the plan file, and keep only those that cannot be resolved yet,
-labelled `CONDITIONAL — decided by: <the check>` (`implementation/planner.md` → backward
+labelled `CONDITIONAL — decided by: <the check>` (`plan/planner.md` → backward
 check). The Implementer must not spend round trips on them. A check or gate that names an open
 branch or PR (for example `git merge-tree --write-tree feat/x HEAD`) runs against
 `origin/{{STAGING_BRANCH}}` instead once that branch is merged (`gh pr view <N> --json state`
@@ -117,7 +117,7 @@ Dispatch the planner to analyze the codebase and produce a step-by-step plan.
 
 ```
 Dispatch via Agent tool:
-  prompt: "Read .claude/agents/implementation/planner.md and follow its instructions. Task: {task description}"
+  prompt: "Read .claude/agents/plan/planner.md and follow its instructions (single mode: no architect, explorer or researcher report). Task: {task description}"
 ```
 
 Review the returned plan for completeness: are all affected files identified? Is

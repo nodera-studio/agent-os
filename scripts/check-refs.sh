@@ -3,8 +3,8 @@
 #
 # Usage: bash .claude/scripts/check-refs.sh [--root <dir>] [--exclude-packs] [--exclude <path>]... <needle>...
 #
-# Each needle is a fixed string (a path such as `agents/implementation/planner.md`, a subagent name such as
-# `impl-coder-claude`, a command such as `commands/goal.md`), matched as a plain substring, case-sensitively,
+# Each needle is a fixed string (a path such as `agents/old/planner.md`, a subagent name such as
+# `old-planner`, a command such as `commands/old.md`), matched as a plain substring, case-sensitively,
 # in every text file below --root (default: the harness root, the parent of this script's directory).
 # `.git` and `node_modules` are always skipped, and symlinks are not followed (so the plugin mirror, which is
 # only symlinks, never double-counts). --exclude-packs also skips `packs/`; --exclude <path> skips one more

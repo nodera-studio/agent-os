@@ -7,7 +7,7 @@ re-indexed code. Four roles, not eighteen steps.
 
 ```mermaid
 flowchart LR
-    P["planner<br/>(Claude)"] --> I["Implementer<br/>write → wire → harden →<br/>test → gate → fix<br/>(fused loop, coder-claude.md<br/>or coder-codex.md by routing)"]
+    P["planner<br/>(plan/planner.md,<br/>single mode)"] --> I["Implementer<br/>write → wire → harden →<br/>test → gate → fix<br/>(fused loop, coder-claude.md<br/>or coder-codex.md by routing)"]
     I --> RV["Review<br/>(fresh context —<br/>see review-implementation/)"]
     RV --> TAIL
 
@@ -23,7 +23,7 @@ flowchart LR
 `orchestrator-quick.md` is the fast-path variant of the same shape for small/low-risk
 changes — fewer gates, same quality bar — dispatched by `/implement-quick`.
 
-1. **planner** — Analyzes the codebase, identifies affected files, produces a numbered plan.
+1. **planner** — `plan/planner.md` in single mode: analyzes the codebase, identifies affected files, produces a numbered plan.
 2. **Implementer** — the fused generative loop in ONE context: writes the code, wires
    every layer, hardens error paths, writes unit + integration tests, runs them, runs the
    deterministic quality gate (`scripts/quality-gate.sh`), and fixes every failure and
