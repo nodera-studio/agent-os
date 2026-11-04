@@ -75,5 +75,45 @@ check 'the unmatched SessionStart group no longer reinjects' 0 \
   "$(jq '[.hooks.SessionStart[] | select(.matcher == null) | .hooks[] | select(.command | endswith("reinject-invariants.sh"))] | length' "$ROOT/settings.json")"
 check 'the payload file is not an always-on rule (it carries paths:)' 1 "$(head -n 6 "$ROOT/rules/invariants.md" | grep -c '^paths:')"
 
+# --- 11c: prettier-on-edit runs only when configured and installed, and reports through additionalContext (AC-042) ---
+prettier_out() { # prettier_out <file>: the hook's stdout for an Edit of <file>
+  jq -n --arg f "$1" '{tool_name:"Edit",tool_input:{file_path:$f}}' | /bin/bash "$HOOKS/prettier-on-edit.sh" 2>/dev/null || true
+}
+mkpkg() { # mkpkg <dir> <package.json>
+  mkdir -p "$1/src"
+  printf '%s\n' "$2" >"$1/package.json"
+  printf 'const a   =  1\n' >"$1/src/a.ts"
+}
+# a stub prettier that records its argv and either formats (rewrites the file) or fails
+stub_prettier() { # stub_prettier <dir> ok|fail
+  mkdir -p "$1/node_modules/.bin"
+  if [ "$2" = ok ]; then
+    printf '#!/bin/sh\necho "$@" >"%s/prettier-argv"\nfor last; do :; done\nprintf "const a = 1;\\n" >"$last"\n' "$WORK" >"$1/node_modules/.bin/prettier"
+  else
+    printf '#!/bin/sh\necho "SyntaxError: boom" >&2\nexit 2\n' >"$1/node_modules/.bin/prettier"
+  fi
+  chmod +x "$1/node_modules/.bin/prettier"
+}
+P1="$WORK/p-noconfig"; mkpkg "$P1" '{"name":"x"}'; stub_prettier "$P1" ok
+check 'no prettier config: silent, file untouched' 'const a   =  1' "$(prettier_out "$P1/src/a.ts" >/dev/null; cat "$P1/src/a.ts")"
+P2="$WORK/p-notinstalled"; mkpkg "$P2" '{"name":"x","devDependencies":{"prettier":"^3"}}'
+check 'configured but not installed: silent' '' "$(prettier_out "$P2/src/a.ts")"
+P3="$WORK/p-ok"; mkpkg "$P3" '{"name":"x","devDependencies":{"prettier":"^3"}}'; stub_prettier "$P3" ok
+check 'configured and installed: no output on success' '' "$(prettier_out "$P3/src/a.ts")"
+check 'and the file is formatted by the local binary' 'const a = 1;' "$(cat "$P3/src/a.ts")"
+P4="$WORK/p-rc"; mkpkg "$P4" '{"name":"x"}'; : >"$P4/.prettierrc"; stub_prettier "$P4" ok
+prettier_out "$P4/src/a.ts" >/dev/null
+check 'a config file alone also enables it' 'const a = 1;' "$(cat "$P4/src/a.ts")"
+P5="$WORK/p-fail"; mkpkg "$P5" '{"name":"x","prettier":{}}'; stub_prettier "$P5" fail
+out=$(prettier_out "$P5/src/a.ts")
+check 'a failure goes through additionalContext' PostToolUse "$(printf '%s' "$out" | jq -r '.hookSpecificOutput.hookEventName')"
+case "$(printf '%s' "$out" | jq -r '.hookSpecificOutput.additionalContext')" in *'SyntaxError: boom'*) check 'the context carries prettier output' ok ok ;; *) check 'the context carries prettier output' ok "$out" ;; esac
+check 'a failure never exits non-zero' 0 "$(jq -n --arg f "$P5/src/a.ts" '{tool_input:{file_path:$f}}' | /bin/bash "$HOOKS/prettier-on-edit.sh" >/dev/null 2>&1; echo $?)"
+mkdir -p "$WORK/nopkg"; printf 'x\n' >"$WORK/nopkg/a.ts"
+check 'no package.json above the file: silent' '' "$(prettier_out "$WORK/nopkg/a.ts")"
+printf 'x\n' >"$P3/src/readme.md"
+check 'a non-code extension is ignored' '' "$(prettier_out "$P3/src/readme.md")"
+if grep -q 'pnpm\|rebuild-shared' "$HOOKS/prettier-on-edit.sh"; then check 'no pnpm assumption or dangling comment' clean dirty; else check 'no pnpm assumption or dangling comment' clean clean; fi
+
 printf '%d cases, %d failures\n' "$CASES" "$FAILURES"
 [ "$FAILURES" -eq 0 ]
