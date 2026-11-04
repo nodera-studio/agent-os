@@ -24,18 +24,14 @@ are affected (schema, shared, backend, frontend, tests, docs).
 
 ### Step 2 — Discovery Triage
 
-Classify the task to set discovery depth, weighing three signals: **novelty** (new
-library / integration / pattern vs. established), **ambiguity** (clear boundaries vs.
-open questions about approach), and **scope** (single layer vs. 3+ layers).
+Planning always runs the explorer AND the researcher in parallel, then the dual-engine architect
+and planner passes; there is no lighter discovery depth and no single-planner shortcut. Triage only
+sets how far the researcher looks, weighing three signals: **novelty** (new library / integration /
+pattern vs. established), **ambiguity** (clear boundaries vs. open questions about approach), and
+**scope** (single layer vs. 3+ layers).
 
 <triage_protocol>
 Pick one depth:
-
-<depth name="minimal" trigger="Low novelty + low ambiguity + narrow scope">
-Explorer only — no researcher. For tasks that follow existing patterns: add a column,
-rename a field, create a CRUD endpoint matching an existing one, fix a known bug, add
-a missing error handler.
-</depth>
 
 <depth name="standard" trigger="Some novelty OR some ambiguity OR wide scope">
 Explorer AND researcher in parallel. The default when unsure. For features touching
@@ -51,8 +47,8 @@ and compatibility concerns." For integrating a new external service, adopting a 
 library, a feature with no existing pattern, or a major architectural change.
 </depth>
 
-A UI wave that names a component library or design reference runs at least **standard**, even
-when the other signals say minimal: the researcher owns the catalogue survey (Step 3).
+For a UI wave that names a component library or design reference, the researcher owns the
+catalogue survey (Step 3).
 
 Announce the decision before dispatching: "Triage: **{depth}** — {one-sentence reason}."
 </triage_protocol>
@@ -60,13 +56,6 @@ Announce the decision before dispatching: "Triage: **{depth}** — {one-sentence
 ### Step 3 — Explore and Research
 
 Dispatch per the triage depth.
-
-**Minimal:** Explorer only.
-```
-Dispatch via Agent tool:
-  prompt: "Read .claude/agents/plan/explorer.md and follow its instructions.
-           Task: {task description}"
-```
 
 **Standard:** Explorer + researcher in parallel.
 ```
@@ -97,7 +86,7 @@ Dispatch via Agent tool (parallel):
 
 **UI waves: survey the catalogue before anyone picks components.** For a wave with
 design-heavy UI (`{{FRONTEND_DIR}}`, landing pages, visual components) that names a
-component library or design reference (triaged at least standard, Step 2), the researcher
+component library or design reference, the researcher
 brief adds (the agent's `research/agent.md` → "UI waves: survey the catalogue"): "Survey the WHOLE catalogue of {library}: list every
 component with a fit rating for this page (use / maybe / no) and a one-line reason, and inventory
 the design reference(s) — tokens (type scale, colours, spacing, radii, motion) and signature
@@ -168,8 +157,7 @@ That diversity is the bulk of the gain; the judge is the load-bearing component.
 
 **High-stakes escalation — conditional 3rd architect (Gemini).** For irreversible / high-stakes
 specs (a schema migration, a regulated state machine, anything touching this project's
-domain-critical correctness invariant — the same risk heuristic `scripts/quick-classify.sh`
-uses, once this project has defined one), add a THIRD architect to the
+domain-critical correctness invariant), add a THIRD architect to the
 parallel batch IF a Gemini CLI is present:
 ```bash
 command -v gemini >/dev/null 2>&1   # only then dispatch the 3rd architect
@@ -248,35 +236,15 @@ why the separability rule must be conservative: the auto path must never splice 
 The winning author writes the spec single-threaded (Step 6) so one mind owns the spine — grafts are
 folded in, never blended into a new hybrid plan.
 
-### Step 6 — Plan (complexity-gated: single vs dual-engine → judge-select)
+### Step 6 — Plan (dual-engine → judge-select)
 
-Now turn the chosen approach into a detailed step plan. **This is the step the orchestrator gates by
-complexity** — the plan is where step-level errors and missed edges hide, so spend a second engine
-when the task is non-trivial, but don't pay for it on a one-obvious-shape change. Reuse the Step 2
-triage signal.
+Now turn the chosen approach into a detailed step plan. The plan is where step-level errors and
+missed edges hide, so it is always dual-engine: two planners (Claude + a second engine) independently
+produce a step plan from the SAME chosen approach, and a fresh judge-selector then picks the stronger
+plan and grafts any separable steps (the same select-then-graft discipline as Step 4.5). There is no
+single-planner path; a later complexity decision step may add one.
 
-<plan_engine_gate>
-- **Single planner (Claude only)** — for **minimal**-triage tasks (low novelty + low ambiguity +
-  narrow scope, cheaply-reversible). One planner writes the plan; go straight to Step 7.
-- **Dual-engine (Claude + Codex planner in parallel → judge-select)** — for **standard** / **deep**-
-  triage tasks. Two planners independently produce a step plan from the SAME chosen approach; a fresh
-  judge-selector then picks the stronger plan and grafts any separable steps (the same
-  select-then-graft discipline as Step 4.5).
-
-Announce: "Planner: **{single | dual}** — {one-sentence reason}." When torn, pick dual.
-</plan_engine_gate>
-
-**Single planner** —
-```
-Dispatch via Agent tool:
-  prompt: "Read .claude/agents/plan/planner.md and follow its instructions.
-           Task: {task description}
-           Chosen approach: {approach name and details}
-           Explorer report: {explorer output}
-           Researcher report: {researcher output}"
-```
-
-**Dual-engine** — dispatch BOTH planners in ONE message (parallel):
+Dispatch BOTH planners in ONE message (parallel):
 
 Claude planner —
 ```

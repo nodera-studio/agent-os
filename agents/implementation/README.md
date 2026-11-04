@@ -20,9 +20,6 @@ flowchart LR
     TAIL --> RE["Re-index<br/>(codebase MCP picks up<br/>the changed files)"]
 ```
 
-`orchestrator-quick.md` is the fast-path variant of the same shape for small/low-risk
-changes — fewer gates, same quality bar — dispatched by `/implement-quick`.
-
 1. **planner** — `plan/planner.md` in single mode: analyzes the codebase, identifies affected files, produces a numbered plan.
 2. **Implementer** — the fused generative loop in ONE context: writes the code, wires
    every layer, hardens error paths, writes unit + integration tests, runs them, runs the

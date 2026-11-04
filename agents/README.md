@@ -36,7 +36,6 @@ workflow below) once to adapt the templated files to that project's actual stack
 │
 ├── implementation/                  # Workflow: Build a feature/fix (4 roles)
 │   ├── orchestrator.md              # Pipeline manager: routed Implementer → Review → tail → re-index
-│   ├── orchestrator-quick.md        # Fast path for small/low-risk changes — fewer gates, same quality bar
 │   ├── coder-codex.md               # Role 1 — the fused Implementer, run in Codex (task --json --write), only when `routing.sh implementation` prints `codex`; routing picks one of the two
 │   ├── coder-ui.md                  # Role 1 for design-heavy web UI — Claude UI Implementer, frontend-design skill, browser check vs the design reference (`routing.sh ui`)
 │   ├── implementer.md               # Role 1 — the fused Implementer (agent `impl-implementer`), run in Claude (the default: `routing.sh implementation` prints `claude`); also the canonical loop envelope (coder-codex.md forwards it to Codex)
@@ -145,8 +144,8 @@ with the full per-step diagram — this file is the map of how they fit together
 ## Plan workflow (`/plan-implementation`)
 
 Turns a task into an approved, backward-verified plan before any code gets written.
-Discovery triage decides how much exploration a task actually needs (minimal / standard /
-deep), then two independent architects propose approaches in parallel and a judge picks
+Discovery triage decides how far the researcher looks (standard / deep; the explorer and
+researcher always both run), then two independent architects propose approaches in parallel and a judge picks
 the stronger one — grafting in whatever the loser got right — rather than blending two
 drafts into a compromise neither would have written alone. The planner that follows does
 the same dual-engine-then-judge pass for the step-by-step plan itself, plus a
@@ -160,9 +159,7 @@ or Codex) writes the code, wires it in,
 and writes its own tests; a lean internal review gate (1 Claude pass ‖ 1 Codex pass, 2-vote
 consensus) catches must-fix issues before the tail — an author-blind conformance-test
 writer (who only ever saw the plan, never the diff or the Implementer's own tests) and a
-docs updater. `/implement-quick` is the same pipeline with fewer gates for small, low-risk
-changes, behind a fail-safe classifier that falls back to the full path on anything
-ambiguous. See `agents/implementation/README.md` for the full pipeline diagram.
+docs updater. See `agents/implementation/README.md` for the full pipeline diagram.
 
 ## Review workflow (`/review-implementation`)
 
@@ -248,7 +245,6 @@ explicitly approved. See `agents/orchestrator/README.md` for the full loop diagr
 | `/brainstorm`            | Creative exploration                                                              | `brainstorm.md`                                                                               |
 | `/plan-implementation`   | Plan before coding                                                                | `plan/orchestrator.md`                                                                        |
 | `/implement`             | Build features/fixes                                                              | `implementation/orchestrator.md` (includes a lean internal Claude‖Codex code-review gate)     |
-| `/implement-quick`       | Fast path for small, low-risk changes                                            | `implementation/orchestrator-quick.md`                                                         |
 | `/review-implementation` | Self-review (heavy, standalone); `--lean` is the lean dual-engine gate on the current diff (standalone form of `/implement` Step 13) | `review-implementation/orchestrator.md`; `--lean`: `review/claude-reviewer.md` (`depth: lean`) ‖ `codex:codex-rescue`, merged by `review-implementation/synthesizer.md` |
 | `/second-opinion`        | Second opinion from the other engine; `--advisor` = read-only adversarial critique | `scripts/omp-engine.sh ask` (`omp:codex`)                                                     |
 | `/deep-debug`            | Heavy investigation                                                               | `debug/investigator.md` + `debug/adversary.md` (+ `debug/queue.md` for async-pipeline bugs)   |
@@ -287,14 +283,13 @@ explicitly approved. See `agents/orchestrator/README.md` for the full loop diagr
 - Self-check step verifies every plan step was actually implemented
 - Lean dual-engine code-review gate (Step 13): 1 Claude + 1 Codex pass in parallel, 2-vote consensus + ≤2 rework cycles — separate from and much leaner than the standalone `/review-implementation`
 - Plan splitting into waves for 12+ step plans (fresh context per wave)
-- Fast path (`/implement-quick`) for small, low-risk changes — a fail-safe classifier gate, same quality bar, fewer gates
 - Optional project-specific domain-rubric gate slot (Role 3, conditional) — wire up your own isolated-context grader for any non-numeric, structural/textual artifact class this project cares about (see `implementation/orchestrator.md`'s Role 3 note)
 
 **Planning pipeline:**
 
-- Discovery triage: minimal (explorer only) / standard (both) / deep (expanded research)
+- Discovery triage: standard (explorer ‖ researcher) / deep (expanded research)
 - Dual-engine architect (Claude ‖ Codex) + judge-selector (select-then-graft, never blend)
-- Complexity-gated planner: single-engine for minimal-triage tasks, dual-engine + judge-selector otherwise
+- Dual-engine planner + judge-selector on every task (no single-planner shortcut)
 - Goal-backward verification catches missing wiring and error handling
 - Dual-format plans (MD + XML) for machine-parseable status tracking
 

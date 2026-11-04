@@ -510,8 +510,8 @@ hook refuses such a name on the Write tool only.
 Escalate to the **triple-engine review block** (see
 `.claude/agents/review-implementation/orchestrator.md`: Claude reviewer (`depth: full`)
 ‖ `codex review` ‖ `coderabbit review --plain --agent`, plus the omp engine when its probe
-is ready → synthesizer) only when `command -v coderabbit` succeeds or the diff is high-risk (the risk heuristic
-`scripts/quick-classify.sh` uses: this project's risk keywords and protected paths). When
+is ready → synthesizer) only when `command -v coderabbit` succeeds or the diff is high-risk (this project's risk
+keywords and protected paths). When
 CodeRabbit is not installed, a high-risk diff runs that block with its available engines
 and says so, naming omp's skip reason when the probe is skipped. Every diff that stays on
 the lean gate brings omp in as its third pass whenever the probe is ready.

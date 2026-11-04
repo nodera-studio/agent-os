@@ -38,8 +38,7 @@ components) goes to the agent `routing.sh ui` names, and Codex reviews it
    planner (`/plan-implementation`), the `/deep-debug` investigator pair and the audit
    orchestrators, via `codex:codex-rescue`.
 4. **Implementer, only when `routing.sh implementation` prints `codex`** — the fused
-   write → wire → harden → test → gate → fix loop for `/implement` (Role 1) and
-   `/implement-quick`, run in Codex's own context via the **`coder-codex.md`** agent
+   write → wire → harden → test → gate → fix loop for `/implement` (Role 1), run in Codex's own context via the **`coder-codex.md`** agent
    (`codex-companion.mjs task --json --write`). Codex reads its conventions from the
    repo-root `AGENTS.md`. This is not the thin `codex:codex-rescue` forwarder — it owns the
    `touchedFiles`/completion-report contract the orchestrator needs. When routing prints
@@ -90,7 +89,7 @@ flags the user may include and that you should preserve in the prompt text:
 ### Foreground by default for agent briefs
 
 Every harness brief to `codex:codex-rescue` (plan, implement, review, `/review-implementation --lean`,
-`/implement-quick`, `/second-opinion --advisor`, `/deep-debug` and the audit orchestrators) MUST include
+`/second-opinion --advisor`, `/deep-debug` and the audit orchestrators) MUST include
 `--wait` and say: "Run in the foreground: wait for the Codex task to finish and
 return its full result as your final message; never return only a background task id." Without
 `--wait` the forwarder backgrounds any task that looks long and returns at once with a task id
