@@ -38,12 +38,6 @@ Two-tier audit architecture:
 | `docs-audit`      | `.claude/agents/codebase/docs-audit/`      | Documentation accuracy audit (multi-agent)     |
 | `tech-debt-audit` | `.claude/agents/codebase/tech-debt-audit/` | Comprehensive tech debt analysis (multi-agent) |
 
-**Standalone (not part of audits):**
-
-| Agent         | File                                     | Purpose                                              |
-| ------------- | ---------------------------------------- | ---------------------------------------------------- |
-| `docs-expert` | `.claude/agents/codebase/docs-expert.md` | Documentation Q&A -- answers questions, not an audit |
-
 </context>
 
 <instructions>

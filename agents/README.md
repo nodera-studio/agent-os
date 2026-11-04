@@ -65,7 +65,6 @@ workflow below) once to adapt the templated files to that project's actual stack
 ├── codebase/                        # Workflow: Full-codebase analysis (occasional)
 │   ├── orchestrator.md              # Two-tier dispatcher (quick health check / deep audits)
 │   ├── dependency-audit.md          # Dependency vulnerabilities, outdated deps, licenses
-│   ├── docs-expert.md               # Documentation Q&A (on-demand, not an audit) — discovers the doc layout fresh each time
 │   ├── security-audit/                       # Periodic deep audit — up to 6 agents / 4 passes, ASVS 5.0 L2
 │   │   ├── orchestrator.md          # cartographer → deep agents → synthesizer; union-recall + evidence-precision
 │   │   ├── audit-cartographer.md    # Stage 1 — app-intent map (endpoints/authz, tenant key, domain-critical sites, PII/SSRF)
@@ -322,7 +321,6 @@ explicitly approved. See `agents/orchestrator/README.md` for the full loop diagr
 - Tier 2 deep audits: 5 standalone multi-agent audits (security, error, API, docs, tech debt) with dual-engine consensus, semi-formal reasoning, mid-thought abort, and conventions-first anchoring
 - Security audit (periodic, up to 6 agents / 4 passes): cartographer → access-control/IDOR ‖ domain-integrity (project-specific slot, optional) → evidence-demanding synthesizer; ASVS 5.0 L2 as the reporting taxonomy, not the decomposition
 - Each tier 2 audit is independently invocable via its own slash command
-- `docs-expert.md` discovers the project's actual documentation layout fresh via Glob each time — it has no hardcoded doc map, so it never goes stale when ported to a new project
 
 ---
 

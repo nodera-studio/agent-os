@@ -64,12 +64,6 @@ Each is a standalone multi-agent audit with its own orchestrator. Dispatched ind
 | Documentation | `/docs-audit` | `docs-audit/` | 3 (2 Claude + 1 Codex) | Dual-engine |
 | Tech Debt | `/tech-debt-audit` | `tech-debt-audit/` | 4 (3 Claude + 1 Codex) | Dual-engine |
 
-## Standalone (Not Part of Audits)
-
-| Agent | File | Purpose |
-|-------|------|---------|
-| Docs Expert | `docs-expert.md` | Documentation Q&A -- answers questions, not an audit |
-
 ## When to Run
 
 | Audit | Frequency | Trigger |
@@ -96,9 +90,6 @@ Each is a standalone multi-agent audit with its own orchestrator. Dispatched ind
 /api-audit
 /docs-audit
 /tech-debt-audit
-
-# On-demand Q&A (not an audit)
-# Invoke docs-expert agent directly
 ```
 
 ## Research-Backed Improvements
