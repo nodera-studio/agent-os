@@ -54,5 +54,26 @@ reason=$(jq -n --arg c "rm -rf \"\$TMPDIR/proj-x\"" '{tool_name:"Bash",tool_inpu
   | HARNESS_SCRATCH_PREFIX=proj- HARNESS_CLEAN_SCRATCH=tools/clean.sh /bin/bash "$HOOKS/steer-bash.sh" | jq -r '.hookSpecificOutput.permissionDecisionReason')
 case "$reason" in *'bash tools/clean.sh '*) check 'scratch helper path is configurable' ok ok ;; *) check 'scratch helper path is configurable' ok "$reason" ;; esac
 
+# --- 11b: reinject-invariants prints nothing while the placeholder remains (AC-041) ---
+reinject() { /bin/bash "$1/hooks/reinject-invariants.sh" </dev/null 2>/dev/null || true; }
+check 'the shipped placeholder payload prints nothing' '' "$(reinject "$ROOT")"
+RI="$WORK/reinject"
+mkdir -p "$RI/hooks" "$RI/rules"
+cp "$HOOKS/reinject-invariants.sh" "$RI/hooks/"
+check 'no payload file prints nothing' '' "$(reinject "$RI")"
+printf -- '---\npaths:\n  - "x"\n---\n1. Never bypass the repository layer.\n' >"$RI/rules/invariants.md"
+check 'a real payload prints, frontmatter stripped' '1. Never bypass the repository layer.' "$(reinject "$RI")"
+printf -- '1. Real rule.\n2. [Add your project'"'"'s second invariant here]\n' >"$RI/rules/invariants.md"
+check 'any remaining placeholder keeps it silent' '' "$(reinject "$RI")"
+mkdir -p "$WORK/link/hooks"
+printf -- '1. Via a symlink.\n' >"$RI/rules/invariants.md"
+ln -s "$RI/hooks/reinject-invariants.sh" "$WORK/link/hooks/reinject-invariants.sh"
+check 'a symlinked hook finds the payload beside its target' '1. Via a symlink.' "$(/bin/bash "$WORK/link/hooks/reinject-invariants.sh" </dev/null)"
+check 'settings.json runs it on resume|compact only' 'resume|compact' \
+  "$(jq -r '.hooks.SessionStart[] | select(any(.hooks[]; .command | endswith("reinject-invariants.sh"))) | .matcher' "$ROOT/settings.json")"
+check 'the unmatched SessionStart group no longer reinjects' 0 \
+  "$(jq '[.hooks.SessionStart[] | select(.matcher == null) | .hooks[] | select(.command | endswith("reinject-invariants.sh"))] | length' "$ROOT/settings.json")"
+check 'the payload file is not an always-on rule (it carries paths:)' 1 "$(head -n 6 "$ROOT/rules/invariants.md" | grep -c '^paths:')"
+
 printf '%d cases, %d failures\n' "$CASES" "$FAILURES"
 [ "$FAILURES" -eq 0 ]

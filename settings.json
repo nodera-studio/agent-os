@@ -65,7 +65,12 @@
           {
             "type": "command",
             "command": ".claude/hooks/session-start.sh"
-          },
+          }
+        ]
+      },
+      {
+        "matcher": "resume|compact",
+        "hooks": [
           {
             "type": "command",
             "command": ".claude/hooks/reinject-invariants.sh"
