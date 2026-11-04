@@ -218,10 +218,126 @@ EOF
   eq "dep-audit: a Go project is unsupported (exit 3)" "$rc:$(jqv "$out" .detected[0])" "3:go.mod"
 }
 
+# ===================================================================== stale-reference-scan.sh
+suite_stale_ref() {
+  local R out rc
+  R="$TMP/stale"; mkdir -p "$R/docs" "$R/src" "$R/.claude/commands"
+  printf '# T\nRun `npm run build` and `npm run nope`, `make ci`, `make ghost`.\nSee `src/a.ts:12`, `src/missing.ts`, env `API_URL` and `GHOST_VAR`. Use `/deploy` and `/gone`.\nProse mentions make sure and npm run prose-only.\n```bash\nnpm run lint\n```\n' >"$R/docs/x.md"
+  echo a >"$R/src/a.ts"; echo 'process.env.API_URL' >"$R/src/b.ts"
+  printf '{"scripts":{"build":"x","lint":"y"}}\n' >"$R/package.json"
+  printf '.PHONY: ci\nci:\n\ttrue\n' >"$R/Makefile"
+  echo '# d' >"$R/.claude/commands/deploy.md"
+  printf 'API_URL=1\nUNUSED_VAR=2\n' >"$R/.env.example"
+  out="$(bash "$SCRIPTS/stale-reference-scan.sh" --root "$R")"; rc=$?
+  eq "stale-ref: scans and exits 0" "$rc:$(jqv "$out" .status)" "0:ok"
+  eq "stale-ref: finds exactly the stale references" "$(jqv "$out" '[.stale[] | .type + ":" + .reference] | sort | join(",")')" \
+    "command:/gone,env:GHOST_VAR,env:UNUSED_VAR,file:src/missing.ts,make:ghost,script:nope"
+  eq "stale-ref: existing references are not reported" "$(jqv "$out" '[.stale[].reference] | map(select(. == "build" or . == "ci" or . == "API_URL" or . == "src/a.ts" or . == "/deploy" or . == "lint")) | length')" 0
+  eq "stale-ref: counts the docs with stale references" "$(jqv "$out" .docs_with_stale)" 2
+  out="$(bash "$SCRIPTS/stale-reference-scan.sh" --root "$R" docs/x.md)"
+  eq "stale-ref: an explicit file limits the scan" "$(jqv "$out" .files_scanned)" 1
+  rm -rf "$R/.claude/commands"
+  out="$(bash "$SCRIPTS/stale-reference-scan.sh" --root "$R")"
+  eq "stale-ref: no commands dir skips command checks" "$(jqv "$out" '.skipped_types[0] + ":" + ([.stale[] | select(.type == "command")] | length | tostring)')" "command:0"
+  R="$TMP/stale-none"; mkdir -p "$R"
+  out="$(bash "$SCRIPTS/stale-reference-scan.sh" --root "$R")"; rc=$?
+  eq "stale-ref: no docs is unsupported (exit 3)" "$rc:$(jqv "$out" .status)" "3:unsupported"
+}
+
+# ===================================================================== tech-debt-scan.sh
+suite_tech_debt() {
+  local R out rc
+  R="$TMP/debt"; mkdir -p "$R/apps/api/src" "$R/apps/web" "$R/.claude/tech-debt"
+  seq 1 450 | sed 's/^/const a = /' >"$R/apps/api/src/big.ts"
+  cat >"$R/apps/api/src/m.ts" <<'EOS'
+// TODO(ann): remove after migration to v3
+const x = y as any;
+try { a() } catch (e) {}
+try {
+  a()
+} catch (e) {
+}
+console.log('hi')
+          if (b) {
+                    deep();
+          }
+// FIXME: bare
+// PARKED: later
+EOS
+  echo "console.log(1) // HACK(jo) #12" >"$R/apps/web/p.tsx"
+  echo "console.log('t')" >"$R/apps/web/p.spec.ts"
+  echo "apps/api/src/m.ts" >"$R/.claude/tech-debt/a.md"
+  out="$(bash "$SCRIPTS/tech-debt-scan.sh" --root "$R")"; rc=$?
+  eq "tech-debt: scans and exits 0" "$rc:$(jqv "$out" .status)" "0:ok"
+  eq "tech-debt: a file over 400 lines is listed" "$(jqv "$out" '.large_files.items[0].file + ":" + (.large_files.items[0].lines | tostring)')" "apps/api/src/big.ts:450"
+  eq "tech-debt: as any is counted" "$(jqv "$out" .totals.type_escapes)" 1
+  eq "tech-debt: one-line and multi-line empty catch" "$(jqv "$out" '[.empty_catch.items[].line] | join(",")')" "3,6"
+  eq "tech-debt: console skips test files" "$(jqv "$out" '[.console.items[].file] | sort | join(",")')" "apps/api/src/m.ts,apps/web/p.tsx"
+  eq "tech-debt: deep nesting is counted per file" "$(jqv "$out" '.deep_nesting.items[0].deep_lines')" 3
+  eq "tech-debt: four markers" "$(jqv "$out" '.marker_summary.by_marker | to_entries | map(.key + "=" + (.value | tostring)) | sort | join(",")')" "FIXME=1,HACK=1,PARKED=1,TODO=1"
+  eq "tech-debt: owner and plan hint" "$(jqv "$out" '.markers.items[] | select(.marker == "TODO") | .owner + ":" + (.plan_hint | tostring)')" "ann:true"
+  eq "tech-debt: PARKED is intentional" "$(jqv "$out" '.markers.items[] | select(.marker == "PARKED") | .intentional | tostring')" true
+  eq "tech-debt: category from the path" "$(jqv "$out" '.markers.items[] | select(.marker == "HACK") | .category')" frontend
+  eq "tech-debt: registry status" "$(jqv "$out" '[.markers.items[] | .registry_status] | unique | join(",")')" "EXISTING,NEW"
+  out="$(bash "$SCRIPTS/tech-debt-scan.sh" --root "$R" --limit 1)"
+  eq "tech-debt: --limit trims lists but not totals" "$(jqv "$out" '(.markers.items | length | tostring) + ":" + (.totals.markers | tostring)')" "1:4"
+  R="$TMP/debt-py"; mkdir -p "$R"; echo 'print(1)' >"$R/a.py"
+  out="$(bash "$SCRIPTS/tech-debt-scan.sh" --root "$R")"; rc=$?
+  eq "tech-debt: no JS/TS source is unsupported (exit 3)" "$rc:$(jqv "$out" .status)" "3:unsupported"
+}
+
+# ===================================================================== endpoint-inventory.sh
+suite_endpoints() {
+  local R out rc
+  R="$TMP/nest"; mkdir -p "$R/apps/api/src/invoices"
+  echo "app.setGlobalPrefix('api');" >"$R/apps/api/src/main.ts"
+  cat >"$R/apps/api/src/invoices/invoices.controller.ts" <<'EOS'
+@UseGuards(AuthGuard)
+@Controller('invoices')
+export class InvoicesController {
+  @Get()
+  list(@Query() q: ListDto, @CurrentUser() user: User) {
+    return [];
+  }
+
+  @Public()
+  @Get(':id')
+  one(@Param('id', ParseUUIDPipe) id: string) {
+    return 1;
+  }
+
+  @Post()
+  create(
+    @Body(new ZodValidationPipe(S)) body: B,
+    @Param('x') x: string,
+  ): Promise<void> {
+    return;
+  }
+}
+EOS
+  out="$(cd "$R" && bash "$SCRIPTS/endpoint-inventory.sh")"; rc=$?
+  eq "endpoints: scans and exits 0" "$rc:$(jqv "$out" .framework)" "0:nestjs"
+  eq "endpoints: three routes with the global prefix" "$(jqv "$out" '[.endpoints[] | .method + " " + .path] | join(",")')" "GET /api/invoices,GET /api/invoices/:id,POST /api/invoices"
+  eq "endpoints: @Public on the method" "$(jqv "$out" '[.endpoints[] | .auth] | join(",")')" "protected,public,protected"
+  eq "endpoints: unvalidated query" "$(jqv "$out" '.endpoints[0].query_validation')" no
+  eq "endpoints: a Parse pipe validates a param" "$(jqv "$out" '.endpoints[1].param_validation')" yes
+  eq "endpoints: a Zod pipe validates the body, a bare param does not" "$(jqv "$out" '.endpoints[2].body_validation + "/" + .endpoints[2].param_validation')" "yes/no"
+  eq "endpoints: CurrentUser is noticed" "$(jqv "$out" '.endpoints[0].current_user | tostring')" true
+  eq "endpoints: totals" "$(jqv "$out" '.totals | [.endpoints, .public, .unvalidated_param, .unvalidated_query] | map(tostring) | join(",")')" "3,1,1,1"
+  out="$(cd "$R" && bash "$SCRIPTS/endpoint-inventory.sh" --prefix v2)"
+  eq "endpoints: --prefix overrides main.ts" "$(jqv "$out" '.endpoints[0].path')" "/v2/invoices"
+  R="$TMP/express"; mkdir -p "$R/src"; echo "app.get('/x', h)" >"$R/src/app.js"
+  out="$(cd "$R" && bash "$SCRIPTS/endpoint-inventory.sh")"; rc=$?
+  eq "endpoints: another framework is unsupported (exit 3)" "$rc:$(jqv "$out" .status)" "3:unsupported"
+}
+
 # ===================================================================== sections
 # SECTIONS-BEGIN
 suite_run_ci
 suite_dep_audit
+suite_stale_ref
+suite_tech_debt
+suite_endpoints
 # SECTIONS-END
 
 PATH="$ORIG_PATH"
