@@ -66,7 +66,7 @@ commands, just scripts something else invokes (or you run by hand).
   harness feature: it captures episodic fixes during sessions and periodically distills
   them into promotable `CLAUDE.md` conventions. Fully optional; needs no external server.
 - **`scripts/cron/mnemo-reindex.sh`** — talks to the separate **Mnemosyne MCP server**
-  (the memory/codebase/secrets stack — see `skills/mnemosyne/SKILL.md`), which is its
+  (the memory/codebase/secrets stack — see the `mnemosyne` plugin's skill), which is its
   own project you run yourself, not something this repo ships. This script just
   triggers that server's codebase reindex on a schedule.
 

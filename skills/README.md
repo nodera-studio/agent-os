@@ -50,7 +50,7 @@ the connection itself wherever your team manages account/workspace settings.
 Three integrations get real client-side wiring in this repo, because their configuration
 is a portable setup step rather than an account-level OAuth grant:
 
-- **Mnemosyne** (memory/codebase/secrets MCP) — see `skills/mnemosyne/SKILL.md` and the
+- **Mnemosyne** (memory/codebase/secrets MCP) — see the `mnemosyne` plugin's skill and the
   top-level `README.md`'s "Mnemosyne MCP integration" section. Client wiring only; the
   servers themselves are a separate project you run.
 - **Exa** (web search/fetch) — see `skills/exa/SKILL.md`; a standard MCP server you
