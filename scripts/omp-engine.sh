@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Isolated read-only review/debug engine. Policy/envcheck are internal smoke helpers.
+# Isolated read-only review/debug/ask engine. Policy/envcheck are internal smoke helpers.
 # Without --engine it is the legacy glen-harness (Cursor) engine. With --engine omp:codex|omp:opencode
 # --slot S --role R it runs that profile, picks the model with select_model, and records provenance.
 set -euo pipefail
@@ -35,7 +35,8 @@ interrupted() {
 usage() {
   log 'usage: omp-engine.sh probe | review [--repo DIR] (--base REF | --uncommitted) --out FILE [--scope TEXT] [--deadline 15m] [--keep]'
   log '       omp-engine.sh debug [--repo DIR] --brief FILE --out FILE [--base REF] [--deadline 20m] [--keep]'
-  log '       review|debug|probe also take --engine omp:codex|omp:opencode [--slot S] --role R [--have ENGINE]'
+  log '       omp-engine.sh ask --brief FILE --out FILE [--no-tools] [--repo DIR] [--deadline 10m] [--keep]   (text-only second opinion)'
+  log '       review|debug|ask|probe also take --engine omp:codex|omp:opencode [--slot S] --role R [--have ENGINE]'
   log '       omp-engine.sh snapshot SRC DEST | policy SRC | envcheck -- CMD...'
   stop failed 'usage error' 2
 }
@@ -386,11 +387,26 @@ save_result() {
   mv "$tmp" "$OUT.json"
 }
 
+# sanitize_untrusted FILE: engine text is untrusted data for Claude to read. Drop Unicode tag characters,
+# zero-width and bidi controls and the soft hyphen, turn U+2028/U+2029 into newlines, and escape `<` so
+# the text cannot open a tag. Without perl only printable ASCII and whitespace survive.
+sanitize_untrusted() {
+  local tmp
+  tmp="$(mktemp "$1.XXXXXX")" || return 1
+  if command -v perl >/dev/null 2>&1; then
+    perl -CSD -pe 's/[\x{E0000}-\x{E007F}\x{200B}-\x{200F}\x{202A}-\x{202E}\x{2060}-\x{2064}\x{2066}-\x{2069}\x{FEFF}\x{00AD}]//g; s/[\x{2028}\x{2029}]/\n/g; s/</&lt;/g' "$1" > "$tmp" || { rm -f "$tmp"; return 1; }
+  else
+    LC_ALL=C tr -cd '\11\12\15\40-\176' < "$1" | sed 's/</\&lt;/g' > "$tmp" || { rm -f "$tmp"; return 1; }
+  fi
+  mv "$tmp" "$1"
+}
+
 # shellcheck disable=SC2329 # Called by the EXIT handler.
 capture() {
   local meta last_line transcript_model
   [ -n "$ENVELOPE" ] && [ -s "$ENVELOPE" ] || return 0
   jq -jr '.data.assistant_text // ""' "$ENVELOPE" > "$OUT" || return 1
+  [ "$MODE" != ask ] || sanitize_untrusted "$OUT" || return 1
   REPLIES="$(jq -r '(.data.replies // []) | length' "$ENVELOPE")" || return 1
   if [ -n "$SESSION_PATH" ] && [ -f "$SESSION_PATH" ]; then
     meta="$(jq -sc '
@@ -435,7 +451,7 @@ capture() {
         ! printf '%s\n' "$last_line" | grep -Eq '^Mnemosyne:'; then
         STATUS=failed REASON='malformed output'
       fi
-    elif ! grep -Eq '^#{1,6}[[:space:]]+Root Cause[[:space:]]*$' "$OUT"; then
+    elif [ "$MODE" = debug ] && ! grep -Eq '^#{1,6}[[:space:]]+Root Cause[[:space:]]*$' "$OUT"; then
       STATUS=failed REASON='malformed output'
     fi
     # A content-shape failure has no vote, but does not fail a completed dispatch.
@@ -905,12 +921,12 @@ case "$MODE" in
     exit 0
     ;;
   snapshot) [ "$#" -eq 2 ] || usage; snapshot_command "$1" "$2"; exit 0 ;;
-  review | debug) ;;
+  review | debug | ask) ;;
   *) usage ;;
 esac
 
 REPO="$PWD" BASE='' UNCOMMITTED=0 SCOPE='all changed behavior' BRIEF=''
-if [ "$MODE" = review ]; then DEADLINE=15m; else DEADLINE=20m; fi
+case "$MODE" in review) DEADLINE=15m ;; ask) DEADLINE=10m ;; *) DEADLINE=20m ;; esac
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --repo | --base | --out | --scope | --deadline | --brief)
@@ -921,7 +937,7 @@ while [ "$#" -gt 0 ]; do
         --out) OUT="$2" ;;
         --scope) [ "$MODE" = review ] || usage; SCOPE="$2" ;;
         --deadline) DEADLINE="$2" ;;
-        --brief) [ "$MODE" = debug ] || usage; BRIEF="$2" ;;
+        --brief) [ "$MODE" != review ] || usage; BRIEF="$2" ;;
       esac
       shift 2
       ;;
@@ -932,6 +948,7 @@ while [ "$#" -gt 0 ]; do
       ;;
     --uncommitted) [ "$MODE" = review ] || usage; UNCOMMITTED=1; shift ;;
     --keep) KEEP=1; shift ;;
+    --no-tools) NO_TOOLS=1; shift ;;
     *) usage ;;
   esac
 done
@@ -1011,8 +1028,14 @@ if [ "$(fingerprint_source "$REPO")" != "$(jq -r '.source_fingerprint // empty' 
   stop skipped 'source changed during capture' 3
 fi
 [ "$MODE" != debug ] || cp "$BRIEF" "$TREE/_review/brief.md"
-cat "$ENGINE_ROOT/.claude/skills/omp/templates/$MODE.md" > "$RUN_DIR/prompt.md"
-{
+if [ "$MODE" = ask ]; then
+  # The brief rides in the prompt itself, so a run with no tools still sees it.
+  TEMPLATES="$ENGINE_ROOT/.claude/skills/omp/templates"
+  { cat "$TEMPLATES/_readonly-preamble.md"; printf '\n'; cat "$TEMPLATES/ask.md"; printf '\n## Brief\n\n'; cat "$BRIEF"; } > "$RUN_DIR/prompt.md"
+else
+  cat "$ENGINE_ROOT/.claude/skills/omp/templates/$MODE.md" > "$RUN_DIR/prompt.md"
+fi
+[ "$MODE" = ask ] || {
   printf '\n## Run context\n\nBase: %s\nMerge-base SHA: %s\nScope: %s\n' "${BASE:-HEAD (uncommitted)}" "$MERGE_BASE" "$SCOPE"
   printf '\nChanged files (first 200):\n'
   sed -n '1,200p' "$TREE/_review/changed-files.txt"
