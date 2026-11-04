@@ -331,6 +331,87 @@ EOS
   eq "endpoints: another framework is unsupported (exit 3)" "$rc:$(jqv "$out" .status)" "3:unsupported"
 }
 
+# ===================================================================== copywrite-checks.sh
+suite_copywrite() {
+  local C="$SCRIPTS/copywrite-checks.sh" R out rc
+  R="$TMP/cw"; mkdir -p "$R/node_modules/@formatjs/icu-messageformat-parser" "$R/node_modules/@babel/parser"
+  # stand-ins for the two parser packages: the ICU stub compares the number of "{" in the strings,
+  # the Babel stub rejects any source that contains SYNTAX_ERROR
+  cat >"$R/node_modules/@formatjs/icu-messageformat-parser/index.js" <<'EOS'
+exports.parse = (s) => ({ braces: (s.match(/\{/g) || []).length });
+exports.isStructurallySame = (a, b) => (a.braces === b.braces ? { success: true } : { success: false, error: { message: "shape changed" } });
+EOS
+  cat >"$R/node_modules/@babel/parser/index.js" <<'EOS'
+exports.parse = (src) => { if (src.indexOf("SYNTAX_ERROR") >= 0) throw new Error("Unexpected token (1:1)"); return {}; };
+EOS
+
+  out="$(bash "$C" dash --old "Pay now" --new "Pay now. Done")"; rc=$?
+  eq "copywrite dash: no dash passes" "$rc:$(jqv "$out" .ok)" "0:true"
+  out="$(bash "$C" dash --old "Pay now" --new "Pay now — done")"; rc=$?
+  eq "copywrite dash: a new em dash fails" "$rc:$(jqv "$out" '.introduced[0]')" "1:em dash"
+  out="$(bash "$C" dash --old "A–B" --new "A–B and C")"; rc=$?
+  eq "copywrite dash: an existing en dash is allowed" "$rc" 0
+  out="$(bash "$C" dash --old "A–B" --new "A–B–C")"; rc=$?
+  eq "copywrite dash: a second en dash fails" "$rc:$(jqv "$out" '.introduced[0]')" "1:en dash"
+  printf 'x — y' >"$R/new.txt"
+  out="$(bash "$C" dash --old "x" --new "@$R/new.txt")"; rc=$?
+  eq "copywrite dash: @file values are read" "$rc" 1
+
+  out="$(bash "$C" icu --old "Hello" --new "Hi" --resolve-from "$R")"; rc=$?
+  eq "copywrite icu: plain text skips the parser" "$rc:$(jqv "$out" '.skipped != null | tostring')" "0:true"
+  out="$(bash "$C" icu --old "{n, plural, one {# item} other {# items}}" --new "{n, plural, one {# thing} other {# things}}" --resolve-from "$R")"; rc=$?
+  eq "copywrite icu: same structure passes" "$rc:$(jqv "$out" .ok)" "0:true"
+  out="$(bash "$C" icu --old "{n, plural, one {# item} other {# items}}" --new "# items" --resolve-from "$R")"; rc=$?
+  eq "copywrite icu: changed structure fails" "$rc:$(jqv "$out" .reason)" "1:shape changed"
+  out="$(bash "$C" icu --old "{n, plural, one {a} other {b}}" --new "x" --resolve-from "$TMP")"; rc=$?
+  eq "copywrite icu: a missing parser is unsupported (exit 3)" "$rc:$(jqv "$out" .status)" "3:unsupported"
+
+  printf 'export const A = () => <b>ok</b>;\n' >"$R/ok.tsx"
+  printf 'SYNTAX_ERROR\n' >"$R/bad.tsx"
+  out="$(bash "$C" babel --file "$R/ok.tsx" --resolve-from "$R")"; rc=$?
+  eq "copywrite babel: a parsable file passes" "$rc:$(jqv "$out" .ok)" "0:true"
+  out="$(bash "$C" babel --file "$R/bad.tsx" --resolve-from "$R")"; rc=$?
+  eq "copywrite babel: a parse failure fails" "$rc:$(jqv "$out" .reason)" "1:Unexpected token (1:1)"
+  printf 'SYNTAX_ERROR\n' >"$R/x.json"
+  out="$(bash "$C" babel --file "$R/x.json" --resolve-from "$R")"; rc=$?
+  eq "copywrite babel: other extensions are skipped" "$rc:$(jqv "$out" '.skipped != null | tostring')" "0:true"
+  out="$(bash "$C" babel --file "$R/ok.tsx" --resolve-from "$TMP")"; rc=$?
+  eq "copywrite babel: a missing parser is unsupported (exit 3)" "$rc:$(jqv "$out" .status)" "3:unsupported"
+
+  printf 'Primește factura țării\n' >"$R/before.txt"
+  printf 'Primeste factura tarii\n' >"$R/after.txt"
+  out="$(bash "$C" diacritics --class 'ăâîșțĂÂÎȘȚ' --before-file "$R/before.txt" --after-file "$R/after.txt")"; rc=$?
+  eq "copywrite diacritics: a drop fails" "$rc:$(jqv "$out" '(.before | tostring) + "/" + (.after | tostring)')" "1:3/0"
+  out="$(bash "$C" diacritics --class 'ăâîșțĂÂÎȘȚ' --before-file "$R/before.txt" --after-file "$R/before.txt")"; rc=$?
+  eq "copywrite diacritics: no drop passes" "$rc" 0
+
+  printf '{"a":{"b":"x","c":"y"},"d":"z"}\n' >"$R/en.json"
+  printf '{"a":{"b":"x"},"d":"z","e":"w"}\n' >"$R/ro.json"
+  out="$(bash "$C" parity --a "$R/en.json" --b "$R/ro.json")"; rc=$?
+  eq "copywrite parity: differing keys fail" "$rc:$(jqv "$out" '(.missing_in_b | join(",")) + "|" + (.missing_in_a | join(","))')" "1:a.c|e"
+  out="$(bash "$C" parity --a "$R/en.json" --b "$R/ro.json" --keys a.b,d)"; rc=$?
+  eq "copywrite parity: --keys limits the check" "$rc" 0
+  out="$(bash "$C" parity --a "$R/en.json" --b "$R/ro.json" --keys a.c)"; rc=$?
+  eq "copywrite parity: a changed key absent from the sibling fails" "$rc:$(jqv "$out" '.missing_in_b[0]')" "1:a.c"
+
+  cat >"$R/brand.md" <<'EOS'
+# Glossary
+| Term | Locale A | Locale B | Notes |
+|---|---|---|---|
+| `Acme Pay` | | | the product |
+| `eFactura` | `eFactura` | `e-Factura` | regulatory |
+| `[Placeholder]` | | | |
+EOS
+  printf 'Use Acme Pay and e-Factura. Never acme pay or Efactura.\n' >"$R/copy.txt"
+  out="$(bash "$C" glossary --terms "$R/brand.md" --text "$R/copy.txt")"; rc=$?
+  eq "copywrite glossary: miscapitalised terms fail" "$rc:$(jqv "$out" '[.violations[].found] | sort | join(",")')" "1:Efactura,acme pay"
+  printf 'Use Acme Pay and e-Factura.\n' >"$R/copy.txt"
+  out="$(bash "$C" glossary --terms "$R/brand.md" --text "$R/copy.txt")"; rc=$?
+  eq "copywrite glossary: canonical spellings pass" "$rc" 0
+  bash "$C" bogus >/dev/null 2>&1; rc=$?
+  eq "copywrite: an unknown gate exits 2" "$rc" 2
+}
+
 # ===================================================================== sections
 # SECTIONS-BEGIN
 suite_run_ci
@@ -338,6 +419,7 @@ suite_dep_audit
 suite_stale_ref
 suite_tech_debt
 suite_endpoints
+suite_copywrite
 # SECTIONS-END
 
 PATH="$ORIG_PATH"
