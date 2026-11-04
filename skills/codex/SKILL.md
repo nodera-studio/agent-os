@@ -3,11 +3,11 @@ name: codex
 description: >
   Dispatch a task to OpenAI Codex through the installed `codex:codex-rescue` plugin
   agent. Use when the user wants a second-opinion review, a deep-dive on a hard
-  bug, an independent implementation pass, or any time they type `/codex <prompt>`.
+  bug, an independent implementation pass, or any time they type `/second-opinion <prompt>`.
   Also use proactively when Claude is stuck on a substantial debugging or
   implementation problem and a different model's perspective is likely to help.
   Triggers on: "ask codex", "second opinion", "have codex look at this", "fire
-  codex", "/codex", being stuck on a multi-step bug, wanting parallel investigation,
+  codex", "/second-opinion", being stuck on a multi-step bug, wanting parallel investigation,
   review-implementation orchestrators needing the Codex engine.
 allowed-tools: Agent, Bash
 argument-hint: '<task or question to dispatch to Codex>'
@@ -29,7 +29,7 @@ components) goes to the agent `routing.sh ui` names, and Codex reviews it
    review, via the native **`codex review --base <BASE>`** diff reviewer, and the second
    engine of the lean `/review-implementation --lean` gate via `codex:codex-rescue` (the optional omp
    engine joins that gate as a third pass when its probe is ready).
-2. **Advisor** — the **Step 4.5 advisor gate** in `/implement` and `/codex-advisor`:
+2. **Advisor** — the **Step 4.5 advisor gate** in `/implement` and `/second-opinion --advisor`:
    a read-only adversarial critique of the approved plan (verdict/risks/steelman) via
    the **`codex:codex-rescue`** agent — NOT `codex review`, NEVER `codex exec`.
    **Synthesize, never forward**; ONE reconcile call on disagreement; escalate
@@ -90,13 +90,13 @@ flags the user may include and that you should preserve in the prompt text:
 ### Foreground by default for agent briefs
 
 Every harness brief to `codex:codex-rescue` (plan, implement, review, `/review-implementation --lean`,
-`/implement-quick`, `/codex-advisor`, `/deep-debug` and the audit orchestrators) MUST include
+`/implement-quick`, `/second-opinion --advisor`, `/deep-debug` and the audit orchestrators) MUST include
 `--wait` and say: "Run in the foreground: wait for the Codex task to finish and
 return its full result as your final message; never return only a background task id." Without
 `--wait` the forwarder backgrounds any task that looks long and returns at once with a task id
 ("file doesn't exist yet"), leaving the caller to poll. If a task id comes back anyway, fetch it
 (`node "$COMPANION" status <id> --wait`, then `node "$COMPANION" result <id>`) before using the
-pass. Use `--background` only when the user asks for it; a user's own `/codex` request keeps
+pass. Use `--background` only when the user asks for it; a user's own request keeps
 whatever mode they chose.
 
 ### Artifacts come back as text, never as files

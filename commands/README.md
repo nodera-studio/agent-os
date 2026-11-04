@@ -58,8 +58,7 @@ drives.
 
 | Command | Dispatches | What it does |
 | --- | --- | --- |
-| `/codex` | `codex:codex-rescue` (plugin agent) | Dispatch a task to OpenAI Codex |
-| `/codex-advisor` | `codex:codex-rescue` (read-only) | Ask Codex for an adversarial second opinion, no edits |
+| `/second-opinion [--advisor]` | `scripts/omp-engine.sh ask` (`omp:codex`, read-only) | Put a question or task to the other engine; `--advisor` asks for an adversarial critique with ranked risks and a verdict |
 
 ## Orchestrator mode
 
