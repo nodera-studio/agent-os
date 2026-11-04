@@ -74,8 +74,7 @@ workflow below) once to adapt the templated files to that project's actual stack
 │   │   └── audit-synthesizer.md     # Stage 3 — evidence-demanding synthesis, ASVS 5.0, memory write
 │   ├── error-audit/
 │   │   ├── orchestrator.md          # 6-agent dual-engine (3 Claude + 3 Codex)
-│   │   ├── backend.md               # Controllers/routes, services, global infra
-│   │   ├── frontend.md              # Hooks, components, pages, global UI
+│   │   ├── scanner.md               # `scope=backend` (controllers/routes, services, global infra) | `scope=frontend` (hooks, components, pages, global UI)
 │   │   └── queue.md                 # Background-job processors, pipeline UX, concurrency
 │   ├── api-audit/
 │   │   └── orchestrator.md          # 4-agent dual-engine (endpoint inventory + contract)

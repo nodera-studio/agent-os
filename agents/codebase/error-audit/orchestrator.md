@@ -94,8 +94,8 @@ Dispatch each via the Agent tool:
 **Agent 1 -- Backend:**
 
 ```
-Read .claude/agents/codebase/error-audit/backend.md and follow its instructions exactly.
-Audit every controller/route, service, and global infrastructure component in the backend
+Read .claude/agents/codebase/error-audit/scanner.md and follow its instructions exactly.
+scope=backend. Audit every controller/route, service, and global infrastructure component in the backend
 workspace. Do NOT audit queue/background-job processors (covered by a separate agent).
 Be exhaustive -- read every file, not a sample. Report findings only -- no fixes.
 ```
@@ -103,8 +103,8 @@ Be exhaustive -- read every file, not a sample. Report findings only -- no fixes
 **Agent 2 -- Frontend:**
 
 ```text
-Read .claude/agents/codebase/error-audit/frontend.md and follow its instructions exactly.
-Audit every hook, component, page, and global error infrastructure in the frontend
+Read .claude/agents/codebase/error-audit/scanner.md and follow its instructions exactly.
+scope=frontend. Audit every hook, component, page, and global error infrastructure in the frontend
 workspace. Be exhaustive -- read every file, not a sample. Report findings only -- no fixes.
 ```
 
