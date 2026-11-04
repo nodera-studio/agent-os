@@ -302,7 +302,7 @@ A staging-only goal is **done** once its last wave is merged + shipped-to-stagin
     drifts `{{PROD_BRANCH}}` from `{{STAGING_BRANCH}}`). Then **flip every goal ticket**
     (the main ticket + every wave sub-issue) `shipped:staging → shipped:prod` per
     **Shipping-state labels** below, then "Closing the run". (Full runbook: the
-    `promote-to-prod` skill.)
+    `release-flow` skill → `references/promote-runbook.md`.)
 
 ## Closing the run
 
@@ -502,7 +502,7 @@ successful merge onto `{{PROD_BRANCH}}`, enumerate every ticket in the promotion
 (`git log origin/{{PROD_BRANCH}}..origin/{{STAGING_BRANCH}} --pretty=%s | grep -oE
 '{{TICKET_PREFIX}}-[0-9]+'`, plus their parent epics) and flip each `shipped:staging` →
 `shipped:prod`. This is the moment the branch-divergence the labels exist to surface gets
-resolved. (See the `promote-to-prod` skill.)
+resolved. (See the `release-flow` skill → `references/promote-runbook.md`.)
 
 ## Code-review-bot command hooks (drive the bot, don't wait on it)
 

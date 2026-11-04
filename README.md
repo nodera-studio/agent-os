@@ -12,7 +12,7 @@ disciplined, verifiable, surgical changes.
 
 - **Agents** — 53 orchestration prompts across 8 workflows (plan · implement · review · debug · audit · copywrite · bootstrap · orchestrator)
 - **Commands** — 29 slash commands, the entry points into those workflows
-- **Skills** — 12 trigger-activated capabilities (Playwright testing, GitHub/PR workflows, Exa web search, branching-model conventions, and more)
+- **Skills** — 12 trigger-activated capabilities (Playwright testing, GitHub/PR workflows, Exa web search, release-flow conventions, and more)
 - **Hooks** — 10 enforcement scripts wired into `PreToolUse`/`PostToolUse`/session-lifecycle events
 - **Engine model** — who implements comes from `routing.json` (Claude by default, Codex when routed); Claude + Codex dual-engine for review/debug/audits, where cross-model disagreement catches what one model misses. omp is an optional, probe-gated third engine
 
@@ -153,7 +153,7 @@ produce the same quality bar; the difference is how much you want to watch.
   `/deep-debug`, `/research`, `/security-audit`, `/api-audit`,
   `/docs-audit`, `/tech-debt-audit`, `/codebase-audit`, `/copywrite`, and more.
 - **Skills** (`skills/`) — reusable, trigger-activated capabilities (e.g.
-  `/playwright-cli`, `/branching-model`, `/exa`, `/gh`) invoked automatically when
+  `/playwright-cli`, `/release-flow`, `/exa`, `/gh`) invoked automatically when
   a task matches their description, or explicitly via `/skill-name`.
 - **Hooks** (`hooks/`) — enforcement scripts wired into `settings.json` for
   `PreToolUse`/`PostToolUse`/session-lifecycle events (steering risky bash,

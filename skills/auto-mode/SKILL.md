@@ -54,7 +54,7 @@ single source of truth so the loop survives context compaction. (Template in
 
 The default base is your **staging trunk** (e.g. `staging`), and the loop PRs each wave
 **directly into it** — there is no per-goal integration branch (see the
-`branching-model` skill). The **release branch** (e.g. `main`) is release-only: it is
+`release-flow` skill). The **release branch** (e.g. `main`) is release-only: it is
 reached solely by a staging → release **promotion** (a merge commit, never a squash), so
 it never originates work and never drifts from staging.
 
@@ -193,6 +193,6 @@ Per wave, in order — this sequence is the spine of the mode:
   bot command hooks, escalation ladder, blocker criteria, reporting cadence.
 - `.claude/commands/implement.md`, `.claude/commands/plan-implementation.md` — the
   per-wave engines this loop drives.
-- Your project's branching-model doc — the staging-trunk / release-branch model, the
+- Your project's branching doc — the staging-trunk / release-branch model, the
   two no-drift rules, the merge-method contract, and the enforcement stack.
 - `.claude/rules/` — path-scoped conventions; consult before deciding "unclear".

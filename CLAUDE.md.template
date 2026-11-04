@@ -42,7 +42,7 @@ that gate `git push`) and how to bypass it deliberately (`--no-verify`) when jus
 
 Document your branching model here — trunk name, release-branch name (if any), PR
 target, squash vs merge-commit policy, and any branch-protection rulesets. If you use
-the `/branching-model` skill pattern from this harness, describe day-to-day branch/PR
+the `/release-flow` skill pattern from this harness, describe day-to-day branch/PR
 rules there and keep this section to the summary.
 
 ## Language mode

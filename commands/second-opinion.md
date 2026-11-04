@@ -18,6 +18,10 @@ If `$ARGUMENTS` is empty, ask the user what they want the other engine to look a
 A leading `--advisor` selects advisor mode (below) and is removed from the material; without it the user's text
 goes to the engine as the task, verbatim.
 
+Read `.claude/skills/second-engine/SKILL.md` for how the engine is reached, the brief rules and the capacity retry.
+The engine is read-only and text-only: this command never hands it implementation work (who implements follows
+`routing.sh implementation`).
+
 ## Steps
 
 1. **Brief tightly.** Assemble the decision / plan / diff and the constraints that matter. Do not dump the whole

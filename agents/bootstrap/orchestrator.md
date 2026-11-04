@@ -107,7 +107,7 @@ guess and do not silently default):
   before CI). Ask, don't assume yes.
 - **Branching model** — does this project use a single trunk branch, a
   staging-then-main promotion model, or something else? This determines whether the
-  `/branching-model`-style skill and PR-target guidance in the ported agents makes sense
+  `/release-flow`-style skill and PR-target guidance in the ported agents makes sense
   as-is or needs adapting.
 - **Which optional agents/audits actually apply** — e.g. the `copywrite/` suite only
   matters if the project has meaningful user-facing copy to polish; the

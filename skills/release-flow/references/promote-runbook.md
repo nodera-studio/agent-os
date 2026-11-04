@@ -1,18 +1,8 @@
----
-name: promote-to-prod
-description: >-
-  The staging → release production-release runbook. Use this WHENEVER the user
-  wants to ship to prod, promote staging to the release branch, cut a release, "push staging
-  live", or land the staging batch on production — even when they don't name branches. It
-  enforces the one-way-door details that are easy to get wrong: open the PR staging→release,
-  wait for your CI-guard + CI-ok gates, capture a release memory BEFORE merging (if you run a
-  durable-memory system), merge with a MERGE COMMIT (never squash/rebase — that drifts the release
-  branch from staging), then flip every promoted ticket's shipping label and verify the prod
-  deploy. Trigger on "ship to prod", "release to production", "promote to main", "deploy staging
-  to prod", "cut a prod release".
----
+# Promote runbook — staging → release branch
 
-# Promote to prod — staging → release branch
+Referenced from [`../SKILL.md`](../SKILL.md), which holds the two branching rules, the day-to-day
+branch/PR/merge steps and the hotfix escape hatch. Substitute your actual branch names for
+`{{STAGING_BRANCH}}` / `{{PROD_BRANCH}}` / `{{TICKET_PREFIX}}`.
 
 Production is reached **only** by promoting your staging trunk (e.g. `staging`) into your release
 branch (e.g. `main`). The release branch never originates work, so this PR is always the staging
@@ -20,7 +10,7 @@ trunk exactly as it stands. The detail that bites people is the **merge method**
 commit**, never squash or rebase. Squashing a long-lived branch writes a brand-new commit the
 release branch doesn't share with staging, which instantly recreates "commits on the release
 branch not on staging > 0" and drifts the two branches — the exact failure this model exists to
-prevent. See your project's branching-model doc if one exists.
+prevent.
 
 ## Runbook
 
@@ -69,11 +59,9 @@ prevent. See your project's branching-model doc if one exists.
    - Every promoted ticket carries the prod shipping label (step 6).
    - Resolve the tech-debt memories whose fixes shipped in this release (`memory_update`, status
      `resolved`, with the fix `path:line`), if you run a durable-memory system.
-   - Stop any preview server or Codex broker the release work started: for a preview server,
-     check its cwd (`lsof -a -d cwd -p <pid> -Fn`) is under the release worktree before you
-     `kill <pid>`, and confirm it is gone. Then remove any release worktree with
-     `bash .claude/scripts/remove-worktree.sh <absolute path>` and run
-     `bash .claude/scripts/sweep-codex-orphans.sh`.
+   - Stop any preview server the release work started: check its cwd (`lsof -a -d cwd -p <pid>
+     -Fn`) is under the release worktree before you `kill <pid>`, and confirm it is gone. Then
+     remove any release worktree with `bash .claude/scripts/remove-worktree.sh <absolute path>`.
    - Under `/auto-mode`, continue with `.claude/skills/auto-mode/references/loop-procedures.md` →
      "Closing the run" (checkpoints until the run ends, schedule removal).
 
@@ -88,10 +76,3 @@ prevent. See your project's branching-model doc if one exists.
 - **Capture the release memory before merging** (if a hook enforces it).
 - **The release is not done until the post-deploy check passes** — the prod app (or the
   published artifact) answers with the new version.
-
-## References
-
-- Your project's branching-model doc, if one exists — the model, the two no-drift rules, the
-  enforcement stack.
-- `.claude/skills/auto-mode/SKILL.md` — the autonomous wave loop that feeds staging.
-- `.claude/skills/branching-model/SKILL.md` — the day-to-day branch/PR/merge rules.

@@ -50,4 +50,4 @@ already exists elsewhere in the suite.
 No product code. No implementation. This is a configuration pass over the harness's own
 files (`CLAUDE.md`, `settings.json`, hooks) — never the target project's actual source.
 Re-run it any time the project's stack changes enough that the harness's picture is
-stale (a new package manager, a monorepo split, a branching-model change).
+stale (a new package manager, a monorepo split, a branching change).

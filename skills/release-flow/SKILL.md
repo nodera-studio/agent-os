@@ -1,18 +1,21 @@
 ---
-name: branching-model
+name: release-flow
 description: >-
-  The staging-trunk branching rules — consult this WHENEVER you cut a branch, open a
-  PR, merge a PR, or pick a base branch, even in passing ("open a PR for this", "what do
-  I branch off?", "merge it", "ship this fix"). The rules exist to prevent two specific
-  failures: work originating on the release branch, and squash-promotions that drift the
-  release branch from the staging trunk. In short: branch off your staging trunk, PR into
-  it (squash-merge), never start work on the release branch; capture a durable memory
-  before merging any green PR (if you have a memory system); reach prod only by promoting
-  staging → release with a merge commit. Use it before doing git/PR/merge work so the base
-  branch and merge method are right the first time.
+  The staging-trunk branching rules and the staging → release promotion runbook — consult
+  this WHENEVER you cut a branch, open a PR, merge a PR, pick a base branch, or ship to prod,
+  even in passing ("open a PR for this", "what do I branch off?", "merge it", "ship this fix",
+  "ship to prod", "promote to main", "cut a prod release"). The rules exist to prevent two
+  specific failures: work originating on the release branch, and squash-promotions that drift
+  the release branch from the staging trunk. In short: branch off your staging trunk, PR into
+  it (squash-merge), never start work on the release branch; capture a durable memory before
+  merging any green PR (if you have a memory system); reach prod only by promoting
+  staging → release with a merge commit, following the runbook in
+  references/promote-runbook.md. Use it before doing git/PR/merge work so the base branch and
+  merge method are right the first time.
 ---
 
-# Branching model — staging is the trunk, the release branch is release-only
+# Release flow — staging is the trunk, the release branch is release-only
+
 
 Two rules keep your release branch (e.g. `main`) and your staging trunk (e.g. `staging`) from
 drifting. If your project has a fuller written doc for this model, link it here as the
@@ -50,9 +53,10 @@ for `{{STAGING_BRANCH}}` / `{{PROD_BRANCH}}` below.
   (a prompt even under `bypassPermissions`); record the waiver in the state file's decision log.
 - **Merge:** `gh pr merge <n> --squash`. Don't auto-delete the branch in the same step if you want
   deletion to stay a deliberate, post-capture step; delete it yourself once the PR is closed out.
-- **Ship to prod:** never push to `{{PROD_BRANCH}}` directly. Use the `promote-to-prod` skill —
-  open ONE `{{STAGING_BRANCH}} → {{PROD_BRANCH}}` PR and merge it with `gh pr merge --merge`
-  (merge commit).
+- **Ship to prod:** never push to `{{PROD_BRANCH}}` directly. Follow
+  [`references/promote-runbook.md`](./references/promote-runbook.md) — open ONE
+  `{{STAGING_BRANCH}} → {{PROD_BRANCH}}` PR, show the promoted ticket list and get an explicit
+  go, then merge it with `gh pr merge --merge` (merge commit).
 
 ## Hotfixes
 
@@ -63,10 +67,3 @@ match whatever escape-hatch label your CI guard workflow checks for (e.g. `emerg
 definition. If your repo needs hard enforcement of "nothing originates on the release branch",
 wire up a CI guard workflow that checks the PR head branch and blocks merges that don't come from
 the staging trunk (minus the labeled escape hatch).
-
-## References
-
-- Your project's branching-model doc, if one exists — full model + enforcement (rulesets, default
-  branch, guard workflow, capture hygiene).
-- `.claude/skills/promote-to-prod/SKILL.md` — the staging → release runbook.
-- `.claude/skills/auto-mode/SKILL.md` — the autonomous multi-wave loop (also staging-trunk).
