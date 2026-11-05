@@ -8,11 +8,11 @@ drives.
 
 | Command | Dispatches | What it does |
 | --- | --- | --- |
-| `/plan-implementation` | `agents/plan/orchestrator.md` | Explore, research, dual-engine architect + judge, dual-engine plan + judge — see `agents/plan/README.md` |
-| `/implement` | `agents/implementation/orchestrator.md` | Plan → routed Implementer (`routing.sh implementation`, Claude by default) → triple-engine review → docs + conformance tail → re-index — see `agents/implementation/README.md` |
-| `/review-implementation` | `agents/review-implementation/orchestrator.md` | Standalone triple-engine review (+ optional omp) + synthesizer on the current branch; `--lean` runs the lean 2-engine (+ omp) version of the review gate on the current diff |
-| `/respond-to-review` | `agents/respond-to-review.md` | Classify PR review comments, verify claims, draft responses, apply fixes |
-| `/run-ci` | `agents/local-ci.md` | Full local CI pipeline in Docker (format, lint, typecheck, build, test) |
+| `/plan-implementation` | `agents/plan/orchestrator.md` | Explore, research, multi-engine architect + judge, multi-engine plan + judge — see `agents/plan/README.md` |
+| `/implement` | `agents/implementation/orchestrator.md` | Plan → routed Implementer (`routing.sh implementation`, Claude by default) → lean multi-engine review (Claude ‖ omp roster) → docs + conformance tail → re-index — see `agents/implementation/README.md` |
+| `/review-implementation` | `agents/review-implementation/orchestrator.md` | Standalone multi-engine review (Claude ‖ the omp roster ‖ CodeRabbit) + synthesizer on the current branch; `--lean` runs the lean version (Claude ‖ the omp roster, 2-vote) of the review gate on the current diff |
+| `/respond-to-review` | `agents/respond-to-review.md` | Classify PR review comments, verify claims, draft responses, apply fixes; AI review bots (CodeRabbit, Bugbot) get a mode that fixes, pushes and resolves, with an UNCERTAIN state |
+| `/run-ci` | `scripts/run-ci.sh` + `agents/local-ci.md` | Local CI pipeline run by script (format, lint, typecheck, build, test) with a JSON result; the agent only diagnoses a failure |
 
 ## Autonomous / unattended
 
@@ -33,7 +33,7 @@ drives.
 
 | Command | Dispatches | What it does |
 | --- | --- | --- |
-| `/deep-debug` | `agents/debug/{investigator,queue}.md` + `agents/debug/adversary.md` | Dual-engine investigation (+ optional omp) + mandatory adversarial verification — see `agents/debug/README.md` |
+| `/deep-debug` | `agents/debug/{investigator,queue}.md` + `agents/debug/adversary.md` | Claude + omp investigation (`routing.sh engines debug`) + mandatory adversarial verification — see `agents/debug/README.md` |
 
 ## Codebase-wide audits
 
@@ -41,12 +41,12 @@ drives.
 | --- | --- | --- |
 | `/codebase-audit` | `agents/codebase/orchestrator.md` | Tier 1 quick health check (default) or `deep` for all tier 2 audits |
 | `/security-audit` | `agents/codebase/security-audit/orchestrator.md` | Cartographer → deep agents → evidence-demanding synthesizer, ASVS 5.0 L2 |
-| `/error-audit` | `agents/codebase/error-audit/orchestrator.md` | 6 dual-engine agents (backend, frontend, queue) |
-| `/api-audit` | `agents/codebase/api-audit/orchestrator.md` | 4 dual-engine agents — endpoint inventory, auth, validation, docs sync |
-| `/docs-audit` | `agents/codebase/docs-audit/orchestrator.md` | 3 agents (2 Claude + 1 Codex) — docs vs. actual code |
-| `/tech-debt-audit` | `agents/codebase/tech-debt-audit/orchestrator.md` | 4 agents (3 Claude + 1 Codex) — patterns, complexity, TODOs, library currency |
+| `/error-audit` | `agents/codebase/error-audit/orchestrator.md` | One scanner per scope on Claude and the omp roster (backend, frontend, queue) |
+| `/api-audit` | `agents/codebase/api-audit/orchestrator.md` | Endpoint-inventory script, then auth, validation and docs-sync passes on Claude + omp |
+| `/docs-audit` | `agents/codebase/docs-audit/orchestrator.md` | Stale-reference script, then docs-vs-code passes on Claude + omp |
+| `/tech-debt-audit` | `agents/codebase/tech-debt-audit/orchestrator.md` | Scan and dep-audit scripts (complexity, TODOs, library currency) + a pattern pass on Claude + omp |
 
-## Codex / cross-model
+## Cross-model
 
 | Command | Dispatches | What it does |
 | --- | --- | --- |

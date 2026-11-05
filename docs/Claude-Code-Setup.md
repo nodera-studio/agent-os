@@ -96,10 +96,10 @@ cheaper models (mechanical roles) and per-role `effort`. A global
 `CLAUDE_CODE_SUBAGENT_MODEL` would flatten all of that. This survives "optimization"
 passes by being written down here.
 
-Which engine does a kind of work (Claude or Codex for implementation, review, planning, debug
+Which engine does a kind of work (Claude for implementation; the omp engines for review, planning, debug
 and audits; the UI Implementer; the fan-out caps) is a separate question: it lives in
-`.claude/routing.json`, read through `bash .claude/scripts/routing.sh <key>`, never hard-coded in
-a prompt.
+`.claude/routing.json`, read through `bash .claude/scripts/routing.sh <key>` (and `routing.sh engines <role>`
+for the omp roster), never hard-coded in a prompt.
 
 ## CLI tooling — `bootstrap-tools.sh`
 
@@ -176,23 +176,29 @@ Run `.claude/scripts/bootstrap-tools.sh` on each machine (`--dry-run` first to
 preview). The `settings.json` `env` block + any `PostToolUse` hook wiring travel
 with the repo — no manual settings.json edit needed beyond what's already committed.
 
-### 3. omp third engine (optional, per machine)
+### 3. omp engines (per machine, owner-run)
 
-omp is an optional read-only third review/debug engine run through the `glen` CLI. Skip this
-step to run without it: the engine's probe exits 3 and the harness reports it skipped in one
-line. To enable it, the owner logs into the provider for the dedicated `glen-harness` profile,
-then configures and checks it:
+The omp engines are read-only review/debug/ask peers run through the `glen` CLI: `omp:codex` (profile
+`glen-harness-codex`, provider `openai-codex`) and `omp:opencode` (profile `glen-harness-opencode`, provider
+`opencode-go`). Skip this step to run without them: a probe exits 3 and the harness reports the engine skipped
+in one line. To enable them, the OWNER logs in by hand, once per profile (an agent never logs in and never
+reads credentials), then configures and checks both profiles:
 
 ```bash
-omp --profile glen-harness login <provider>
-bash .claude/scripts/omp-profile-setup.sh
-bash .claude/scripts/omp-profile-setup.sh --check
+omp --profile glen-harness-codex login openai-codex
+omp --profile glen-harness-opencode login opencode-go      # or export OPENCODE_API_KEY in the invoking shell
+bash .claude/scripts/omp-profile-setup.sh --engine all
+bash .claude/scripts/omp-profile-setup.sh --engine all --check
+bash .claude/scripts/omp-probe-keyed.sh                    # once, with a key: writes omp/probe-result.json
 ```
 
-Export `MNEMOSYNE_TOKEN` in the invoking shell if the profile's MCP needs read-only memory
-access; never put its value in the repo. `TMPDIR` (or `/tmp` when unset) must resolve outside
-`$HOME` for the engine to run. Set `GLEN_OMP_ENGINE=off` to skip omp while the other engines
-continue. See `skills/omp/SKILL.md`.
+`omp-probe-keyed.sh` verifies the opencode-go model ids, how a model is chosen at launch, that the key survives
+the environment scrub, tool use per slot and the cap signal. Until `omp/probe-result.json` exists a dispatch
+to `omp:opencode` skips with `reason:"unprobed"` and only `omp:codex` runs; the probe never prints a secret.
+Export `MNEMOSYNE_TOKEN` in the invoking shell if a profile's MCP needs read-only memory access; never put its
+value in the repo. `TMPDIR` (or `/tmp` when unset) must resolve outside `$HOME` for the engine to run. Set
+`GLEN_OMP_ENGINE=off` to skip omp while Claude continues. Cap state is `.claude/state/omp-caps.json`
+(git-ignored). See `skills/omp/SKILL.md`, `skills/second-engine/SKILL.md` and `docs/design.md`.
 
 ## Mac bring-up sequence
 

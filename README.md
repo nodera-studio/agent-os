@@ -14,7 +14,7 @@ disciplined, verifiable, surgical changes.
 - **Commands** — 29 slash commands, the entry points into those workflows
 - **Skills** — 12 trigger-activated capabilities (Playwright testing, GitHub/PR workflows, Exa web search, release-flow conventions, and more)
 - **Hooks** — 10 enforcement scripts wired into `PreToolUse`/`PostToolUse`/session-lifecycle events
-- **Engine model** — who implements comes from `routing.json` (Claude by default, Codex when routed); Claude + Codex dual-engine for review/debug/audits, where cross-model disagreement catches what one model misses. omp is an optional, probe-gated third engine
+- **Engine model** — Claude is the only writer (`routing.json` → `implementation`). The read-only omp engines (`omp:codex`, `omp:opencode`) join review, planning, debug and audits as peers, where cross-model disagreement catches what one model misses; `routing.sh engines <role>` names the roster, an engine that is capped or not set up is skipped with a one-line reason, and native Codex is an opt-in pack
 
 ## Why this exists
 
@@ -27,16 +27,17 @@ between them — closer to how a real engineering team catches its own errors th
 "ask the AI and hope."
 
 Concretely: `/plan-implementation` runs an explorer and a researcher before two
-independent architects propose approaches and a judge picks (and grafts the best of
-both). `/implement` writes code, then reviews it with Claude AND Codex in parallel,
+independent architects (Claude plus an omp engine) propose approaches and a judge picks (and grafts the best of
+both). `/implement` writes code, then reviews it with Claude AND the omp engines in parallel,
 plus an author-blind conformance test writer who never saw the plan being graded
-against. `/review-implementation` runs three independent engines (Claude, Codex,
-and a third reviewer) that don't see each other's output until a fourth agent
-synthesizes them — so a finding that survives independent scrutiny from three
-different vantage points is a much stronger signal than one model's opinion.
+against. `/review-implementation` runs several independent engines (Claude, the omp
+roster, and CodeRabbit if installed) that don't see each other's output until a
+synthesizer agent merges them — so a finding that survives independent scrutiny from different
+vantage points is a much stronger signal than one model's opinion, and Claude still verifies each
+omp finding against the source.
 
 The same principle runs through the rest of the suite, not just the plan → implement →
-review triangle: `/deep-debug` pairs a dual-engine investigation with a dedicated
+review triangle: `/deep-debug` pairs a multi-engine investigation with a dedicated
 adversary agent whose only job is to try to disprove the leading hypothesis before you
 act on it. The five `/codebase-audit` deep audits (security, API contract, error paths,
 docs accuracy, tech debt) apply the same cross-model-consensus idea at whole-repo
@@ -80,7 +81,7 @@ you: /implement Add rate limiting to the /api/upload endpoint
 1. Planner reads the codebase, drafts a step-by-step plan with a
    backward-verification pass (does this actually close the gap?).
 2. The Implementer writes the code, wires it in, and writes its own tests.
-3. Two independent reviewers — Claude and Codex — review the diff in parallel,
+3. Independent reviewers — Claude and the omp roster — review the diff in parallel,
    blind to each other's findings, then a 2-vote consensus gate decides what's
    actually a must-fix vs. a nitpick.
 4. A conformance-test writer, who only ever saw the PLAN (never the diff or the
@@ -100,7 +101,7 @@ or auto-push. You stay the one who decides what ships.
 flowchart TD
     U["You, in Claude Code"] -->|"/plan-implementation"| P["Plan workflow<br/>explore → research → 2× architect + judge → plan"]
     U -->|"/implement"| I["Implement workflow<br/>plan → code → review → conformance test → docs"]
-    U -->|"/review-implementation"| R["Review workflow<br/>Claude ‖ Codex ‖ 3rd engine → synthesizer"]
+    U -->|"/review-implementation"| R["Review workflow<br/>Claude ‖ omp roster ‖ CodeRabbit → synthesizer"]
     U -->|"/deep-debug"| D["Debug workflow<br/>investigator ⇄ adversary (disprove loop)"]
     U -->|"/codebase-audit"| A["Audit workflows<br/>security · API · docs · tech-debt"]
     U -->|"/bootstrap-project"| B["Bootstrap workflow<br/>explore target stack → fill {{TOKENS}} → report"]
@@ -124,7 +125,7 @@ The commands above compose. Here's the full lifecycle, manual and autonomous:
 flowchart TD
     IDEA["A vague idea"] -->|"/brainstorm"| REQ["Requirements doc<br/>(+ optional browser mockups)"]
     REQ -->|"/plan-implementation"| PLAN["Approved plan<br/>saved to .claude/plans/"]
-    PLAN -->|"/implement"| CODE["Code, wired + tested +<br/>reviewed (Claude ‖ Codex ‖ 3rd engine) +<br/>conformance-gated + docs updated"]
+    PLAN -->|"/implement"| CODE["Code, wired + tested +<br/>reviewed (Claude ‖ omp roster) +<br/>conformance-gated + docs updated"]
     CODE -->|"gh pr create"| PR["Pull request"]
     PR -->|"CI + review bots green"| SHIP["Merged — shipped"]
 
@@ -174,7 +175,7 @@ produce the same quality bar; the difference is how much you want to watch.
   (the learned-rules-loop scripts), `cron/` (reference cron wiring for the
   codebase-reindex job), and the run-hygiene helpers: `routing.sh` (engine routing),
   `suite-lock.sh`, `clean-scratch.sh`, `checkpoint-due.sh`, `remove-worktree.sh`,
-  and the optional omp engine scripts (`omp-engine.sh`, `omp-profile-setup.sh`); smokes live in `scripts/tests/`.
+  and the omp engine scripts (`omp-engine.sh`, `omp-profile-setup.sh`, `omp-caps.sh`) plus the deterministic helpers (`run-ci.sh`, `dep-audit.sh`, `merge-trunk.sh`, `poll-pr.sh`, `close-run.sh`, …); smokes live in `scripts/tests/`.
 - **Prompts** (`prompts/`) — general-purpose prompt-engineering reference guides
   for Claude and OpenAI models.
 - **Plugin packaging** (`plugin/agent-os-workflow/`) — the whole suite packaged
@@ -265,7 +266,7 @@ for the plugin-packaging details.
 | `scripts/`   | Standalone tooling used by hooks/commands/cron                                            |
 | `prompts/`   | Prompt-engineering reference guides                                                       |
 | `routing.json` | Who does each kind of work (implementation, review, …); read via `scripts/routing.sh` |
-| `omp/`       | Optional omp third-engine profile overlay, sandbox launchers and skills                    |
+| `omp/`       | omp engine profile registry and overlay, sandbox launchers and skills                      |
 | `plugin/`    | The whole suite packaged as a toggleable Claude Code plugin                                |
 | `plans/`     | Implementation plans — accumulate as project history, not deleted after use               |
 | `research/`  | Research reports (topic deep-dives, library comparisons)                                  |
