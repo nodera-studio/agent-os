@@ -17,7 +17,7 @@
 #   - `omp` with a profile not in omp/profiles.sh (`--profile`, OMP_PROFILE, PI_PROFILE), and
 #     `mkdir`/`cp`/`mv`/`rsync`/`ln` into another ~/.omp/profiles/<name> -> HOME="$(mktemp -d)"
 # Does NOT touch grep/rg (agentic search is good in-loop — routed via CLAUDE.md)
-# or codex (block-old-codex.sh). Fails open on any error. Project-specific
+# or codex (block-legacy-engines.sh). Fails open on any error. Project-specific
 # steering (e.g. a dev-tool wrapper hook) can be layered in separately — see
 # hooks/README.md ("Custom hooks for your project").
 set -uo pipefail

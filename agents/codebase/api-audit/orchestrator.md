@@ -90,8 +90,8 @@ Launch all 4 agents simultaneously in 2 groups.
 Read-only (state it in the prompt), in the foreground: end the prompt with
 "Do NOT write any file: return the full result as your final message text. --wait. Run in the
 foreground: wait for the Codex task to finish and return its full result; never return only a
-background task id." Never `codex exec` or a `skill-codex` Skill call; the `block-old-codex`
-hook blocks both.
+background task id." Never `codex exec` or a `skill-codex` Skill call; the
+`block-legacy-engines` hook denies both.
 
 ```
 # API Endpoint Inventory Scan
@@ -174,8 +174,8 @@ proposed fix.
 Read-only (state it in the prompt), in the foreground: end the prompt with
 "Do NOT write any file: return the full result as your final message text. --wait. Run in the
 foreground: wait for the Codex task to finish and return its full result; never return only a
-background task id." Never `codex exec` or a `skill-codex` Skill call; the `block-old-codex`
-hook blocks both.
+background task id." Never `codex exec` or a `skill-codex` Skill call; the
+`block-legacy-engines` hook denies both.
 
 ```
 # API Contract Schema Scan

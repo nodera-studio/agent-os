@@ -23,6 +23,7 @@ coder-codex|coder-codex impl-coder-codex
 skill-mnemosyne|skills/mnemosyne/SKILL.md
 skill-wrangler|skills/wrangler
 skill-codex|skills/codex/SKILL.md
+core-codex-hook|block-old-codex
 '
 
 while IFS='|' read -r label needles; do

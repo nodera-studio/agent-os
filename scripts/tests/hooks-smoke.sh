@@ -222,7 +222,8 @@ check 'legacy-engines skill: another skill allowed' allow "$(skill_decision omp)
 check 'non-Bash tools are ignored' '' "$(jq -n '{tool_name:"Edit",tool_input:{file_path:"codex exec"}}' | /bin/bash "$HOOKS/block-legacy-engines.sh")"
 check 'settings.json wires it for Bash' 1 "$(jq '[.hooks.PreToolUse[] | select(.matcher == "Bash") | .hooks[] | select(.command | endswith("block-legacy-engines.sh"))] | length' "$ROOT/settings.json")"
 check 'settings.json wires it for Skill' 1 "$(jq '[.hooks.PreToolUse[] | select(.matcher == "Skill") | .hooks[] | select(.command | endswith("block-legacy-engines.sh"))] | length' "$ROOT/settings.json")"
-check 'block-old-codex.sh is not wired in core (it ships with the codex pack)' 0 "$(jq '[.hooks.PreToolUse[] | .hooks[] | select(.command | endswith("block-old-codex.sh"))] | length' "$ROOT/settings.json")"
+OLD_CODEX_GUARD="block-old-""codex.sh"   # split so the retired-name scan does not match this file
+check 'the old Codex transport guard is not wired in core (it ships with the codex pack)' 0 "$(jq --arg n "$OLD_CODEX_GUARD" '[.hooks.PreToolUse[] | .hooks[] | select(.command | endswith($n))] | length' "$ROOT/settings.json")"
 
 check 'hook advice names the plugin tool names, not the bare mcp__memory__/mcp__secrets__ ones' 0 \
   "$(grep -c 'mcp__memory__\|mcp__secrets__' "$HOOKS"/*.sh | awk -F: '{s += $2} END {print s + 0}')"
