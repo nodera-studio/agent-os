@@ -142,28 +142,27 @@ autonomy is the point of this mode.
    skip re-planning.
 3. **Implement.** Invoke `/implement` for the wave. Let it own its internal gates: the
    loop of the Implementer (`impl-implementer`) and `scripts/quality-gate.sh`, the local
-   lean `/review-implementation --lean` gate (1 Claude ‖ 1 Codex pass, 2-vote), the conformance tail and the docs
+   lean `/review-implementation --lean` gate (Claude ‖ the omp roster of `routing.sh engines review`, 2-vote), the conformance tail and the docs
    updater.
    - **File names.** Saved review or plan files per engine are named `<engine>-review.md` /
      `<engine>-plan.md` (e.g. `.claude/plans/reviews/<wave>/claude-review.md`), never
      `claude.md`: Claude Code loads any `claude.md` as a nested `CLAUDE.md` on macOS's
      case-insensitive filesystem.
-   - **Codex unavailable.** If the Codex review pass hits a capacity or rate error, the gate
-     retries once and then runs single-engine (see `.claude/commands/review-implementation.md`, `--lean`); record
-     that in the wave-end comment.
+   - **An omp engine unavailable.** If an omp review pass is capped, off, unprobed or fails, the gate
+     continues with the engines that completed and states how many ran (see
+     `.claude/commands/review-implementation.md`, `--lean`; the router reroutes a capped high-stakes slot to
+     `omp:codex` unless it is already in the run); record that in the wave-end comment.
    - **UI routing.** Design-heavy web UI (landing pages, visual components) is built by the
      agent `bash .claude/scripts/routing.sh ui` names (`impl-coder-ui`,
      `implementation/coder-ui.md`: the `frontend-design:frontend-design` skill), which
-     verifies its own work in a browser against the named design reference; Codex still
-     reviews it, and the rest stays with the Implementer `routing.sh implementation` names
+     verifies its own work in a browser against the named design reference; the omp
+     engines still review it, and the rest stays with the Implementer `routing.sh implementation` names
      (`implementation/orchestrator.md` → UI implementation routing).
    - **Live smoke.** A wave that builds a test harness driving a real TUI, agent CLI or network
      service runs it live once before the PR (`implementation/orchestrator.md` → Live smoke).
    - **Stopping an Implementer** (e.g. to re-brief it) first runs the check in
      `implementation/orchestrator.md` → Role 1 → "Check before stopping an Implementer"
-     (worktree status, stashes; ask the agent and wait one reply cycle). An agent that ran a
-     Codex pass also needs the codex pack's cancel recipe: TaskStop alone leaves Codex
-     running.
+     (worktree status, stashes; ask the agent and wait one reply cycle).
 4. **Pre-push check.** Run your local CI-check command (e.g. `make ci-check`); fix red
    before pushing (a pre-push hook should block otherwise, since a failed CI cycle
    typically costs several minutes of round-trip). Run test suites through
@@ -175,9 +174,10 @@ autonomy is the point of this mode.
    Each wave must leave `{{STAGING_BRANCH}}` green and non-broken — gate any incomplete
    surface behind a flag.
 6. **Poll continuously.** Wake ~270s apart (under a typical 5-min prompt-cache window).
-   Each cycle: `gh pr checks` + fetch new inline review-comments, issue-comments,
-   and reviews since the recorded last-seen cursors (`poll-pr.sh --state` reads and advances
-   both lines under **Poll cursors**).
+   Each cycle is `bash .claude/scripts/poll-pr.sh <pr> --state .claude/auto-mode/state.md`: it prints
+   only what is new (inline review-comments, issue-comments and reviews since the last-seen cursor, and the
+   checks) and prints nothing on a quiet cycle (exit 1), so a quiet poll costs no tokens. It reads and
+   advances both lines under **Poll cursors**, makes GET requests only, and never posts, resolves or merges.
    If you run an AI code-review bot (CodeRabbit or similar), it typically re-reviews
    every push; a bot like Cursor Bugbot posts a status check.
 
@@ -187,7 +187,7 @@ autonomy is the point of this mode.
    - On each wake, run the checkpoint check first ("Run checkpoints" above). Then compare
      against the previous wake, for every running agent:
      `git -C "$WT" status --short` and the last commit time (`git -C "$WT" log -1 --format=%cI`),
-     the companion `status` where Codex runs, and the CI status.
+     and the CI status.
    - Two wakes in a row with no change for an agent → run "Check before stopping an
      Implementer" (`implementation/orchestrator.md` → Role 1). Never use a wake as a reason to
      stop an agent by itself.
@@ -206,12 +206,13 @@ autonomy is the point of this mode.
      marker and resume it when you delete the marker.
 7. **Triage + fix.** **Merge the staging trunk at the start of every fix cycle**, before
    briefing any fix (CI, review or conformance), with `WT` = the wave's checkout:
-   `git -C "$WT" fetch origin && git -C "$WT" merge --no-edit origin/{{STAGING_BRANCH}}`.
-   Never rebase.
+   `bash .claude/scripts/merge-trunk.sh --worktree "$WT" --trunk origin/{{STAGING_BRANCH}} --fetch`.
+   Never rebase; the script refuses a dirty worktree, never pushes, and prints one JSON (status `merged`,
+   `up-to-date`, `conflict` or `error`).
    - Who merges: when a CI-owner agent (marker above) works in `$WT`, it merges the trunk as
      its first fix step and you do not. Otherwise you merge, and only when
      `git -C "$WT" status --short` is empty; with uncommitted edits, have their agent commit
-     or stash first.
+     or stash first (`merge-trunk.sh` refuses otherwise).
    - A conflict goes to integration routing (`bash .claude/scripts/routing.sh integration`),
      recorded as in Shared seams item 4 below.
    - After a non-trivial merge, re-run `scripts/quality-gate.sh` and the tests before the fix.
@@ -222,30 +223,16 @@ autonomy is the point of this mode.
    - A merge changes the head SHA, so a SHA-bound proof (a flake proof, a recorded benchmark)
      has to re-run on the new head.
    - **Squash-merged base.** A branch cut from, or merged with, another wave's pre-squash
-     commit (Shared seams item 2) merges the trunk with this recipe instead of the plain merge:
-
-     ```bash
-     # The branch was cut from, or merged, wave A's pre-squash commit CUT; the trunk has A's squash SQ.
-     git -C "$WT" fetch origin "pull/<A>/head"                     # wave A's last tip, if not local
-     A_TIP="$(gh pr view <A> --json headRefOid -q .headRefOid)"
-     CUT="$(git -C "$WT" merge-base HEAD "$A_TIP")"
-     SQ="$(gh pr view <A> --json mergeCommit -q .mergeCommit.oid)"
-     # Exit 1 from a preview or the merge means conflicts; `|| …` keeps a `bash -e` shell going.
-     git -C "$WT" merge-tree --write-tree --name-only HEAD origin/{{STAGING_BRANCH}} || true                   # preview: plain base
-     git -C "$WT" merge-tree --write-tree --name-only --merge-base="$CUT" HEAD origin/{{STAGING_BRANCH}} || true  # preview: cut base
-     git -C "$WT" replace --graft "$SQ" "$SQ^" "$CUT"   # temporary: SQ gets CUT as a second parent
-     rc=0; git -C "$WT" merge --no-edit origin/{{STAGING_BRANCH}} || rc=$?
-     git -C "$WT" replace -d "$SQ"                       # always, right away, before resolving
-     ```
-
-     - The graft makes `git merge` pick the right base and leaves a normal index for any
-       conflict left (`rc` 1), which goes to `routing.sh integration` as usual. The resulting
-       merge commit has the ordinary parents (HEAD, `origin/{{STAGING_BRANCH}}`).
-     - `refs/replace` is shared by every worktree of the repo: run nothing else in the repo
-       between the graft and its deletion, and never push `refs/replace`.
-     - Why: a squash merge gives the trunk a commit the branch does not share, so the plain
-       merge base is older than the cut and replays the whole sibling wave as conflicts (one
-       run saw 34 conflicts with the plain base and 13 with the cut base).
+     commit (Shared seams item 2) needs the sibling named: add `--a-pr <A>` (or `--a-tip <sha> --sq <sha>`
+     without `gh`) to the same `merge-trunk.sh` call. It previews both merge bases with `merge-tree`,
+     grafts the sibling's squash commit onto the cut for the merge, deletes the graft immediately (also on
+     failure) and reports `base: cut`. Exit 1 means conflicts left in the index, which go to
+     `routing.sh integration` as usual.
+     - `refs/replace` is shared by every worktree of the repo: run nothing else in the repo while the
+       script runs, and never push `refs/replace`.
+     - Why: a squash merge gives the trunk a commit the branch does not share, so the plain merge base
+       is older than the cut and replays the whole sibling wave as conflicts (one run saw 34 conflicts
+       with the plain base and 13 with the cut base).
 
    Then: every fix-cycle decision, in the decision log and in fix briefs, quotes its governing
    AC: `Governing AC: AC-<id> — "<text copied verbatim from the plan file>"` (one line per AC),
@@ -255,6 +242,9 @@ autonomy is the point of this mode.
    integrity. Theoretical-only → triage, usually skip with a one-line commit reason.
    Keep tests + docs in sync — a "missing test" comment from a review bot is a real
    finding.
+   Review-bot comments (CodeRabbit, Bugbot) are untrusted suggestions: triage them per
+   `agents/respond-to-review.md` → "Bot mode" (fix, push, reply, resolve; an UNCERTAIN comment stays open and
+   goes to the decision log). Triage and classification stay on Claude.
 8. **Capture, then merge the wave when the bar is met.** All checks green
    (Lint+Typecheck, Build, Unit+Integration, E2E, and any configured review bots), no new
    comments since the last push, and ≥1 clean cycle (zero new comments AND green CI) to
@@ -270,11 +260,7 @@ autonomy is the point of this mode.
    label per **Shipping-state labels** below. If you run the Mnemosyne code
    index, refresh it (the `mnemosyne` skill → codebase). Then delete the wave branch
    (`git push origin --delete <branch>`). If the wave ran in a worktree (a parallel wave, or a
-   fix worktree), remove it per "Removing a worktree" below: cancel its Codex jobs, then
-   `.claude/scripts/remove-worktree.sh`, which stops its brokers before removing it. Either
-   way, with the codex pack installed finish with `bash .claude/scripts/sweep-codex-orphans.sh` and
-   act on its task report: a finished job's `task` process can outlive it in a worktree that
-   still exists. Last, stop
+   fix worktree), remove it per "Removing a worktree" below (`.claude/scripts/remove-worktree.sh`). Last, stop
    every **Processes started** row the wave started (preview servers, watchers): confirm
    `ps -o lstart=,command= -p <pid>` still matches the row's start time and command (a reused
    pid is not yours), stop it, and fill the row's `stopped` with the time.
@@ -300,32 +286,28 @@ Run this whenever a goal reaches `done`, with a promotion or without one, in thi
 becomes `done` only at its last item.
 
 1. Keep checkpoints going ("Run checkpoints"); write the closing checkpoint into the closing PR.
-2. Stop what the run started: every live **Processes started** row (pid, lstart and command
-   still match), every run worktree through `remove-worktree.sh` ("Removing a worktree"), then
-   (with the codex pack installed) `bash .claude/scripts/sweep-codex-orphans.sh`, acting on its
-   task report.
+2. The mechanical closing steps are one script. Plan first, then apply:
+   `bash .claude/scripts/close-run.sh [--prs 12,15] [--worktree <path>]...` prints what each step would do
+   and changes nothing; `--apply` then (a) stops every live **Processes started** row (pid, lstart and
+   command still match), (b) removes the run's worktrees through `remove-worktree.sh`, (c) lists scratch
+   entries with `clean-scratch.sh --dry-run '<prefix>*'` and cleans the `--scratch-pattern` entries the run
+   created (`<prefix>` is `$HARNESS_SCRATCH_PREFIX`, else the main checkout's directory name plus `-`), and
+   (d) deletes the head branches of the run's MERGED PRs (the numbers come from `--prs` or the state file's
+   ledger; never `{{STAGING_BRANCH}}`, `{{PROD_BRANCH}}` or `HEAD`). It never merges or closes a PR and
+   never pushes anything else. Exit 1 means something was blocked or failed: do not set the run to `done`.
+   List the scratch entries it leaves for the owner.
 3. Tech-debt memories (if you run a durable-memory system): list the active ones for the
    project. For each whose fix merged this run, cite the fix `path:line` on the trunk and mark
-   it `resolved`. Mark decisions this run reversed as `superseded`.
+   it `resolved`. Mark decisions this run reversed as `superseded`. (Under `manual` in the script's JSON.)
 4. Tracker: the goal's parent ticket or epic → `Done`, and any run ledger you kept closed.
 5. Deliverables meant for the trunk (audit reports under `.claude/reviews/`) go into the
    closing PR after a secret scan, or the decision log says why not.
-6. Scratch: `bash .claude/scripts/clean-scratch.sh --dry-run '<prefix>*'` (`<prefix>` is
-   `$HARNESS_SCRATCH_PREFIX`, else the main checkout's directory name plus `-`; see the
-   script's header), then the real run for the entries this run created; list the rest for the
-   owner.
-7. Delete the run's merged PR branches. `git branch -r --merged origin/{{STAGING_BRANCH}}`
-   cannot find them (a squash merge leaves the branch unmerged) and lists the trunk itself, so
-   take them from the run ledger's PR numbers: `gh pr view <N> --json state,headRefName -q
-   'select(.state == "MERGED") | .headRefName'` for each. Never delete `{{STAGING_BRANCH}}`,
-   `{{PROD_BRANCH}}` or `HEAD`; for each other name that
-   `git ls-remote --exit-code --heads origin <branch>` still finds,
-   `git push origin --delete <branch>`.
-8. Last, after the closing PR merges: `CronList`, then `CronDelete` the id under
-   **Checkpoints** → Schedule (load both with ToolSearch first), set `Cadence: none` and
-   `Schedule: none`, set status `done`, and stop scheduling heartbeats.
+6. Last, after the closing PR merges: `bash .claude/scripts/close-run.sh --apply --closing-pr <N>
+   --finalize-state` (only if PR N is MERGED it sets `Cadence: none`, `Schedule: none` and status `done`),
+   then `CronList` and `CronDelete` the id under **Checkpoints** → Schedule (load both with ToolSearch
+   first; the script returns it under `manual`), and stop scheduling heartbeats.
 
-Why: a run once closed with no checkpoints for hours, Codex brokers and a preview server
+Why: a run once closed with no checkpoints for hours, a preview server
 still running, fixed debt memories still active, the parent ticket open, and the hourly
 prompt firing after the run ended.
 
@@ -356,13 +338,15 @@ parallel:
 1. List each wave's touched files and seams from its plan (files to create or modify, plus
    shared surfaces: a command or route registry, a shared config list, a shared conformance
    table) and flag every overlap in the state file's decision log. Build each list (one path
-   per line) from the plan's "files to create/modify" section, or, once the wave's branch has
-   commits, from `git diff --name-only origin/{{STAGING_BRANCH}}...<branch>`:
+   per line) from the plan's "files to create/modify" section, or give the script the two branches once they
+   have commits:
 
    ```bash
-   PLANS="$(cd "$(git rev-parse --path-format=absolute --git-common-dir)/.." && pwd -P)/.claude/plans"
-   comm -12 <(sort -u "$PLANS/wave-a.files") <(sort -u "$PLANS/wave-b.files")
+   bash .claude/scripts/seam-overlap.sh .claude/plans/wave-a.files .claude/plans/wave-b.files
+   bash .claude/scripts/seam-overlap.sh --trunk origin/{{STAGING_BRANCH}} --branch <A> --branch <B>
    ```
+
+   It prints the shared files as JSON (exit 1 on any overlap, 0 on none) and reads only.
 
 2. Overlapping waves either run in sequence, or the second wave merges the first wave's
    branch early: right after the first wave's review gate (`/implement` Role 2 green),
@@ -380,7 +364,7 @@ parallel:
    it prints `claude`), not necessarily the Implementer `routing.sh implementation` names,
    since it is merge resolution, not new product code (`implementation/orchestrator.md` →
    Role 1). When the two differ, record it as a routing deviation in the decision log and the
-   PR body. Then re-run the gate and tests and a scoped Claude ‖ Codex `/review-implementation --lean` of the
+   PR body. Then re-run the gate and tests and a scoped Claude ‖ omp `/review-implementation --lean` of the
    resolved files.
 
 When `.claude/plans/` is git-ignored, a new worktree does not contain the wave's plan. Every
@@ -392,32 +376,21 @@ expected; otherwise Implementers report it "missing". Design-heavy UI waves foll
 routing in step 3 above. After the wave's squash-merge (step 9), remove its worktree, and any
 fix worktree cut for it, as below.
 
-### Removing a worktree (stop its Codex processes)
+### Removing a worktree
 
-Every Codex run in a worktree leaves a codex-companion broker (`app-server-broker.mjs serve
---cwd <worktree>`) and its app-server running after the run ends and after the worktree is
-deleted, and a finished job's `codex-companion.mjs task` process can stay alive for hours.
 For each wave, fix or harness worktree you remove, follow `implementation/orchestrator.md` →
 Role 1 → "Removing a worktree" with `WT` = its absolute path, from the main checkout
 (`MAIN="$(cd "$(git rev-parse --path-format=absolute --git-common-dir)/.." && pwd -P)"`):
-
-1. Cancel `$WT`'s jobs with the companion first (the codex pack's cancel recipe, steps 0–1). The scripts never cancel jobs or signal tasks.
-2. `bash "$MAIN/.claude/scripts/remove-worktree.sh" "$WT" [<branch>]` (`--dry-run` first if in
-   doubt). It refuses unless `$WT` is a registered worktree directly under `.claude/worktrees/`
-   and your cwd is outside it; with `<branch>`, unless that branch is checked out there and its
-   tip is on the trunk or on its fetched upstream. It refuses while a live job (queued, or
-   running with a live companion task pid, in either companion state store) or a task process
-   is in `$WT`, printing the cancel commands; else it stops `$WT`'s brokers (TERM, wait, KILL),
-   confirms nothing is left, copies every untracked or ignored file under `$WT`'s
-   `.claude/{evidence,plans,research,handoffs,tech-debt,testing,reviews}/` to the same path in
-   the main checkout (a different file already there is never overwritten: the worktree's copy
-   goes under `.claude/evidence/from-worktrees/<worktree name>-<UTC stamp>/`; a failed copy
-   removes nothing), then `git worktree remove --force` and `git branch -D`. Everything else
-   uncommitted is discarded, so commit or push first. Never do these steps by hand or in
-   another order.
-3. Only with the codex pack installed, `bash "$MAIN/.claude/scripts/sweep-codex-orphans.sh"`: stops this repo's brokers whose
-   worktree is gone, with no live job or task process referencing it; lists suspected orphan
-   tasks and stale job records without stopping them.
+`bash "$MAIN/.claude/scripts/remove-worktree.sh" "$WT" [<branch>]` (`--dry-run` first if in doubt). It
+refuses unless `$WT` is a registered worktree directly under `.claude/worktrees/` and your cwd is outside it;
+with `<branch>`, unless that branch is checked out there and its tip is on the trunk or on its fetched
+upstream. It copies every untracked or ignored file under `$WT`'s
+`.claude/{evidence,plans,research,handoffs,tech-debt,testing,reviews}/` to the same path in the main checkout (a
+different file already there is never overwritten: the worktree's copy goes under
+`.claude/evidence/from-worktrees/<worktree name>-<UTC stamp>/`; a failed copy removes nothing), then runs
+`git worktree remove --force` and `git branch -D`. Everything else uncommitted is discarded, so commit or push
+first. Never do these steps by hand or in another order. The omp engines run in their own snapshot, so
+nothing engine-side needs stopping.
 
 ## Shipping-state labels (optional: `auto-mode-extras` pack)
 

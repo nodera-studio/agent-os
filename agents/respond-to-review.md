@@ -231,7 +231,7 @@ thread saying what changed or why not (one or two sentences, no thanks, no essay
 you settled (VALID_FIX once pushed, INCORRECT_CLAIM, STYLE_PREFERENCE). Leave UNCERTAIN threads open. Use the
 host CLI/MCP (`gh api graphql` `resolveReviewThread` on GitHub); never merge the PR and never approve it.
 Under `/auto-mode` the same loop runs inside the wave (`.claude/skills/auto-mode/references/loop-procedures.md`
-step 6) and UNCERTAIN comments go to the run's ledger instead of a prompt.
+step 7) and UNCERTAIN comments go to the run's ledger instead of a prompt.
 
 Report bot comments in the Step 6 summary as a separate table (counts per classification, threads resolved,
 threads left open and why, commits pushed).
