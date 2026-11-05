@@ -85,10 +85,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/block-old-codex.sh"
-          },
-          {
-            "type": "command",
             "command": ".claude/hooks/block-legacy-engines.sh"
           },
           {
@@ -104,10 +100,6 @@
       {
         "matcher": "Skill",
         "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/block-old-codex.sh"
-          },
           {
             "type": "command",
             "command": ".claude/hooks/block-legacy-engines.sh"

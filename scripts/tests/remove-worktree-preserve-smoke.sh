@@ -3,13 +3,18 @@
 #
 # Usage: /bin/bash .claude/scripts/tests/remove-worktree-preserve-smoke.sh
 # Bash 3.2, no network, no real companion: a temp repo carries copies of remove-worktree.sh and
-# codex-procs.sh and lib/proc-common.sh, and every run uses CLAUDE_PLUGIN_DATA and TMPDIR under the mktemp work dir with
+# lib/proc-common.sh, plus codex-procs.sh when the codex pack's copy is found (installed next to the script, or
+# packs/codex/ in the harness checkout), and every run uses CLAUDE_PLUGIN_DATA and TMPDIR under the mktemp work dir with
 # --force-no-state. Case (d) adds a local bare origin for the branch-deletion check. Prints ok/FAIL
 # per case; exit 1 on any FAIL.
 set -euo pipefail
 
 TEST_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 SCRIPTS="$TEST_DIR/.."
+# The Codex job helper ships with the codex pack; case (e) runs both with and without it.
+HELPER="$SCRIPTS/codex-procs.sh"
+[ -f "$HELPER" ] || HELPER="$TEST_DIR/../../packs/codex/scripts/codex-procs.sh"
+[ -f "$HELPER" ] || HELPER=""
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/remove-worktree-preserve-smoke.XXXXXX")"
 WORK="$(cd "$WORK" && pwd -P)"
 trap 'rm -rf "$WORK"' EXIT
@@ -20,7 +25,8 @@ G() { git -C "$REPO" -c user.name=smoke -c user.email=smoke@example.invalid \
   -c core.hooksPath=/dev/null -c commit.gpgsign=false "$@"; }
 git init -q "$REPO"
 printf '%s\n' .claude/worktrees/ .claude/evidence/ .claude/plans/ target/ >"$REPO/.gitignore"
-cp "$SCRIPTS/remove-worktree.sh" "$SCRIPTS/codex-procs.sh" "$REPO/.claude/scripts/"
+cp "$SCRIPTS/remove-worktree.sh" "$REPO/.claude/scripts/"
+[ -z "$HELPER" ] || cp "$HELPER" "$REPO/.claude/scripts/codex-procs.sh"
 cp "$SCRIPTS/lib/proc-common.sh" "$REPO/.claude/scripts/lib/"
 G add -A
 G commit -q -m init
@@ -136,9 +142,13 @@ run_nf() { # run_nf ARGS...: like run, without --force-no-state
   OUT="$(cd "$REPO" && env CLAUDE_PLUGIN_DATA="$WORK/none" TMPDIR="$WORK/tmp" \
     /bin/bash "$REPO/.claude/scripts/remove-worktree.sh" "$@" 2>&1)" || RC=$?
 }
-run_nf "$W5"
-if [ "$RC" = 1 ] && has "no companion state store exists" && [ -d "$W5" ]; then ok "(e) with the helper, no state store refuses"
-else fail "(e) with helper: rc $RC: $OUT"; fi
+if [ -n "$HELPER" ]; then
+  run_nf "$W5"
+  if [ "$RC" = 1 ] && has "no companion state store exists" && [ -d "$W5" ]; then ok "(e) with the helper, no state store refuses"
+  else fail "(e) with helper: rc $RC: $OUT"; fi
+else
+  ok "(e) with the helper: skipped, the codex pack is not in this tree"
+fi
 rm -f "$REPO/.claude/scripts/codex-procs.sh"
 run_nf "$W5" t5
 if [ "$RC" = 0 ] && [ ! -e "$W5" ] && ! has "companion" && ! G rev-parse -q --verify refs/heads/t5 >/dev/null; then

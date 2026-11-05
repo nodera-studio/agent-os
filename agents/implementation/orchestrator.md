@@ -279,7 +279,7 @@ stashes that had to be restored by SHA. Before you stop one:
 **Stopping a Codex pass (`codex:codex-rescue`).** TaskStop on an agent that ran
 `codex-companion.mjs` does NOT stop Codex: the companion job, its broker, the app-server and
 the sandbox keep running in the worktree. Whenever you stop such an agent, run the cancel
-recipe of the codex skill (companion `cancel`, then kill the worktree's
+recipe of the codex pack's skill (companion `cancel`, then kill the worktree's
 `app-server-broker.mjs serve --cwd <worktree>` tree if anything survives) and confirm the
 worktree has stopped changing before dispatching anything else into it.
 
@@ -296,7 +296,7 @@ harness worktree (after its merge, or when abandoning it), from the main checkou
 --git-common-dir)/.." && pwd -P)"`); run both scripts from there, never from inside `$WT`. The
 scripts signal brokers only: they never cancel a job or signal a task or task-worker.
 
-1. **Cancel the worktree's jobs first, with the companion** (the codex skill's cancel
+1. **Cancel the worktree's jobs first, with the companion** (the codex pack's cancel
    recipe, steps 0–1, which unset `CODEX_COMPANION_SESSION_ID` so every session's jobs show).
    Stop a leftover `task` / `task-worker` process of `$WT` only after checking it is that
    worktree's and its job is finished or cancelled.
@@ -311,15 +311,16 @@ scripts signal brokers only: they never cancel a job or signal a task or task-wo
    checkout without overwriting, runs `git worktree remove --force` and, with `<branch>`,
    `git branch -D`. Everything else uncommitted is discarded, so commit or push first. The
    script header documents the remaining checks and flags.
-3. `bash "$MAIN/.claude/scripts/sweep-codex-orphans.sh"` (`--dry-run` to only list). It stops
+3. Only with the codex pack installed: `bash "$MAIN/.claude/scripts/sweep-codex-orphans.sh"`
+   (`--dry-run` to only list; skip the step when the script is absent). It stops
    only brokers whose `--cwd` under `.claude/worktrees/` no longer exists, that no live job
    references, and that no task process sits under. Tasks are report-only: it lists suspected
    orphan `task` / `task-worker` processes and stale job records with the evidence. Stop a
    listed task yourself only after checking it.
 
-**Wave end: sweep orphans.** At the end of every wave (after its last Implementer returns, and
-again at wave close after the merge), run step 3 even when no worktree is removed, and act on
-its task report: a `task` process can outlive its finished job in a worktree that still exists.
+**Wave end: sweep orphans (codex pack only).** With the codex pack installed, at the end of every
+wave (after its last Implementer returns, and again at wave close after the merge), run step 3 even
+when no worktree is removed, and act on its task report: a `task` process can outlive its finished job in a worktree that still exists.
 
 **Re-verification (never trust the Implementer's red or green).** You verify the Implementer's
 output; you do not commit it.
@@ -747,10 +748,11 @@ Plans are **kept after implementation** — they accumulate as project history. 
   gets at most one smaller-delta re-dispatch.
   Small or targeted fix briefs carry exact line ranges, forbid full-file reads beyond them and
   skip Mnemosyne recall.
-- Stopping an agent that ran a Codex pass always runs the codex skill's cancel recipe; TaskStop
+- Stopping an agent that ran a Codex pass always runs the codex pack's cancel recipe; TaskStop
   alone leaves Codex running in the worktree. Removing a worktree goes through
-  `.claude/scripts/remove-worktree.sh`, then `sweep-codex-orphans.sh` (brokers only; tasks are
-  report-only); the sweep also runs at every wave end (Role 1 → "Removing a worktree").
+  `.claude/scripts/remove-worktree.sh`, then, with the codex pack installed, `sweep-codex-orphans.sh`
+  (brokers only; tasks are report-only), which also runs at every wave end (Role 1 → "Removing a
+  worktree").
 - Never trust the Implementer's red or green: you re-run the gate and tests once more before
   review as a deliberate check and never commit Implementer output yourself; report every
   discrepancy. A stress or N-run green proves non-flakiness only: ask for a red → green test

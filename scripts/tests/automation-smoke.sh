@@ -613,7 +613,7 @@ suite_close_run() {
   git init -q --bare -b main "$O"
   git init -q -b main "$R"
   printf '.claude/worktrees/\n.claude/evidence/\n.claude/auto-mode/\n' >"$R/.gitignore"
-  cp "$SCRIPTS/close-run.sh" "$SCRIPTS/remove-worktree.sh" "$SCRIPTS/sweep-codex-orphans.sh" "$SCRIPTS/clean-scratch.sh" "$SCRIPTS/codex-procs.sh" "$R/.claude/scripts/"
+  cp "$SCRIPTS/close-run.sh" "$SCRIPTS/remove-worktree.sh" "$SCRIPTS/clean-scratch.sh" "$R/.claude/scripts/"
   cp "$SCRIPTS/lib/proc-common.sh" "$R/.claude/scripts/lib/"
   git -C "$R" add -A; git -C "$R" commit -q -m init
   git -C "$R" remote add origin "$O"; git -C "$R" push -q origin main
@@ -680,6 +680,7 @@ EOS
   eq "close-run: plan changes nothing" "$(cmp -s "$R/.claude/auto-mode/state.md" "$W/state.orig" && echo same):$(kill -0 "$sp1" 2>/dev/null && echo alive)" "same:alive"
   eq "close-run: the plan marks merged PR branches, protects the trunk, skips an open PR" \
     "$(jqv "$out" '[.branches[] | .subject + "=" + .action] | sort | join(",")')" "#11=would-delete,#12=skipped,#13=skipped,#14=would-delete"
+  eq "close-run: without the codex pack the orphan sweep is skipped, not failed" "$(jqv "$out" '.sweep.skipped | tostring'):$(jqv "$out" '.blocked | tostring')" "true:0"
   eq "close-run: the plan only dry-runs the worktree" "$(jqv "$out" '.worktrees[0].action'):$([ -d "$R/.claude/worktrees/w1" ] && echo present)" "would-remove:present"
   eq "close-run: the remote branches are untouched in a plan" "$(git -C "$O" branch --list | tr -d ' *\n')" "feat/afeat/bmainstagingwave-w1"
   has "close-run: the schedule id is returned for CronDelete" "$(jqv "$out" '.manual | join("|")')" "cron-77"

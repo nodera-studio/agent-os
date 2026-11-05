@@ -172,7 +172,7 @@ autonomy is the point of this mode.
    - **Stopping an Implementer** (e.g. to re-brief it) first runs the check in
      `implementation/orchestrator.md` → Role 1 → "Check before stopping an Implementer"
      (worktree status, stashes; ask the agent and wait one reply cycle). An agent that ran a
-     Codex pass also needs the codex skill's cancel recipe: TaskStop alone leaves Codex
+     Codex pass also needs the codex pack's cancel recipe: TaskStop alone leaves Codex
      running.
 4. **Pre-push check.** Run your local CI-check command (e.g. `make ci-check`); fix red
    before pushing (a pre-push hook should block otherwise, since a failed CI cycle
@@ -282,8 +282,9 @@ autonomy is the point of this mode.
    (`git push origin --delete <branch>`). If the wave ran in a worktree (a parallel wave, or a
    fix worktree), remove it per "Removing a worktree" below: cancel its Codex jobs, then
    `.claude/scripts/remove-worktree.sh`, which stops its brokers before removing it. Either
-   way, finish with `bash .claude/scripts/sweep-codex-orphans.sh` and act on its task report:
-   a finished job's `task` process can outlive it in a worktree that still exists. Last, stop
+   way, with the codex pack installed finish with `bash .claude/scripts/sweep-codex-orphans.sh` and
+   act on its task report: a finished job's `task` process can outlive it in a worktree that
+   still exists. Last, stop
    every **Processes started** row the wave started (preview servers, watchers): confirm
    `ps -o lstart=,command= -p <pid>` still matches the row's start time and command (a reused
    pid is not yours), stop it, and fill the row's `stopped` with the time.
@@ -311,7 +312,8 @@ becomes `done` only at its last item.
 1. Keep checkpoints going ("Run checkpoints"); write the closing checkpoint into the closing PR.
 2. Stop what the run started: every live **Processes started** row (pid, lstart and command
    still match), every run worktree through `remove-worktree.sh` ("Removing a worktree"), then
-   `bash .claude/scripts/sweep-codex-orphans.sh`, acting on its task report.
+   (with the codex pack installed) `bash .claude/scripts/sweep-codex-orphans.sh`, acting on its
+   task report.
 3. Tech-debt memories (if you run a durable-memory system): list the active ones for the
    project. For each whose fix merged this run, cite the fix `path:line` on the trunk and mark
    it `resolved`. Mark decisions this run reversed as `superseded`.
@@ -436,7 +438,7 @@ For each wave, fix or harness worktree you remove, follow `implementation/orches
 Role 1 → "Removing a worktree" with `WT` = its absolute path, from the main checkout
 (`MAIN="$(cd "$(git rev-parse --path-format=absolute --git-common-dir)/.." && pwd -P)"`):
 
-1. Cancel `$WT`'s jobs with the companion first (the codex skill's cancel recipe, steps 0–1). The scripts never cancel jobs or signal tasks.
+1. Cancel `$WT`'s jobs with the companion first (the codex pack's cancel recipe, steps 0–1). The scripts never cancel jobs or signal tasks.
 2. `bash "$MAIN/.claude/scripts/remove-worktree.sh" "$WT" [<branch>]` (`--dry-run` first if in
    doubt). It refuses unless `$WT` is a registered worktree directly under `.claude/worktrees/`
    and your cwd is outside it; with `<branch>`, unless that branch is checked out there and its
@@ -450,7 +452,7 @@ Role 1 → "Removing a worktree" with `WT` = its absolute path, from the main ch
    removes nothing), then `git worktree remove --force` and `git branch -D`. Everything else
    uncommitted is discarded, so commit or push first. Never do these steps by hand or in
    another order.
-3. `bash "$MAIN/.claude/scripts/sweep-codex-orphans.sh"`: stops this repo's brokers whose
+3. Only with the codex pack installed, `bash "$MAIN/.claude/scripts/sweep-codex-orphans.sh"`: stops this repo's brokers whose
    worktree is gone, with no live job or task process referencing it; lists suspected orphan
    tasks and stale job records without stopping them.
 

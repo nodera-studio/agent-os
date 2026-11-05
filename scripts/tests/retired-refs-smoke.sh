@@ -22,6 +22,7 @@ quick-lanes|implement-quick orchestrator-quick quick-classify
 coder-codex|coder-codex impl-coder-codex
 skill-mnemosyne|skills/mnemosyne/SKILL.md
 skill-wrangler|skills/wrangler
+skill-codex|skills/codex/SKILL.md
 '
 
 while IFS='|' read -r label needles; do

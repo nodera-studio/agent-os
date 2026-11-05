@@ -75,7 +75,7 @@ handoff is `progress.md` + the plan's `<task>` XML, never a transcript.
 
 Roles come from `.claude/routing.json` through `.claude/scripts/routing.sh`. By default
 Role 1 runs in Claude (`implementer.md`); no other engine writes product code. Codex is one engine of the Review gate
-(`codex review` / `codex:codex-rescue`, see `.claude/skills/codex/SKILL.md`). The planner,
+(`codex review` / `codex:codex-rescue`, see `.claude/skills/second-engine/SKILL.md`). The planner,
 Review synthesizer, the parallel tail (docs-updater ‖ conformance-test-writer), and re-index
 are Claude subagents on the main-loop model (Fable 5, then Opus). Only the routed
 Implementer writes product code.

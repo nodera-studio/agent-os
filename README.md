@@ -178,8 +178,7 @@ produce the same quality bar; the difference is how much you want to watch.
   (the learned-rules-loop scripts), `cron/` (reference cron wiring for the
   codebase-reindex job), and the run-hygiene helpers: `routing.sh` (engine routing),
   `suite-lock.sh`, `clean-scratch.sh`, `checkpoint-due.sh`, `remove-worktree.sh`,
-  `codex-procs.sh` / `sweep-codex-orphans.sh` (Codex broker cleanup), and the optional omp
-  engine scripts (`omp-engine.sh`, `omp-profile-setup.sh`); smokes live in `scripts/tests/`.
+  and the optional omp engine scripts (`omp-engine.sh`, `omp-profile-setup.sh`); smokes live in `scripts/tests/`.
 - **Prompts** (`prompts/`) — general-purpose prompt-engineering reference guides
   for Claude and OpenAI models.
 - **Plugin packaging** (`plugin/agent-os-workflow/`) — the whole suite packaged

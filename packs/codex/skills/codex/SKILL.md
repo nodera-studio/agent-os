@@ -13,7 +13,17 @@ allowed-tools: Agent, Bash
 argument-hint: '<task or question to dispatch to Codex>'
 ---
 
-# Codex Dispatch
+# Codex Dispatch (native Codex pack)
+
+> **Pack skill, opt-in.** This is the native Codex integration (`codex:codex-rescue`, `codex review`,
+> `codex-companion.mjs`) shipped by `install.sh --pack codex`. The core harness reaches Codex through the
+> read-only `omp:codex` engine instead (`skills/second-engine`). Use this skill only where the openai-codex
+> plugin is installed and you have chosen to run Codex natively.
+>
+> **Do not enable native Codex as a fallback for an omp engine until read-only confinement is added and
+> tested.** The `codex:codex-rescue` sandbox is `workspace-write`: Codex can write inside its own cwd, so a
+> prompt that says "read-only" is advice, not enforcement. A capacity or rate error on an omp engine never
+> activates native Codex; `omp_fallback` stays `[]` in `routing.json` until the owner sets it on purpose.
 
 ## Roles come from routing
 

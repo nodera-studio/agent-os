@@ -127,7 +127,7 @@ Per wave, in order — this sequence is the spine of the mode:
    (files / commit / PR / tests), update the ledger, apply a **`shipped:staging`**-style
    label (the code is now on the staging trunk), then delete the wave branch. A wave run in
    a worktree is removed with `.claude/scripts/remove-worktree.sh`, then
-   `.claude/scripts/sweep-codex-orphans.sh` (references → Removing a worktree). The harness
+   (with the codex pack) `.claude/scripts/sweep-codex-orphans.sh` (references → Removing a worktree). The harness
    self-improvement batch and any independent wave run in their own worktrees alongside
    (references → Parallel work).
 10. **Advance** to the next wave without asking. 2–3 line status at boundaries only;

@@ -120,7 +120,7 @@ Steps:
      fetch the review (`codex-companion.mjs status <id> --wait`, then `result <id>`)
      before merging; never merge a pass you have not read.
    - If `codex:codex-rescue` is unavailable, fall back per
-     `.claude/skills/codex/SKILL.md`; if Codex is unreachable, run the Claude
+     `.claude/skills/second-engine/SKILL.md`; if Codex is unreachable, run the Claude
      pass (and omp, when ready) without it and note the degraded gate.
    - If the Codex pass fails on capacity or rate ("Selected model is at
      capacity", 429, rate limit), retry it once after a short wait (about 60 s).
