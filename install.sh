@@ -7,7 +7,7 @@
 #
 # Copies this repo's agents/, commands/, skills/, hooks/, rules/, docs/, scripts/,
 # prompts/, plugin/, omp/, templates/, the scaffold dirs (plans/, research/, tech-debt/, testing/,
-# evidence/, handoffs/), settings.json, routing.json (if absent), orchestrator/GapLog.md (if absent) and
+# evidence/, handoffs/), settings.json, routing.json (if absent) and
 # CLAUDE.md.template into <target>/.claude/. Never overwrites an existing <target>/.claude/settings.json
 # or <target>/.claude/CLAUDE.md — those are skipped with a warning if present, so
 # a re-run never clobbers project-specific customization. Nothing is ever deleted by a plain install
@@ -205,7 +205,7 @@ copy_dir() {
 }
 
 # Project-owned files: seed once, never overwrite (routing.json carries the project's engine
-# routing override; orchestrator/ holds the gap log, which record-gap.mjs appends to).
+# routing override). The orchestrator pack's gap log is not seeded: the pack's recorder creates it on first use.
 seed_once() {
   local rel="$1"
   [ -f "$SOURCE_DIR/$rel" ] || return 0
@@ -226,7 +226,6 @@ base_install() {
   done
 
   seed_once routing.json
-  seed_once orchestrator/GapLog.md
 
   # settings.json and CLAUDE.md.template: never clobber an existing settings.json
   # or CLAUDE.md in the target — those carry project-specific customization once

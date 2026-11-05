@@ -24,6 +24,7 @@ skill-mnemosyne|skills/mnemosyne/SKILL.md
 skill-wrangler|skills/wrangler
 skill-codex|skills/codex/SKILL.md
 core-codex-hook|block-old-codex
+orchestrator-pack|commands/orchestrate.md commands/audit-agent-gaps.md agents/orchestrator/ scripts/orchestrator/ record-gap gap-auditor orchestrator-mode.md GapLog gaps.jsonl
 '
 
 while IFS='|' read -r label needles; do

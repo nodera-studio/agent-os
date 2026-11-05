@@ -69,7 +69,6 @@ engine brief stay English. The full rule is `.claude/rules/language-mode.md`.
 | `testing/`   | Test plan TODO (supervised test writing)                                                                                                                        | Read when working on tests                                 |
 | `evidence/`  | Captured evidence artifacts from audits/reviews (screenshots, logs, reports)                                                                                    | Read on demand                                             |
 | `handoffs/`  | Session handoff notes between agents or sessions                                                                                                                | Read on demand                                             |
-| `orchestrator/` | `/orchestrate` mode's gap log (`GapLog.md` + `gaps.jsonl`) — one-off subagent spawns with no matching harness agent, clustered periodically by `/audit-agent-gaps` | Read when reviewing gaps or running `/audit-agent-gaps`  |
 | `routing.json` | Who does each kind of work (implementation, UI, review, planning, debug, audits) and the fan-out caps | Read through `scripts/routing.sh`, never directly |
 
 ### Agents
@@ -78,10 +77,6 @@ Full agent suite documented in `.claude/agents/README.md`. Fill in your project'
 workflows here once `/bootstrap-project` (or manual setup) has wired the agent suite —
 e.g. a table mapping `/plan-implementation`, `/implement`, `/review-implementation`,
 `/debug`, and any audit commands to the agents they dispatch.
-
-`/orchestrate` (dispatch-only mode) and `/audit-agent-gaps` (cluster the gap log, propose
-promoting recurring one-off shapes into permanent agents) are pre-wired and generic — no
-per-project filling-in needed, see `agents/orchestrator/README.md`.
 
 ### Engine routing
 

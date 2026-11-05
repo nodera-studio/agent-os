@@ -344,8 +344,7 @@ prompt firing after the run ended.
 ### Harness self-improvement loop
 
 The run fixes its own harness as it goes. Whenever something in `.claude/` slows or misleads
-a wave, add a line to the state file's **Harness friction log** (and log a gap in
-`.claude/orchestrator/gaps.jsonl` when no agent fits). With each wave PR, run one batch. Plan
+a wave, add a line to the state file's **Harness friction log**. With each wave PR, run one batch. Plan
 the batch as independent fix groups by file (no two groups edit the same file): one
 implementer agent per group in its own worktree, one reviewer per group, and the group
 branches merged into the batch branch. Steps 1–4 describe the batch branch; each group

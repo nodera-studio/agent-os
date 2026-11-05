@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# hooks-smoke.sh — the hook fixes of wave 2b: steer-bash cat rule and scratch path, reinject-invariants
-# (with the orchestrator-mode notice), post-edit-lint (prettier and shellcheck) and block-legacy-engines. Feeds hook JSON on stdin and checks the decision or output.
+# hooks-smoke.sh — the hook fixes of wave 2b: steer-bash cat rule and scratch path, reinject-invariants,
+# post-edit-lint (prettier and shellcheck) and block-legacy-engines. Feeds hook JSON on stdin and checks the decision or output.
 # Needs jq (the hooks fail open without it, so a missing jq is a failure here, not a pass).
 # Bash 3.2, no network.
 set -euo pipefail
@@ -76,15 +76,10 @@ check 'SessionStart source compact prints the payload' '1. Via a symlink.' "$(sr
 check 'SessionStart source startup prints no payload' '' "$(src startup)"
 check 'SessionStart source clear prints no payload' '' "$(src clear)"
 check 'PreCompact (no source) prints the payload' '1. Via a symlink.' "$(jq -n '{hook_event_name:"PreCompact"}' | /bin/bash "$RI/hooks/reinject-invariants.sh" 2>/dev/null || true)"
-# the orchestrator-mode notice prints on every session start, in the project root
-NOTICE='Orchestrator mode is ON (dispatch-only — see .claude/agents/orchestrator/orchestrator-mode.md). Run /orchestrate off to disable.'
+# core no longer knows about orchestrator mode: a marker in the project root changes nothing
 mkdir -p "$WORK/om/.claude"
-om() { (cd "$WORK/om" && jq -n --arg s "$1" '{hook_event_name:"SessionStart",source:$s}' | /bin/bash "$RI/hooks/reinject-invariants.sh" 2>/dev/null) || true; }
-check 'no .orchestrator-mode marker: no notice' '1. Via a symlink.' "$(om resume)"
 : >"$WORK/om/.claude/.orchestrator-mode"
-check 'the marker prints the notice on startup' "$NOTICE" "$(om startup)"
-check 'the marker prints the notice, then the payload, on resume' "$NOTICE
-1. Via a symlink." "$(om resume)"
+check 'an .orchestrator-mode marker no longer prints anything from core' '1. Via a symlink.' "$( (cd "$WORK/om" && jq -n '{hook_event_name:"SessionStart",source:"resume"}' | /bin/bash "$RI/hooks/reinject-invariants.sh" 2>/dev/null) || true)"
 check 'settings.json runs it from one unmatched SessionStart group' 1 \
   "$(jq '[.hooks.SessionStart[] | select(.matcher == null) | .hooks[] | select(.command | endswith("reinject-invariants.sh"))] | length' "$ROOT/settings.json")"
 check 'settings.json also runs it on PreCompact' 1 \

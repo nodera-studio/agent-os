@@ -66,14 +66,11 @@ not spending a model's non-deterministic reasoning on problems a deterministic t
 already solves.
 
 **A third angle: every workflow above is a pre-decided pipeline — a human picked the
-agent shape in advance.** `/orchestrate` mode covers the rest: it turns the main session
-into a pure dispatcher for whatever task doesn't already have a home, matching an
-existing agent first and falling back to a scoped one-off only when nothing fits — and
-logging that fallback instead of throwing the signal away. `/audit-agent-gaps`
-periodically clusters that log and proposes promoting a shape that keeps recurring into a
-permanent agent, evidence-and-approval-gated, the same way the rest of this harness
-gates everything else on verification before it counts as done. See
-`agents/orchestrator/README.md`.
+agent shape in advance.** The optional `orchestrator` pack (`install.sh --pack orchestrator`)
+covers the rest: `/orchestrate` turns the main session into a pure dispatcher for whatever
+task doesn't already have a home, logging each one-off it has to spawn, and
+`/audit-agent-gaps` proposes promoting a shape that keeps recurring into a permanent
+agent, evidence-and-approval-gated. See `packs/orchestrator/README.md`.
 
 ## Quick example — what `/implement` actually does
 
@@ -244,8 +241,7 @@ See [`agents/README.md`](agents/README.md) for the full agent-suite index (with 
 [`implementation`](agents/implementation/README.md),
 [`review-implementation`](agents/review-implementation/README.md),
 [`debug`](agents/debug/README.md), [`codebase`](agents/codebase/README.md),
-[`copywrite`](agents/copywrite/README.md), [`bootstrap`](agents/bootstrap/README.md),
-[`orchestrator`](agents/orchestrator/README.md)),
+[`copywrite`](agents/copywrite/README.md), [`bootstrap`](agents/bootstrap/README.md)),
 [`commands/README.md`](commands/README.md) for every slash command grouped by workflow
 (plus diagrams for `/auto-mode`'s wave loop and `/research`'s fan-out),
 [`hooks/README.md`](hooks/README.md) for the enforcement-hook mechanism and what's
@@ -278,7 +274,6 @@ for the plugin-packaging details.
 | `testing/`   | Test plan TODO for supervised test writing                                                |
 | `evidence/`  | Captured evidence artifacts (screenshots, logs, reports) from audits/reviews               |
 | `handoffs/`  | Session handoff notes between agents or sessions                                          |
-| `orchestrator/` | `/orchestrate` mode's gap log (`GapLog.md` + `gaps.jsonl`), clustered by `/audit-agent-gaps` |
 | `themes/`    | Custom Claude Code color themes (Linear Dark) — installed via `scripts/apply-theme.sh`     |
 
 ## Mnemosyne MCP integration (optional)

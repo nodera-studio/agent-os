@@ -3,7 +3,7 @@
 //
 // Appends one gap record to BOTH the machine-readable ledger
 // (.claude/orchestrator/gaps.jsonl) and the human-readable index
-// (.claude/orchestrator/GapLog.md), so /audit-agent-gaps has something to
+// (.claude/orchestrator/GapLog.md, created on first use), so /audit-agent-gaps has something to
 // cluster and a person can skim the log without parsing JSON. Plain Node/fs —
 // no DB dependency, so this travels cleanly to a portable harness.
 //
@@ -75,11 +75,39 @@ function appendJsonl(record) {
   appendFileSync(JSONL_PATH, JSON.stringify(record) + '\n');
 }
 
+// The human-readable index is created on first use: the orchestrator pack ships no seeded copy, so the
+// project owns GapLog.md from the first gap on (a pack upgrade never touches it).
+const GAPLOG_SCAFFOLD = `# Agent Gap Log
+
+Every time \`/orchestrate\` mode dispatches a one-off subagent because nothing in
+\`.claude/agents/README.md\` fits the task, \`.claude/scripts/orchestrator/record-gap.mjs\`
+appends a row here (and a matching JSON line to \`gaps.jsonl\`, which is what
+\`/audit-agent-gaps\` actually reads — this file is the human-skimmable index).
+
+A single gap is just a data point, not a verdict. \`/audit-agent-gaps\` periodically clusters
+the open gaps below; a recurring shape (3+ similar entries by default) becomes a proposed
+permanent agent, reported for approval before anything is written. See
+\`.claude/agents/orchestrator/gap-auditor.md\`.
+
+Do not hand-edit the tables below — use \`record-gap.mjs\` (append) or \`/audit-agent-gaps\`
+(promote). This file is meant to be checked in and accumulate as project history, same as
+\`.claude/plans/\` and \`.claude/tech-debt/\`.
+
+## Open gaps
+
+| ID | Date | Task | Closest agent | Why no fit | Ad-hoc agent | Tags |
+| --- | --- | --- | --- | --- | --- | --- |
+
+## Promoted
+
+| ID | Date | Task | Promoted to |
+| --- | --- | --- | --- |
+`;
+
 function appendGapLogRow(record) {
   if (!existsSync(GAPLOG_PATH)) {
-    throw new Error(
-      `record-gap: ${GAPLOG_PATH} is missing — it should exist as a checked-in scaffold`,
-    );
+    mkdirSync(ORCH_DIR, { recursive: true });
+    writeFileSync(GAPLOG_PATH, GAPLOG_SCAFFOLD);
   }
   const content = readFileSync(GAPLOG_PATH, 'utf8');
   const lines = content.split('\n');

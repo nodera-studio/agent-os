@@ -92,10 +92,7 @@ workflow below) once to adapt the templated files to that project's actual stack
     ├── brand-terms.md.template                 # SKELETON — fill in this project's canonical spellings glossary
     └── README.md                    # Suite overview + invocation cheatsheet + pipeline diagram
 
-└── orchestrator/                    # Workflow: /orchestrate mode -- dispatch-only + gap tracking
-    ├── orchestrator-mode.md         # Governing prompt: match -> dispatch, no match -> one-off + log gap
-    ├── gap-auditor.md               # Clusters gaps.jsonl, proposes promoting recurring shapes (/audit-agent-gaps)
-    └── README.md                    # Suite overview + dispatch-loop diagram
+(optional packs add more agent folders, e.g. `orchestrator/` -- see `packs/README.md`)
 ```
 
 ---
@@ -214,27 +211,6 @@ generic mechanism and no real per-project vocabulary baked in.
 
 ---
 
-## Orchestrator mode (`/orchestrate`)
-
-A cross-cutting mode, not a pipeline for one kind of task. While on, the main session
-decomposes every request and either dispatches an existing agent/command/skill (the common
-case) or spawns a scoped one-off subagent when nothing fits — logging that gap via
-`.claude/scripts/orchestrator/record-gap.mjs` before reporting back. No hook enforces the
-"never edit directly" rule (a hard `PreToolUse` block on Edit/Write would also block the
-very subagents this mode dispatches to do the writing, since hooks can't distinguish "main
-loop" from "subagent" tool calls) — it's prompt discipline, the same mechanism the rest of
-the suite already relies on for "orchestrators never take autonomous git/external actions."
-
-`/audit-agent-gaps` is the other half: periodically clusters `.claude/orchestrator/gaps.jsonl`
-and proposes a permanent agent for any shape that recurred at or above the threshold
-(default 3) — mirroring the human-gated promotion pattern used by the optional Mnemosyne
-learned-rules loop (`.claude/scripts/mnemosyne/promote.mjs`, if you've adopted it), but
-file-based with no DB dependency, so it works out of the box on any project. It reports and
-stops; nothing is written to `README.md` or a new agent file until the proposal is
-explicitly approved. See `agents/orchestrator/README.md` for the full loop diagram.
-
----
-
 ## Slash Commands
 
 | Command                  | Workflow                                                                          | What it dispatches                                                                            |
@@ -257,8 +233,6 @@ explicitly approved. See `agents/orchestrator/README.md` for the full loop diagr
 | `/docs-audit`            | Codebase analysis                                                                 | `codebase/docs-audit/orchestrator.md` — documentation accuracy                                |
 | `/tech-debt-audit`       | Codebase analysis                                                                 | `codebase/tech-debt-audit/orchestrator.md` — tech debt audit                                  |
 | `/copywrite`             | Polish user-facing copy                                                           | `copywrite/orchestrator.md` — report mode (default) or `--apply` for in-place edits           |
-| `/orchestrate`           | Toggle dispatch-only mode for arbitrary tasks                                     | `orchestrator/orchestrator-mode.md` — match an existing agent or spawn + log a scoped one-off |
-| `/audit-agent-gaps`      | Cluster the gap log, propose promoting recurring shapes into permanent agents     | `orchestrator/gap-auditor.md` — report-then-approve, writes nothing until told to proceed     |
 
 ---
 

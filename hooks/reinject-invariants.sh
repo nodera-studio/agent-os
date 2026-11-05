@@ -1,16 +1,11 @@
 #!/usr/bin/env bash
-# SessionStart (every start) + PreCompact. Two jobs:
-#   1. the orchestrator-mode notice: when .claude/.orchestrator-mode exists, say so on any session start.
-#   2. re-inject the project's non-negotiable invariants so long autonomous/agentic runs survive
-#      compaction. The payload is rules/invariants.md (frontmatter stripped); keep it < ~500 tokens.
-#      A fresh start or /clear (SessionStart source startup|clear) skips it; resume, compact and
-#      PreCompact print it. While the file still holds the template's placeholder text the hook prints
-#      no payload: a list of bracketed examples is noise, not an invariant.
+# SessionStart (every start) + PreCompact. Re-injects the project's non-negotiable invariants so long
+# autonomous/agentic runs survive compaction. The payload is rules/invariants.md (frontmatter stripped);
+# keep it < ~500 tokens. A fresh start or /clear (SessionStart source startup|clear) skips it; resume, compact
+# and PreCompact print it. While the file still holds the template's placeholder text the hook prints no
+# payload: a list of bracketed examples is noise, not an invariant.
+# (The orchestrator-mode notice that used to live here ships with the orchestrator pack.)
 set -uo pipefail
-
-if [ -f .claude/.orchestrator-mode ]; then
-  echo "Orchestrator mode is ON (dispatch-only — see .claude/agents/orchestrator/orchestrator-mode.md). Run /orchestrate off to disable."
-fi
 
 # the SessionStart source, when the payload carries one; unknown (no jq, no stdin) prints the invariants
 source_kind=""

@@ -59,13 +59,6 @@ drives.
 | --- | --- | --- |
 | `/second-opinion [--advisor]` | `scripts/omp-engine.sh ask` (`omp:codex`, read-only) | Put a question or task to the other engine; `--advisor` asks for an adversarial critique with ranked risks and a verdict |
 
-## Orchestrator mode
-
-| Command | Dispatches | What it does |
-| --- | --- | --- |
-| `/orchestrate` | `agents/orchestrator/orchestrator-mode.md` | Toggle dispatch-only mode — match an existing agent or spawn + log a scoped one-off — see `agents/orchestrator/README.md` |
-| `/audit-agent-gaps` | `agents/orchestrator/gap-auditor.md` | Cluster the gap log, propose promoting recurring shapes into permanent agents — report-then-approve |
-
 ## Meta
 
 | Command | Dispatches | What it does |

@@ -1,0 +1,46 @@
+{
+  "name": "orchestrator",
+  "version": "1",
+  "description": "Dispatch-only /orchestrate mode and the /audit-agent-gaps loop around a gap log. Prompt-only; needs node.",
+  "files": [
+    "agents/orchestrator/README.md",
+    "agents/orchestrator/gap-auditor.md",
+    "agents/orchestrator/orchestrator-mode.md",
+    "commands/audit-agent-gaps.md",
+    "commands/orchestrate.md",
+    "hooks/orchestrator-mode-notice.sh",
+    "scripts/orchestrator/record-gap.mjs",
+    "scripts/tests/orchestrator-smoke.sh"
+  ],
+  "hooks": [
+    {
+      "event": "SessionStart",
+      "command": ".claude/hooks/orchestrator-mode-notice.sh",
+      "timeout": 10
+    }
+  ],
+  "requires": [
+    "cmd:node"
+  ],
+  "prior_hashes": {
+    "agents/orchestrator/README.md": [
+      "f6b9877b3dab5a85ca761b6e20f8d2759901048dc1c7c8962e43cf0182a7f4a5"
+    ],
+    "agents/orchestrator/gap-auditor.md": [
+      "74a9c9db97fcd32f697be52cf6d8d4b9afa07669a31761445841da07daaf814c",
+      "daf158becd5cc7d8516fa58a6e342e403617fcdec6eb6e625468fd3a545707c8"
+    ],
+    "agents/orchestrator/orchestrator-mode.md": [
+      "ca8fa81822bba3c37669647a264605655e62a59e0792b8708b04200cb8bf3b5c"
+    ],
+    "commands/audit-agent-gaps.md": [
+      "be9ab1482c5b247cad81cafa002a63eacf9e84f7653696964b2ab8edc1d13085"
+    ],
+    "commands/orchestrate.md": [
+      "ffd40fb9727baed0cfe819fd89cf5ff20d832e9c26805aafa9d97cef1e5813fe"
+    ],
+    "scripts/orchestrator/record-gap.mjs": [
+      "5dff6d5b0e8ee0f9b76d985b7720e17f19f5c6a3b5b4eaef58fed972bdfcd4db"
+    ]
+  }
+}
