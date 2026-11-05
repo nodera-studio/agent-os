@@ -24,6 +24,7 @@ skill-mnemosyne|skills/mnemosyne/SKILL.md
 skill-wrangler|skills/wrangler
 skill-codex|skills/codex/SKILL.md
 core-codex-hook|block-old-codex
+learned-rules-hook|mnemosyne-capture
 orchestrator-pack|commands/orchestrate.md commands/audit-agent-gaps.md agents/orchestrator/ scripts/orchestrator/ record-gap gap-auditor orchestrator-mode.md GapLog gaps.jsonl
 '
 

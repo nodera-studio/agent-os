@@ -1,0 +1,66 @@
+{
+  "name": "learned-rules",
+  "version": "1",
+  "description": "Learned-rules loop: opt-in Stop-hook capture, distiller, digest and human-gated promotion over the project's own Postgres.",
+  "files": [
+    "docs/LearnedRulesLoop.md",
+    "hooks/learned-rules-capture.sh",
+    "scripts/mnemosyne/digest-prompt.md",
+    "scripts/mnemosyne/distill-prompt.md",
+    "scripts/mnemosyne/distill.sh",
+    "scripts/mnemosyne/promote.mjs",
+    "scripts/mnemosyne/query-findings.mjs",
+    "scripts/mnemosyne/record-candidate.mjs",
+    "scripts/mnemosyne/record-finding.mjs",
+    "scripts/mnemosyne/retire.mjs",
+    "scripts/mnemosyne/weekly-digest.sh",
+    "scripts/tests/learned-rules-smoke.sh"
+  ],
+  "hooks": [
+    {
+      "event": "Stop",
+      "command": ".claude/hooks/learned-rules-capture.sh",
+      "timeout": 15
+    }
+  ],
+  "requires": [
+    "cmd:node",
+    "cmd:jq"
+  ],
+  "prior_hashes": {
+    "docs/LearnedRulesLoop.md": [
+      "98d5ee0e4141a8ffb6cb53bd7129a742c3544d9d900767d4edb0902860c62059"
+    ],
+    "hooks/learned-rules-capture.sh": [
+      "44fbbe739e2fbb84271ece41fb9539156c641b3e6d0bbce20bd338715fae5612",
+      "d0f56cdfa910cf099593b9011271fd03ff67290724852081dd2305bac72f3a5f"
+    ],
+    "scripts/mnemosyne/digest-prompt.md": [
+      "c782011a23fb2d2f1b4336b1fbba04d1ba665188a10121be0dc25511b1d72350"
+    ],
+    "scripts/mnemosyne/distill-prompt.md": [
+      "991fdf13aba53b30458fb1bab4bb7dfa33d36a319c2a6cfccc6202dbc16466f7"
+    ],
+    "scripts/mnemosyne/distill.sh": [
+      "238e80fb1c2ce67541c0b684f13a811297cd0c5898b633a0b18e34620a21eafd"
+    ],
+    "scripts/mnemosyne/promote.mjs": [
+      "1101974382cc879e6bebb3bba87266e5f21400aab6f5aa9db107c63625dacf3b"
+    ],
+    "scripts/mnemosyne/query-findings.mjs": [
+      "f6c4e47b6ad0ef34e61cc3925dbc97b3dab8ef0c5cecddda20a922743d42cb4b"
+    ],
+    "scripts/mnemosyne/record-candidate.mjs": [
+      "db18d27ee31325e50cd599f3a7c85f0029e8f279f07ffd87a29d8513204c0cf9"
+    ],
+    "scripts/mnemosyne/record-finding.mjs": [
+      "92d0fa61873eb1957eca43bda7a84e6081d2ce9559db84c08a7cd710ad330998"
+    ],
+    "scripts/mnemosyne/retire.mjs": [
+      "15e663242e0a7689b7a0b5b1cc9f83610a6cb7762cfcf25ccc9da05be2305c50"
+    ],
+    "scripts/mnemosyne/weekly-digest.sh": [
+      "0da2186b3e318cb630074422a178e4988cf904fe14a7fed85e8c463012fe0c26"
+    ]
+  }
+}

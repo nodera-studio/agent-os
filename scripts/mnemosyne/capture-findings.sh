@@ -27,7 +27,7 @@
 # replaces that command (used by the smoke test).
 #
 # Capture is bookkeeping: it never gates a review and never edits product code. Whatever goes wrong
-# (no DATABASE_URL, no node, the ledger down) is reported in the JSON `status` (recorded, dry-run,
+# (no DATABASE_URL, no node, no learned-rules pack, the ledger down) is reported in the JSON `status` (recorded, dry-run,
 # skipped or failed) with a `reason`, and the exit status stays 0. Exit 2 only for a usage error
 # (no --session) or a missing jq.
 #
@@ -93,7 +93,7 @@ CMD="${MNEMOSYNE_RECORD_CMD:-}"
 if [ -z "$CMD" ]; then
   [ -n "${DATABASE_URL:-}" ] || summary skipped "DATABASE_URL is not set (no learned-rules pipeline in this project)" 0
   command -v node >/dev/null 2>&1 || summary skipped "node is not installed" 0
-  [ -f "$HERE/record-finding.mjs" ] || summary failed "record-finding.mjs is missing next to this script" 0
+  [ -f "$HERE/record-finding.mjs" ] || summary skipped "the learned-rules pack is not installed (no record-finding.mjs next to this script)" 0
   CMD="node '$HERE/record-finding.mjs'"
 fi
 if bash -c "$CMD --batch -" <"$TMP/records" >"$TMP/rec.out" 2>"$TMP/rec.err"; then

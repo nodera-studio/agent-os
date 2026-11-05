@@ -131,8 +131,8 @@ MCP/service routing rows below it. Pattern:
 
 ## Learned review conventions
 
-> If you adopt the learned-rules loop (`.claude/scripts/mnemosyne/` +
-> `docs/LearnedRulesLoop.md`), this section is auto-maintained by
+> If you install the `learned-rules` pack (`install.sh --pack learned-rules`:
+> `.claude/scripts/mnemosyne/` + `docs/LearnedRulesLoop.md`), this section is auto-maintained by
 > `.claude/scripts/mnemosyne/promote.mjs` — do not hand-edit. Keep it hard-capped
 > (e.g. 15 lines); lowest-value rules decay out over time. Promotion should be
 > human-gated (a deliberately pasted `promote.mjs` command), not automatic.

@@ -127,16 +127,6 @@
         ]
       }
     ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/mnemosyne-capture.sh"
-          }
-        ]
-      }
-    ],
     "PreCompact": [
       {
         "hooks": [

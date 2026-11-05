@@ -164,8 +164,8 @@ produce the same quality bar; the difference is how much you want to watch.
   layer split and env-var decision matrix (`Claude-Code-Setup.md`), the status
   line setup guide (`docs/customizations/statusline-setup.md`), a custom Linear-styled
   color theme setup guide (`docs/customizations/theme-setup.md`), a config-security
-  scanner writeup for widened-autonomy postures (`config-security.md`), and the
-  learned-rules-loop schema/workflow doc (`LearnedRulesLoop.md`).
+  scanner writeup for widened-autonomy postures (`config-security.md`). The
+  learned-rules-loop schema/workflow doc ships with the `learned-rules` pack.
 - **Scripts** (`scripts/`) — standalone tooling: `bootstrap-tools.sh` (installs
   the CLI productivity layer — shellcheck, gitleaks, delta, difft, ast-grep, sd,
   yq, scc, gron, and more — across macOS/Linux), `statusline.sh` (the Claude Code

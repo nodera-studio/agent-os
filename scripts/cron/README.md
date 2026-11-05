@@ -13,8 +13,8 @@ to your own crontab.
 | `mnemo-reindex.sh`    | Codebase MCP incremental re-index job body — `docker compose exec` into `codebase-mcp`, runs the incremental indexer. Reads `MNEMOSYNE_COMPOSE_DIR` and `PROJECT_REPO_ID` env vars (fails loudly if unset). flock/timeout applied by the cron line. |
 
 The learned-rules distillation loop (`scripts/mnemosyne/distill.sh`,
-`weekly-digest.sh`, `promote.mjs`, `retire.mjs`) is documented separately in
-`docs/LearnedRulesLoop.md` — those scripts are cron-invokable too, but they read/write
+`weekly-digest.sh`, `promote.mjs`, `retire.mjs`) ships with the `learned-rules` pack and is
+documented in its `docs/LearnedRulesLoop.md` — those scripts are cron-invokable too, but they read/write
 your project's own Postgres (`DATABASE_URL`), not the Mnemosyne server's database.
 
 ## Install
