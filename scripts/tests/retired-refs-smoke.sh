@@ -11,6 +11,10 @@ set -u
 HERE="$(cd "$(dirname "$0")" && pwd -P)"
 ROOT="$(cd "$HERE/../.." && pwd -P)"
 SELF_REL="scripts/tests/retired-refs-smoke.sh"
+# With HARNESS_SMOKE_PACKS the fixture carries pack payloads in .claude/, which would trip every group.
+if [ -e "$ROOT/commands/orchestrate.md" ] || [ -e "$ROOT/commands/copywrite.md" ] || [ -e "$ROOT/skills/codex/SKILL.md" ]; then
+  echo "ok   skipped: pack payloads are in this tree (HARNESS_SMOKE_PACKS)"; exit 0
+fi
 FAILS=0
 ok() { echo "ok   $1"; }
 fail() { echo "FAIL $1${2:+ — $2}"; FAILS=$((FAILS + 1)); }
