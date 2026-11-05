@@ -85,14 +85,14 @@ flowchart TD
         W4["Pre-push check → open PR into staging trunk"]
         W5["Poll CI + review-bot comments (~270s cadence)<br/>triage + fix every finding"]
         W6["All green + 1 clean cycle →<br/>capture durable decisions → merge (squash)"]
-        W7["Close wave: ticket → Done,<br/>shipped:staging label, delete branch"]
+        W7["Close wave: ticket → Done,<br/>delete branch"]
         W1 --> W2 --> W3 --> W4 --> W5 --> W6 --> W7
     end
 
     WAVE -->|"more waves"| WAVE
     WAVE -->|"all waves done"| DONE{{"Goal targets prod?"}}
     DONE -->|no| FIN1["done — shipped to staging"]
-    DONE -->|yes| PROMO["ONE staging → release-branch PR,<br/>merge commit (never squash),<br/>flip tickets to shipped:prod"]
+    DONE -->|yes| PROMO["ONE staging → release-branch PR,<br/>merge commit (never squash),<br/>flip tickets (shipped:prod label<br/>with the auto-mode-extras pack)"]
     PROMO --> FIN2["done — shipped to prod"]
 ```
 

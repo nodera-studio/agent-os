@@ -1,0 +1,10 @@
+{
+  "name": "auto-mode-extras",
+  "version": "1",
+  "description": "auto-mode extras: shipped:staging/prod label mechanics, CodeRabbit command hooks and the harness self-improvement loop.",
+  "files": [
+    "skills/auto-mode/references/review-bot-hooks.md",
+    "skills/auto-mode/references/self-improvement-loop.md",
+    "skills/auto-mode/references/shipping-labels.md"
+  ]
+}

@@ -47,8 +47,8 @@ prevent.
    `gh pr merge <N> --merge`. Never `--squash`, never `--rebase`. If your release-branch ruleset
    restricts the allowed method to merge-only, pick it explicitly anyway so intent is clear.
 6. **Post-merge.**
-   - Flip every promoted ticket and its parent epics from a "shipped:staging"-style label to a
-     "shipped:prod"-style label in your issue tracker. Read each ticket's current labels first —
+   - If your tracker uses shipping labels (the `auto-mode-extras` pack), flip every promoted ticket and its
+     parent epics from a "shipped:staging"-style label to a "shipped:prod"-style label. Read each ticket's current labels first —
      a full-replace label API call needs the full desired set, not just the new label.
    - Verify prod auto-deploy fired (whatever your CD platform is) and the app is healthy.
    - Run any migrations the release memory flagged — migrations are typically **not**

@@ -4,8 +4,9 @@
 > SKILL.md keeps the goal contract, the per-wave pipeline sequence, entry/exit
 > conditions, and the hard rules. This file holds the long-form recipes:
 > state-file template, wave-derivation detail, the per-wave step expansions,
-> the shipping-state-label mechanics, the code-review-bot command hooks, the
-> autonomy-before-flagging ladder, blocker criteria, and reporting cadence.
+> the autonomy-before-flagging ladder, blocker criteria, and reporting cadence. The
+> shipping-state labels, the CodeRabbit command hooks and the harness self-improvement
+> loop are the optional `auto-mode-extras` pack (`install.sh --pack auto-mode-extras`).
 >
 > Placeholders below (`{{STAGING_BRANCH}}`, `{{PROD_BRANCH}}`, `{{TICKET_PREFIX}}`) stand
 > in for your project's actual branch names and issue-tracker ticket prefix — substitute
@@ -33,23 +34,12 @@ treat it like `progress.txt`):
 - Main ticket: <{{TICKET_PREFIX}}-XXX or "n/a">
 - Goal kind: <feature (base {{STAGING_BRANCH}}) | promotion ({{STAGING_BRANCH}} → {{PROD_BRANCH}})>
 - Wave source: <tracker-subissues | plan-doc | fresh-plan>
-- Shipping label: <shipped:staging at each wave close (step 9); flipped to shipped:prod only on a {{STAGING_BRANCH}} → {{PROD_BRANCH}} promotion (step 11)>
 
 ## Wave ledger
 
 | Wave | Ticket             | Branch          | PR → {{STAGING_BRANCH}} | State                                                  |
 | ---- | ------------------ | --------------- | ------------------------ | ------------------------------------------------------ |
 | 1    | {{TICKET_PREFIX}}-XXX | feat/...-wave-1 | #NN                     | merged \| in-progress \| polling \| blocked \| pending |
-
-## Harness friction log
-
-- <date> <wave> <what in .claude/ slowed or misled the run> — <fixed in PR #NN | open>
-
-## Harness self-improvement
-
-| Batch | Branch                      | Worktree                    | PR → {{STAGING_BRANCH}} | State |
-| ----- | --------------------------- | --------------------------- | ------------------------ | ----- |
-| 1     | chore/harness-selfimprove-1 | .claude/worktrees/harness-1 | #NN                      | <...> |
 
 ## Promotion PR (prod goals only)
 
@@ -276,8 +266,8 @@ autonomy is the point of this mode.
    9, after capture).
 9. **Close the wave.** Flip tracker ticket(s) → `Done`, post the wave-end comment
    (files / commit / PR / tests) per your tracker workflow conventions. Update the
-   ledger. Apply a **`shipped:staging`**-style label (the code is now on
-   `{{STAGING_BRANCH}}`) per **Shipping-state labels** below. If you run the Mnemosyne code
+   ledger. With the `auto-mode-extras` pack, apply the `shipped:staging`
+   label per **Shipping-state labels** below. If you run the Mnemosyne code
    index, refresh it (the `mnemosyne` skill → codebase). Then delete the wave branch
    (`git push origin --delete <branch>`). If the wave ran in a worktree (a parallel wave, or a
    fix worktree), remove it per "Removing a worktree" below: cancel its Codex jobs, then
@@ -291,7 +281,7 @@ autonomy is the point of this mode.
 10. **Advance** to the next wave without asking the user. 2–3 line status at wave
     boundaries only; silent during polling.
 
-A staging-only goal is **done** once its last wave is merged + shipped-to-staging, then
+A staging-only goal is **done** once its last wave is merged, then
 "Closing the run". Only a goal that targets prod continues to step 11.
 
 11. **Promote `{{STAGING_BRANCH}} → {{PROD_BRANCH}}` (prod goals only).** Set status
@@ -301,7 +291,7 @@ A staging-only goal is **done** once its last wave is merged + shipped-to-stagin
     **`gh pr merge --merge`** (a merge commit — never squash/rebase a promotion, that
     drifts `{{PROD_BRANCH}}` from `{{STAGING_BRANCH}}`). Then **flip every goal ticket**
     (the main ticket + every wave sub-issue) `shipped:staging → shipped:prod` per
-    **Shipping-state labels** below, then "Closing the run". (Full runbook: the
+    **Shipping-state labels** below when the pack is installed, then "Closing the run". (Full runbook: the
     `release-flow` skill → `references/promote-runbook.md`.)
 
 ## Closing the run
@@ -341,37 +331,11 @@ prompt firing after the run ended.
 
 ## Parallel work
 
-### Harness self-improvement loop
+### Harness self-improvement loop (optional: `auto-mode-extras` pack)
 
-The run fixes its own harness as it goes. Whenever something in `.claude/` slows or misleads
-a wave, add a line to the state file's **Harness friction log**. With each wave PR, run one batch. Plan
-the batch as independent fix groups by file (no two groups edit the same file): one
-implementer agent per group in its own worktree, one reviewer per group, and the group
-branches merged into the batch branch. Steps 1–4 describe the batch branch; each group
-worktree is cut and removed the same way.
-
-Group briefs are sections of the batch plan file. A change during the run is written there, at
-the top of the affected section, as `> REVISED <date -u +%Y-%m-%dT%H:%M:%SZ>: <what changed and
-what to do>` or `> REVOKED <ISO>: <decision> — <replacement>`, before any message; every group
-agent and the integrator record `shasum -a 256 <plan file>` when they start and re-hash it
-before each commit and merge, applying every new REVISED or REVOKED line first (and stopping to
-report when one contradicts work already committed). Group agents never read this file, so each
-group brief carries that instruction itself, or names `implementer.md` → Step 3, item 3. A batch
-acceptance check that names an open branch carries "once that branch is merged, run it against
-`origin/{{STAGING_BRANCH}}`" (a check bound to a branch goes stale once it squash-merges).
-
-1. `git worktree add .claude/worktrees/harness-<n> -b chore/harness-selfimprove-<n>
-   origin/{{STAGING_BRANCH}}` — an isolated worktree, so the wave checkout is untouched.
-2. Fix the logged frictions and the open gaps, editing only harness files (`.claude/`) that
-   the open wave branch does not touch
-   (`git diff --name-only origin/{{STAGING_BRANCH}}...<wave branch>`). A friction in a file the
-   wave touches waits for the next batch.
-3. External bugs (memory server, plugins, Codex runtime) are not fixed here: document the
-   workaround in the skill or agent prompt that hits them.
-4. Commit, push, PR into `{{STAGING_BRANCH}}`, then poll, capture a memory and squash-merge
-   exactly like a wave. Mark the fixed friction lines `fixed in PR #NN`, close the gaps, and
-   record the batch in **Harness self-improvement**. Remove the worktree after the merge with
-   `.claude/scripts/remove-worktree.sh`, then sweep (see "Removing a worktree" below).
+Off by default. The pack's `references/self-improvement-loop.md` describes fixing `.claude/` in a side worktree while a run
+goes. Without it, record a friction that slowed or misled a wave in the state file's Decision log, do not edit `.claude/`
+mid-run, and hand the list to the owner when the run closes.
 
 ### Independent waves in parallel
 
@@ -455,79 +419,20 @@ Role 1 → "Removing a worktree" with `WT` = its absolute path, from the main ch
    worktree is gone, with no live job or task process referencing it; lists suspected orphan
    tasks and stale job records without stopping them.
 
-## Shipping-state labels (`shipped:staging` / `shipped:prod`)
+## Shipping-state labels (optional: `auto-mode-extras` pack)
 
-`Done` in your tracker means "merged onto `{{STAGING_BRANCH}}`" (step 9) — it does NOT
-say whether the code reached prod. Two mutually-exclusive labels make the real location
-explicit and stop the same feature being rebuilt on the other branch (the "feature in
-both main and staging" failure):
+`Done` means "merged onto `{{STAGING_BRANCH}}`". A project that also wants its tracker to say whether the code reached
+`{{PROD_BRANCH}}` installs the `auto-mode-extras` pack (`install.sh --pack auto-mode-extras`) and follows its
+`references/shipping-labels.md` (the `shipped:staging` / `shipped:prod` labels). Without the pack, steps 9 and 11 flip the
+ticket to `Done` and post the comments, and apply no shipping label. Whatever labels your tracker holds: a label-set
+write usually REPLACES the whole set, so read the ticket's current labels first and send the full desired set.
 
-| Label             | Meaning                                       |
-| ----------------- | ----------------------------------------------- |
-| `shipped:staging` | Code is on `{{STAGING_BRANCH}}`, NOT yet on `{{PROD_BRANCH}}` |
-| `shipped:prod`    | Code is live on `{{PROD_BRANCH}}` (production)  |
+## Code-review-bot command hooks (optional: `auto-mode-extras` pack)
 
-Set these up once in your issue tracker (as plain labels — no special ID scheme needed
-beyond whatever your tracker assigns).
-
-Flip, never accumulate: a ticket holds AT MOST one. `shipped:prod` supersedes
-`shipped:staging`. `Done` + `shipped:staging` = merged to staging, awaiting prod.
-
-**When the loop applies them.** `shipped:staging` at **wave close (step 9)**, AFTER the
-wave's PR merges onto `{{STAGING_BRANCH}}`, for that wave's ticket. `shipped:prod` only
-after the `{{STAGING_BRANCH}} → {{PROD_BRANCH}}` promotion merges (step 11), flipped for
-EVERY ticket in the promotion (the main ticket + every wave sub-issue + parent epics):
-
-- on a wave staging-merge → ensure the wave ticket has `shipped:staging`, no
-  `shipped:prod`.
-- on a `{{STAGING_BRANCH}} → {{PROD_BRANCH}}` promotion → flip each promoted ticket
-  `shipped:staging` → `shipped:prod`.
-
-If the merge does NOT happen this run (still polling, or blocked), apply NO shipping
-label — the label tracks branch reality, not intent.
-
-**Check whether your tracker's label-set write REPLACES the whole label set** (many do —
-it's NOT additive like `blocks`/`links` typically are). If so, never pass just
-`["shipped:staging"]`: that would strip `Feature`, `Bug`, etc. First read the ticket's
-current labels, then pass the full desired set: keep the existing labels, drop the
-opposite shipping label, add the target one. E.g. a ticket currently `["Feature"]`
-landing on staging → save `["Feature", "shipped:staging"]`; later promoted to the release
-branch → save `["Feature", "shipped:prod"]`.
-
-**Promotion goals (`{{STAGING_BRANCH}} → {{PROD_BRANCH}}`).** A goal phrased "promote
-staging → main" / "land the staging batch on main" is a step-11 promotion:
-`{{STAGING_BRANCH}}` already carries many `Done`, `shipped:staging` tickets. On a
-successful merge onto `{{PROD_BRANCH}}`, enumerate every ticket in the promotion diff
-(`git log origin/{{PROD_BRANCH}}..origin/{{STAGING_BRANCH}} --pretty=%s | grep -oE
-'{{TICKET_PREFIX}}-[0-9]+'`, plus their parent epics) and flip each `shipped:staging` →
-`shipped:prod`. This is the moment the branch-divergence the labels exist to surface gets
-resolved. (See the `release-flow` skill → `references/promote-runbook.md`.)
-
-## Code-review-bot command hooks (drive the bot, don't wait on it)
-
-If you run an AI code-review bot such as CodeRabbit, it typically auto-reviews every PR
-into your release/staging branches and re-reviews on every push (check your bot's config
-for `base_branches` + an auto-incremental-review setting), so you rarely need to force a
-review. Drive it from the loop with `gh pr comment <N> --body "@coderabbitai <cmd>"` (or
-your bot's equivalent mention syntax) at these points — never idle a poll cycle waiting
-on it:
-
-- **After you push fixes for ALL of the bot's actionable comments in a cycle** →
-  `@coderabbitai resolve` (marks its threads resolved so the next poll sees a clean
-  slate and the ≥1-clean-cycle merge bar is reached sooner).
-- **Fallback — no bot status ~2 poll cycles after PR open, or on a PR it skipped** →
-  `@coderabbitai review` (kick a review that didn't auto-trigger).
-- **During a churn-heavy fixup burst** → `@coderabbitai pause` at the start,
-  `@coderabbitai resume` once stable (stops re-review spam while you force-push several
-  quick fixups). Always `resume` before evaluating the merge bar.
-- Skip `full review`, `configure`, `generate docstrings` — manual/interactive only.
-
-If your bot's config holds a PR in "changes requested" until its comments resolve, honor
-it — the merge bar already requires zero new actionable comments, so fix or resolve,
-never merge over an unresolved CRITICAL. If a pre-merge check blocks a wave on something
-like docstring coverage, add the missing artifact (preferred) or, if it's genuinely noise
-for that wave, note it in the decision log and relax the check in your bot's config
-rather than wedging the loop.
+The loop polls a review bot's comments and checks like any reviewer's (`poll-pr.sh`). The mention-driven CodeRabbit commands
+(`resolve`, `review`, `pause` and `resume`) live in the `auto-mode-extras` pack's `references/review-bot-hooks.md`. What
+holds without it: the merge bar needs zero new actionable comments, and a wave never merges over an unresolved CRITICAL or
+over a held "changes requested" state.
 
 ## Autonomy before flagging — the escalation ladder
 
@@ -577,8 +482,8 @@ record the open question in the state file so a context refresh does not lose it
 ## Stop conditions
 
 - Finish line met → "Closing the run" (status `done` at its last item), final summary
-  (waves shipped, PRs, anything deferred to tech-debt). Staging-only goal: last wave merged + `shipped:staging`. Promotion goal:
-  `{{STAGING_BRANCH}} → {{PROD_BRANCH}}` merged + tickets flipped `shipped:prod`.
+  (waves shipped, PRs, anything deferred to tech-debt). Staging-only goal: last wave merged. Promotion goal:
+  `{{STAGING_BRANCH}} → {{PROD_BRANCH}}` merged (+ tickets flipped `shipped:prod` with the `auto-mode-extras` pack).
 - A wave PR red 3+ cycles with no path forward → stop that wave, flag the user.
 - User says stop/pause or changes the goal → stop, confirm current state.
 
