@@ -21,7 +21,7 @@ for t in node dirname; do
   ln -s "$p" "$NOJQ/$t"
 done
 
-DEFAULT_JSON='{"implementation":"claude","ui":"impl-coder-ui","review":["claude","codex"],
+DEFAULT_JSON='{"implementation":"claude","ui":"impl-coder-ui","review":["claude","omp:codex","omp:opencode/argon"],
 "heavy_concurrency":8,"decision":"0a1b2c3d","decided":"2026-01-01"}'
 
 # setup <case>: a fresh routing dir with the default file; prints its path.
@@ -63,7 +63,7 @@ for engine in jq node; do
   # (a) default only.
   d="$(setup "$engine-default")"
   check "$engine: default only, string" "$P" "$d" implementation 0 claude "source=default decision=0a1b2c3d"
-  check "$engine: default only, array" "$P" "$d" review 0 "claude codex" "source=default decision=0a1b2c3d"
+  check "$engine: default only, array" "$P" "$d" review 0 "claude omp:codex omp:opencode/argon" "source=default decision=0a1b2c3d"
   check "$engine: default only, number" "$P" "$d" heavy_concurrency 0 8 "source=default"
 
   # (b) override present.
@@ -214,12 +214,17 @@ check_eng "engines: codex is never counted twice" "" "$d" 0 "$REROUTED" "degrade
 override "$d" '{"omp_fallback":["codex"]}'
 check_eng "engines: omp_fallback never yields a native codex row" "" "$d" 0 "$REROUTED" "degraded=2-engines" security
 
-# The shipped data stays dormant: legacy keys unchanged, no native fallback.
+# The shipped legacy keys carry the engine roster (the flip); implementation, ui and the rest stay on Claude.
 d="$(esetup eng-legacy)"
-check "legacy: review unchanged" "" "$d" review 0 "claude codex" "source=default"
-check "legacy: planning unchanged" "" "$d" planning 0 "claude codex" "source=default"
-check "legacy: debug unchanged" "" "$d" debug 0 "claude codex" "source=default"
-check "legacy: audits unchanged" "" "$d" audits 0 "claude codex" "source=default"
+check "legacy: review is the engine roster" "" "$d" review 0 "claude omp:codex omp:opencode/argon" "source=default"
+check "legacy: planning is the engine roster" "" "$d" planning 0 "claude omp:codex omp:opencode/argon" "source=default"
+check "legacy: debug is the engine roster" "" "$d" debug 0 "claude omp:opencode/glm" "source=default"
+check "legacy: audits is the engine roster" "" "$d" audits 0 "claude omp:opencode/glm" "source=default"
+for k in review planning debug audits; do
+  jq -e --arg k "$k" '.[$k] == .omp_roles[$k].select' "$SHIPPED" >/dev/null 2>&1 \
+    && echo "ok   shipped: $k mirrors omp_roles.$k.select" \
+    || { echo "FAIL shipped: $k mirrors omp_roles.$k.select"; FAILS=$((FAILS + 1)); }
+done
 check "legacy: implementation unchanged" "" "$d" implementation 0 claude "source=default"
 check "legacy: ui unchanged" "" "$d" ui 0 impl-coder-ui "source=default"
 check "legacy: heavy_concurrency unchanged" "" "$d" heavy_concurrency 0 8 "source=default"

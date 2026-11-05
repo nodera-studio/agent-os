@@ -75,6 +75,7 @@ expect_rc 'repeated install exits 0' 0
 [ "$(cat "$T1/.claude/routing.json")" = '{"custom":true}' ] && ok 'edited routing.json survives' || fail 'edited routing.json survives'
 pass_if 'user file in a harness directory survives' test -f "$T1/.claude/agents/my-own-agent.md"
 out_has 'a skipped settings.json is announced' 'settings.json already exists'
+out_has 'a differing routing.json says how to adopt the new defaults' 'new engine defaults are not applied'
 
 # Upgrade from an older install: a stale file the harness no longer ships is left alone.
 printf 'stale\n' >"$T1/.claude/scripts/removed-long-ago.sh"

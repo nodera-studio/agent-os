@@ -7,7 +7,7 @@
 #
 # Copies this repo's agents/, commands/, skills/, hooks/, rules/, docs/, scripts/,
 # prompts/, plugin/, omp/, templates/, the scaffold dirs (plans/, research/, tech-debt/, testing/,
-# evidence/, handoffs/), settings.json, routing.json (if absent) and
+# evidence/, handoffs/), settings.json, routing.json (if absent; an existing one is kept and a note says how to adopt new defaults) and
 # CLAUDE.md.template into <target>/.claude/. Never overwrites an existing <target>/.claude/settings.json
 # or <target>/.claude/CLAUDE.md — those are skipped with a warning if present, so
 # a re-run never clobbers project-specific customization. Nothing is ever deleted by a plain install
@@ -211,6 +211,10 @@ seed_once() {
   [ -f "$SOURCE_DIR/$rel" ] || return 0
   if [ -f "$TARGET_CLAUDE/$rel" ]; then
     echo "install.sh: $rel already exists, skipping (not overwritten)"
+    if [ "$rel" = routing.json ] && ! cmp -s "$SOURCE_DIR/$rel" "$TARGET_CLAUDE/$rel"; then
+      echo "install.sh: note — $rel differs from this release's default; new engine defaults are not applied to an existing file."
+      echo "install.sh:   to adopt them, compare with $SOURCE_DIR/$rel and copy the review, planning, debug, audits, omp_engines, omp_roles and omp_fallback keys (see README.md, 'Adopting new routing defaults')"
+    fi
   else
     mkdir -p "$(dirname "$TARGET_CLAUDE/$rel")"
     cp "$SOURCE_DIR/$rel" "$TARGET_CLAUDE/$rel"

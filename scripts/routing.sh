@@ -3,11 +3,13 @@
 #
 # Usage: bash .claude/scripts/routing.sh <key>
 #   e.g. implementation, ui, review, planning, debug, audits, integration, heavy_concurrency
+#        (review, planning, debug and audits print the engine roster, e.g. `claude omp:codex
+#        omp:opencode/argon`; `engines <role>` is the resolved, cap-aware form of the same roster)
 #        bash .claude/scripts/routing.sh engines <role> [--have <engine>...]
 # `engines` resolves a role from omp_roles to one tab-separated row per omp engine (fields in
 # lib/routing-engines.mjs), applying cap state from $DIR/state/omp-caps.json and the high-stakes
 # reroute to omp:codex. It needs node. Unlike the legacy keys, an override replaces omp_engines by
-# engine id and omp_roles by role, not the whole top-level key. The legacy keys are unaffected.
+# engine id and omp_roles by role, not the whole top-level key. The legacy keys are plain per-key values.
 #
 # Prints the value on stdout (arrays space-separated), then
 # `source=<override|default> decision=<id>` on stderr (`decision=none` when the file that
@@ -18,8 +20,8 @@
 # worktree cut before a routing change still reads the current value):
 #   1. $MAIN/.claude/auto-mode/routing.json  override (git-ignored, per run), written only on a
 #      confirmed owner directive; it may hold only some keys.
-#   2. $MAIN/.claude/routing.json            tracked default (Claude implements, Claude and
-#      Codex review, plan, debug and audit). If the main checkout has no such file yet (its
+#   2. $MAIN/.claude/routing.json            tracked default (Claude implements; Claude plus
+#      the omp engines review, plan, debug and audit). If the main checkout has no such file yet (its
 #      branch predates it), this script's own checkout's .claude/routing.json.
 # HARNESS_ROUTING_DIR (read-only env, for the smoke test) replaces $MAIN/.claude, with no
 # fallback.

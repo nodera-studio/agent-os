@@ -1,6 +1,8 @@
 {"implementation":"claude","ui":"impl-coder-ui",
- "review":["claude","codex"],"planning":["claude","codex"],"debug":["claude","codex"],
- "audits":["claude","codex"],"integration":"claude",
+ "review":["claude","omp:codex","omp:opencode/argon"],
+ "planning":["claude","omp:codex","omp:opencode/argon"],
+ "debug":["claude","omp:opencode/glm"],
+ "audits":["claude","omp:opencode/glm"],"integration":"claude",
  "heavy_concurrency":8,
  "omp_engines":{
   "omp:codex":{"profile":"glen-harness-codex","provider":"openai-codex","slots":[
