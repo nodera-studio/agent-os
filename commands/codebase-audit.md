@@ -17,23 +17,20 @@ Mode from `$ARGUMENTS`: none/`quick`/`light`/`check` → **quick**; `deep`/`full
 Scan recipes and report templates live in `.claude/docs/CodebaseAuditScans.md` —
 read it when you start.
 
-**Quick mode:** dispatch `codebase/dependency-audit.md` and `codebase/dead-code.md`
-via the Agent tool in parallel; run the three inline scans (tech-debt-light,
-api-surface-light, docs-light) yourself from the scans doc while they work; then
-synthesize with the quick-mode template.
+**Quick mode:** run the four scripts, each of which prints one JSON and calls no model:
+`dep-audit.sh`, `tech-debt-scan.sh`, `endpoint-inventory.sh` and `stale-reference-scan.sh` (all in
+`.claude/scripts/`), then synthesize. A script that reports `unsupported` for this stack is listed as not
+covered. Dispatch `codebase/dependency-audit.md` via the Agent tool only to judge a dep-audit result.
+Dead code is covered by Knip in the quality gate.
 
 **Deep mode:** dispatch the five tier-2 audits sequentially (each is heavy —
 sequential avoids context overload), each via the Agent tool reading its command
 file: `security-audit`, `error-audit`, `api-audit`, `docs-audit`,
-`tech-debt-audit` (`.claude/commands/{name}.md`). Then synthesize with the
-deep-mode template and update `.claude/tech-debt/` with new HIGH/CRITICAL
-findings.
+`tech-debt-audit` (`.claude/commands/{name}.md`). Then synthesize and update `.claude/tech-debt/` with new
+HIGH/CRITICAL findings.
 
-**Verification (both modes).** Before the synthesis, every finding of every severity, LOW
-included, gets two independent verifier lenses: REPRODUCE (run it, or cite the exact
-`path:line`) and REFUTE (look for the guard, test or convention that makes it a non-issue). Keep
-a finding only when REPRODUCE confirms it and REFUTE fails to refute it, and record the kill rate
-per lens in the report (`.claude/agents/codebase/orchestrator.md` Step 3).
+**Verification (both modes).** Every finding of every severity gets the REPRODUCE and REFUTE lenses in
+`.claude/agents/codebase/verification.md`; record the kill rate per lens in the report.
 
 <rules>
 - Always produce the synthesis summary — raw agent outputs are too long for the
