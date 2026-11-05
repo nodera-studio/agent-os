@@ -150,7 +150,7 @@ produce the same quality bar; the difference is how much you want to watch.
   `/deep-debug`, `/research`, `/security-audit`, `/api-audit`,
   `/docs-audit`, `/tech-debt-audit`, `/codebase-audit`, and more (`/copywrite` ships in a pack).
 - **Skills** (`skills/`) — reusable, trigger-activated capabilities (e.g.
-  `/playwright-cli`, `/release-flow`, `/exa`, `/gh`) invoked automatically when
+  `/release-flow`, `/exa`, `/gh`; browser, Linear and Sentry skills ship as packs) invoked automatically when
   a task matches their description, or explicitly via `/skill-name`.
 - **Hooks** (`hooks/`) — enforcement scripts wired into `settings.json` for
   `PreToolUse`/`PostToolUse`/session-lifecycle events (steering risky bash,

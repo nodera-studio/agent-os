@@ -1,0 +1,19 @@
+{
+  "name": "playwright",
+  "version": "1",
+  "description": "playwright-cli skill as a thin wrapper plus merged testing, recipes and video-recording references.",
+  "files": [
+    "skills/playwright-cli/SKILL.md",
+    "skills/playwright-cli/references/recipes.md",
+    "skills/playwright-cli/references/testing.md",
+    "skills/playwright-cli/references/video-recording.md"
+  ],
+  "prior_hashes": {
+    "skills/playwright-cli/SKILL.md": [
+      "74e62fbb55d68cc7aeeb5fa453a6fa4feda497d26055c3d6ce6d1f6c2bd37cba"
+    ],
+    "skills/playwright-cli/references/video-recording.md": [
+      "0cea7708999aa663701917615889a84cbc05200718bb161de9a5366a826c2b4d"
+    ]
+  }
+}
