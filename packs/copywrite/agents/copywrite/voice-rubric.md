@@ -1,6 +1,6 @@
 # Voice Rubric (Distilled)
 
-A pocket guide for every specialist except `voice-editor.md`, who loads the full Apple Style Guide. Nine rules. Each rule states the positive imperative, explains why in one sentence, and shows one before/after pair.
+A pocket guide for every specialist except `voice-editor.md`, who greps the unabridged Apple Style Guide on demand. Nine rules. Each rule states the positive imperative, explains why in one sentence, and shows one before/after pair.
 
 ---
 
@@ -120,4 +120,4 @@ A pocket guide for every specialist except `voice-editor.md`, who loads the full
 
 ## Why this exists
 
-The unabridged source is `apple-style-guide.md` (next to this file). The voice-editor loads it in full; every other specialist loads this rubric and skips the guide unless a rare term needs A–Z lookup. If a rule here ever appears to conflict with the guide, the guide wins — the rubric is a working summary, not a replacement.
+The unabridged source is `apple-style-guide.md` (next to this file). The voice-editor greps it for the entry it needs and never loads it in full; every other specialist loads this rubric and skips the guide unless a rare term needs A–Z lookup. If a rule here ever appears to conflict with the guide, the guide wins — the rubric is a working summary, not a replacement.

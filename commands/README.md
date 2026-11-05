@@ -47,12 +47,6 @@ drives.
 | `/tech-debt-audit` | `agents/codebase/tech-debt-audit/orchestrator.md` | 4 agents (3 Claude + 1 Codex) — patterns, complexity, TODOs, library currency |
 | `/security-scan` | (inline — AgentShield + mcp-scan) | Scan `.claude/` config/hooks/MCP setup for security drift |
 
-## Copywrite
-
-| Command | Dispatches | What it does |
-| --- | --- | --- |
-| `/copywrite` | `agents/copywrite/orchestrator.md` | Polish user-facing copy to Apple voice — see `agents/copywrite/README.md` |
-
 ## Codex / cross-model
 
 | Command | Dispatches | What it does |

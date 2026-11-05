@@ -80,19 +80,7 @@ workflow below) once to adapt the templated files to that project's actual stack
 │   └── tech-debt-audit/
 │       └── orchestrator.md          # 4-agent (3 Claude + 1 Codex)
 │
-└── copywrite/                       # Workflow: Polish user-facing copy to Apple voice
-    ├── orchestrator.md              # Pipeline manager — dispatch, merge, gate, write
-    ├── voice-editor.md              # Apple voice transfer + sentence-level surgery (loads full Apple guide)
-    ├── microcopy-specialist.md      # Buttons, toasts, errors, empty states, ICU plural quarantine
-    ├── localization-editor.md       # Cross-locale cultural adaptation, defends the committed register
-    ├── consistency-checker.md       # Glossary, cross-locale parity, diacritic/script gate
-    ├── apple-style-guide.md         # Unabridged Apple Style Guide — voice-editor only
-    ├── voice-rubric.md              # 9-rule distillation of the Apple guide
-    ├── localization-register-memo.md.template  # SKELETON — fill in this project's register decision + formality pitfalls + locale invariants
-    ├── brand-terms.md.template                 # SKELETON — fill in this project's canonical spellings glossary
-    └── README.md                    # Suite overview + invocation cheatsheet + pipeline diagram
-
-(optional packs add more agent folders, e.g. `orchestrator/` -- see `packs/README.md`)
+(optional packs add more agent folders, e.g. `copywrite/` and `orchestrator/` -- see `packs/README.md`)
 ```
 
 ---
@@ -188,26 +176,11 @@ The security audit is the deepest: a cartographer builds a shared app-intent map
 and an evidence-demanding synthesizer refuses to let a finding through without proof,
 reporting against ASVS 5.0 L2. See `agents/codebase/README.md` for the full diagram.
 
-## Copywriting suite (`/copywrite`)
+## Copywriting suite (optional `copywrite` pack)
 
-A six-agent suite for polishing user-facing copy to Apple voice — generic across any
-product's locale(s) and register. The orchestrator dispatches three stage-1 specialists
-(voice + line + microcopy) in parallel, then runs `localization-editor` and
-`consistency-checker` sequentially as gates. Findings merge into a report (default) or
-land as edits in place (`--apply`), with three pre-write gates: ICU
-`isStructurallySame()` for plural strings, Babel re-parse for TSX files, and a
-locale-invariant (diacritic/script) survival check. **Before first use**, fill in
-`copywrite/brand-terms.md.template` and `copywrite/localization-register-memo.md.template`
-with this project's actual glossary and register decisions — the suite ships with
-generic mechanism and no real per-project vocabulary baked in.
-
-| Agent                  | Mission                                                                                             |
-| ----------------------- | ---------------------------------------------------------------------------------------------------- |
-| `orchestrator`         | Resolve scope, dispatch parallel pair, sequence localization + consistency, merge, gate, write     |
-| `voice-editor`         | Apply Apple voice — clarity, warmth, second-person, active voice; sentence-level surgery (filler, passive, long lines). Loads the full Apple Style Guide. |
-| `microcopy-specialist` | Buttons, toasts, errors, empty states, form labels; quarantines ICU plural strings; carries the pattern catalogue |
-| `localization-editor`  | Cross-locale cultural adaptation; defends this project's committed register against formality drift |
-| `consistency-checker`  | Glossary enforcement, cross-locale parity, diacritic/script survival gate                           |
+`/copywrite` and its six agents (voice, microcopy, localization, consistency, Apple voice rubric and style guide)
+ship as `packs/copywrite` (`install.sh --pack copywrite`): they are only useful where the project has user-facing
+copy, and the Romanian ICU, Babel and diacritic gates stay inside the pack. See `packs/copywrite/README.md`.
 
 ---
 
@@ -232,7 +205,6 @@ generic mechanism and no real per-project vocabulary baked in.
 | `/api-audit`             | Codebase analysis                                                                 | `codebase/api-audit/orchestrator.md` — API contract audit                                     |
 | `/docs-audit`            | Codebase analysis                                                                 | `codebase/docs-audit/orchestrator.md` — documentation accuracy                                |
 | `/tech-debt-audit`       | Codebase analysis                                                                 | `codebase/tech-debt-audit/orchestrator.md` — tech debt audit                                  |
-| `/copywrite`             | Polish user-facing copy                                                           | `copywrite/orchestrator.md` — report mode (default) or `--apply` for in-place edits           |
 
 ---
 
@@ -313,6 +285,6 @@ All review agents produce findings in this format:
 
 - Model rides the session via `model: inherit` for every frontier role; mechanical/summarization roles stay pinned `sonnet`. Don't pin a frontier agent to a specific model — inherit is what lets the suite follow the session. See the Engine strategy note at the top.
 - Agents read this project's own `CLAUDE.md` dynamically — conventions live there, not hardcoded into the agent files.
-- Several files ship as explicit templates (`{{TOKEN}}` placeholders, `.template` suffixes, or a "STUB — fill this in" header): `bootstrap/orchestrator.md`'s target is `CLAUDE.md`/`settings.json`; `codebase/security-audit/domain-integrity.md`; `copywrite/brand-terms.md.template` and `copywrite/localization-register-memo.md.template`. Fill these in per-project before relying on the agents that read them.
+- Several files ship as explicit templates (`{{TOKEN}}` placeholders, `.template` suffixes, or a "STUB — fill this in" header): `bootstrap/orchestrator.md`'s target is `CLAUDE.md`/`settings.json`; `codebase/security-audit/domain-integrity.md`; the copywrite pack's brand-terms and register-memo templates. Fill these in per-project before relying on the agents that read them.
 - Stack-specific checklists (`review/claude-reviewer.md`'s Project Conventions block, the error-audit agents' `<context>`/`<conventions>` blocks) ship as placeholder shapes — fill them in with this project's real conventions; project-specific invariants belong in this project's own `.claude/rules/` files, referenced from these agents, not hand-copied into every agent.
 - Each agent is standalone — orchestrators are convenience, any specialist can be invoked directly

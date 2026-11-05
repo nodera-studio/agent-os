@@ -109,7 +109,7 @@ guess and do not silently default):
   staging-then-main promotion model, or something else? This determines whether the
   `/release-flow`-style skill and PR-target guidance in the ported agents makes sense
   as-is or needs adapting.
-- **Which optional agents/audits actually apply** — e.g. the `copywrite/` suite only
+- **Which optional agents/audits actually apply** — e.g. the `copywrite` pack (`install.sh --pack copywrite`) only
   matters if the project has meaningful user-facing copy to polish; the
   `security-audit/domain-integrity.md` slot needs a real domain invariant to be worth
   filling in (see that file's own "if this project has no single dominant business
@@ -178,7 +178,7 @@ Give the user:
   - GitHub/GitLab repo settings (branch protection rules, required status checks) if
     the branching model in Step 3 implies any.
   - Any optional agent/audit left un-configured because it didn't apply yet (e.g. the
-    `domain-integrity.md` slot, the copywrite brand-terms/register-memo templates) —
+    domain-integrity template, the copywrite pack's brand-terms/register-memo templates) —
     point at exactly which file needs filling in and when it'll matter.
   - Whether `claude-md-management` got installed/invoked in Step 4.5, and a reminder to
     run `/revise-claude-md` after future sessions to keep `CLAUDE.md` current.

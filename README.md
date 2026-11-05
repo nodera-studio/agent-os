@@ -41,7 +41,7 @@ adversary agent whose only job is to try to disprove the leading hypothesis befo
 act on it. The five `/codebase-audit` deep audits (security, API contract, error paths,
 docs accuracy, tech debt) apply the same cross-model-consensus idea at whole-repo
 scale, with an evidence-demanding synthesizer standing between a candidate finding and
-the final report. `/copywrite` runs four specialists — voice (with sentence-level
+the final report. The optional `copywrite` pack runs four specialists — voice (with sentence-level
 brevity), microcopy, localization, consistency — in a parallel-then-sequential pipeline, so user-facing copy
 gets checked through several distinct lenses instead of one pass trying to catch
 everything. See the "Complete workflow" diagram below, and each workflow's own
@@ -148,7 +148,7 @@ produce the same quality bar; the difference is how much you want to watch.
 - **Commands** (`commands/`) — the slash-command entry points that kick off those
   agent workflows: `/plan-implementation`, `/implement`, `/review-implementation`,
   `/deep-debug`, `/research`, `/security-audit`, `/api-audit`,
-  `/docs-audit`, `/tech-debt-audit`, `/codebase-audit`, `/copywrite`, and more.
+  `/docs-audit`, `/tech-debt-audit`, `/codebase-audit`, and more (`/copywrite` ships in a pack).
 - **Skills** (`skills/`) — reusable, trigger-activated capabilities (e.g.
   `/playwright-cli`, `/release-flow`, `/exa`, `/gh`) invoked automatically when
   a task matches their description, or explicitly via `/skill-name`.
@@ -241,7 +241,7 @@ See [`agents/README.md`](agents/README.md) for the full agent-suite index (with 
 [`implementation`](agents/implementation/README.md),
 [`review-implementation`](agents/review-implementation/README.md),
 [`debug`](agents/debug/README.md), [`codebase`](agents/codebase/README.md),
-[`copywrite`](agents/copywrite/README.md), [`bootstrap`](agents/bootstrap/README.md)),
+[`bootstrap`](agents/bootstrap/README.md)),
 [`commands/README.md`](commands/README.md) for every slash command grouped by workflow
 (plus diagrams for `/auto-mode`'s wave loop and `/research`'s fan-out),
 [`hooks/README.md`](hooks/README.md) for the enforcement-hook mechanism and what's

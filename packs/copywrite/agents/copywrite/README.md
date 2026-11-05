@@ -23,8 +23,8 @@ register decisions (see each file's header), then reference them by their real n
 | `microcopy-specialist.md` | Buttons, toasts, errors, empty states, ICU plurals; carries the microcopy pattern catalogue | Dispatched by orchestrator (stage 1) |
 | `localization-editor.md` | Cross-locale register and cultural adaptation | Dispatched by orchestrator (stage 2) |
 | `consistency-checker.md` | Glossary + parity + diacritic/script gate | Dispatched by orchestrator (stage 3) |
-| `apple-style-guide.md` | Unabridged Apple Style Guide | `voice-editor` only |
-| `voice-rubric.md` | 9-rule distillation of the Apple guide | Every specialist except `voice-editor` |
+| `apple-style-guide.md` | Unabridged Apple Style Guide (verbatim third-party material, about 8,700 lines) | `voice-editor` only, by grep for one entry at a time |
+| `voice-rubric.md` | 9-rule distillation of the Apple guide | Every specialist; `voice-editor` reads it in full and greps the guide only when it needs an entry |
 | `localization-register-memo.md.template` | Skeleton: register decision + formality-drift pitfalls + locale invariants — fill in per project | `localization-editor` and `consistency-checker` |
 | `brand-terms.md.template` | Skeleton: canonical spellings glossary — fill in per project | `consistency-checker` |
 

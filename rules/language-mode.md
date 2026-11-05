@@ -29,5 +29,5 @@ Agent-facing and user-facing output is English.
 - Diacritic regression gate: when you edit a Romanian file (a locale file, copy, a document), the count of
   diacritics must not drop. Run `bash .claude/scripts/copywrite-checks.sh diacritics --class 'ăâîșțĂÂÎȘȚ'
   --before-file <before> --after-file <after>` and revert the edit when `ok` is false.
-- The Romanian copywriting pipeline (`agents/copywrite/`) keeps its own rules; this file only sets the language
+- The Romanian copywriting pipeline (the optional `copywrite` pack) keeps its own rules; this file only sets the language
   of the conversation.
