@@ -9,16 +9,13 @@ flowchart TD
     T --> ENGINES
     SEN --> ENGINES
 
-    subgraph ENGINES["Mandatory dual-engine dispatch — parallel, independent"]
+    subgraph ENGINES["Mandatory multi-engine dispatch — parallel, independent"]
         direction LR
         C["Claude subagent<br/>investigator.md<br/>(queue.md from the queue-agents pack)"]
-        X["Codex agent<br/>codex:codex-rescue"]
-        O["omp investigator (optional)<br/>omp-engine.sh debug"]
+        O["omp investigator (read-only)<br/>omp-engine.sh debug, per row of<br/>routing.sh engines debug"]
     end
 
-    T -.->|"omp-engine.sh probe exits 0"| O
-    ENGINES --> M["Cross-reference the two or three reports"]
-    O -.-> M
+    ENGINES --> M["Cross-reference the reports"]
     M --> ADV["Mandatory adversarial verification<br/>(adversary.md, fresh context,<br/>max 3 cycles) — tries to DISPROVE<br/>the leading hypothesis"]
     ADV --> RC["Evidence-verified report<br/>(never fixes the bug — you decide<br/>whether to fix manually or run /implement)"]
 ```
@@ -40,9 +37,11 @@ async-pipeline failures -- stalled jobs, stuck processing, worker issues -- and 
 
 ## Entry Point
 
-Invoke via `/deep-debug` slash command. Dual-engine dispatch is mandatory — cross-model
-consensus is the point of this workflow, not an optional extra.
-Dual-engine is mandatory; omp is an optional third.
+Invoke via `/deep-debug` slash command. Multi-engine dispatch is mandatory — cross-model
+consensus is the point of this workflow, not an optional extra. The second engine comes from
+`routing.sh engines debug` (by default `omp:opencode/glm`), is read-only, and its report is untrusted
+analysis text. The adversary always attacks the leading hypothesis on a different engine than the one that
+wrote it. A skipped or capped omp engine is reported as unavailable and the run says it was single-engine.
 
 ## When to Use
 
