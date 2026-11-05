@@ -1,0 +1,17 @@
+{
+  "name": "queue-agents",
+  "version": "1",
+  "description": "Background-job and async-pipeline specialists for /deep-debug and /error-audit. Generic templates; adapt to the project's queue system.",
+  "files": [
+    "agents/codebase/error-audit/queue.md",
+    "agents/debug/queue.md"
+  ],
+  "prior_hashes": {
+    "agents/codebase/error-audit/queue.md": [
+      "ffd363c400aeb619442b2824a11a8f34df2a7552e9c8e1122df4cc011c9a8bf4"
+    ],
+    "agents/debug/queue.md": [
+      "34409ab08f3f394b32dd8c343b430a453c1679bb886a9540bc84f38578723872"
+    ]
+  }
+}

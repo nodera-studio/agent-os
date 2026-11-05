@@ -76,12 +76,12 @@ if [ "$(uname -s)" = Darwin ] && command -v sandbox-exec >/dev/null 2>&1; then
   real_omp="$(command -v omp || true)"
   sandbox_base="$WORK/sandbox"
   mkdir -p "$sandbox_base/home/.ssh" "$sandbox_base/home/.omp/agent" \
-    "$sandbox_base/home/.omp/profiles/glen-harness/agent/extensions" \
-    "$sandbox_base/home/.omp/profiles/glen-harness/agent/skills" \
-    "$sandbox_base/home/.omp/profiles/glen-harness/agent/sessions" \
-    "$sandbox_base/home/.omp/profiles/glen-harness/logs" \
-    "$sandbox_base/home/.omp/profiles/glen-harness/cache" \
-    "$sandbox_base/home/.omp/profiles/glen-harness/run" \
+    "$sandbox_base/home/.omp/profiles/glen-harness-codex/agent/extensions" \
+    "$sandbox_base/home/.omp/profiles/glen-harness-codex/agent/skills" \
+    "$sandbox_base/home/.omp/profiles/glen-harness-codex/agent/sessions" \
+    "$sandbox_base/home/.omp/profiles/glen-harness-codex/logs" \
+    "$sandbox_base/home/.omp/profiles/glen-harness-codex/cache" \
+    "$sandbox_base/home/.omp/profiles/glen-harness-codex/run" \
     "$sandbox_base/home/.omp/natives" "$sandbox_base/run" "$sandbox_base/bin"
   sandbox_base="$(cd "$sandbox_base" && pwd -P)"
   # Exercise aliases only in launcher-owned inputs, including /var under TMPDIR.
@@ -98,18 +98,18 @@ if [ "$(uname -s)" = Darwin ] && command -v sandbox-exec >/dev/null 2>&1; then
   printf 'default config fixture\n' > "$sandbox_base/home/.omp/agent/config.yml"
   printf 'parent context fixture\n' > "$sandbox_base/AGENTS.md"
   for name in config.yml config.yml.lock mcp.json extensions/x.ts skills/x.md unknown-future-file; do
-    printf 'read-only fixture\n' > "$sandbox_base/home/.omp/profiles/glen-harness/agent/$name"
+    printf 'read-only fixture\n' > "$sandbox_base/home/.omp/profiles/glen-harness-codex/agent/$name"
   done
   printf 'native fixture\n' > "$sandbox_base/home/.omp/natives/x"
   # Fix cycle 6, HIGH-1: shared and profile daemon state the child must
   # neither read nor plant, next to the lease files it needs.
   mkdir -p "$sandbox_base/home/.omp/run/daemons/abc" "$sandbox_base/home/.omp/run/session-owners" \
-    "$sandbox_base/home/.omp/profiles/glen-harness/run/daemons/0123456789abcdef/daemons/x" \
-    "$sandbox_base/home/.omp/profiles/glen-harness/agent/sessions/other-slug" "$sandbox_base/run/staged/daemons/x"
+    "$sandbox_base/home/.omp/profiles/glen-harness-codex/run/daemons/0123456789abcdef/daemons/x" \
+    "$sandbox_base/home/.omp/profiles/glen-harness-codex/agent/sessions/other-slug" "$sandbox_base/run/staged/daemons/x"
   printf 'token fixture\n' > "$sandbox_base/home/.omp/run/daemons/abc/broker.token"
-  printf 'spec fixture\n' > "$sandbox_base/home/.omp/profiles/glen-harness/run/daemons/0123456789abcdef/daemons/x/spec.json"
+  printf 'spec fixture\n' > "$sandbox_base/home/.omp/profiles/glen-harness-codex/run/daemons/0123456789abcdef/daemons/x/spec.json"
   printf 'planted spec\n' > "$sandbox_base/run/staged/daemons/x/spec.json"
-  printf 'session fixture\n' > "$sandbox_base/home/.omp/profiles/glen-harness/agent/sessions/other-slug/s.jsonl"
+  printf 'session fixture\n' > "$sandbox_base/home/.omp/profiles/glen-harness-codex/agent/sessions/other-slug/s.jsonl"
 
   # Prewarm and sandboxed startup must resolve the same HOME-based native cache.
   # Clear caller overrides for both, rather than warming a separate XDG location.
@@ -126,7 +126,7 @@ if [ "$(uname -s)" = Darwin ] && command -v sandbox-exec >/dev/null 2>&1; then
     cd "$sandbox_base/run" || exit 1
     fixture_omp_env OMP_REAL_BIN="$binary" \
       OMP_SANDBOX_RUN_ROOT="$sandbox_run" \
-      OMP_PROFILE_AGENT_DIR="${sandbox_agent:-$sandbox_home/.omp/profiles/glen-harness/agent}" \
+      OMP_PROFILE_AGENT_DIR="${sandbox_agent:-$sandbox_home/.omp/profiles/glen-harness-codex/agent}" \
       /bin/bash "$SANDBOX" "$@"
   )
   run_sandbox sandbox_call "$sandbox_alias/bin/omp" "$sandbox_base/run/readable"
@@ -138,7 +138,7 @@ if [ "$(uname -s)" = Darwin ] && command -v sandbox-exec >/dev/null 2>&1; then
   generated_profile="${profiles[0]}"
   assert_contains 'sandbox imports dyld bootstrap support' '(import "dyld-support.sb")' "$generated_profile"
   assert_contains 'sandbox canonicalizes run root' "(subpath \"$sandbox_base/run\")" "$generated_profile"
-  assert_contains 'sandbox canonicalizes HOME' "(subpath \"$sandbox_base/home/.omp/profiles/glen-harness/agent\")" "$generated_profile"
+  assert_contains 'sandbox canonicalizes HOME' "(subpath \"$sandbox_base/home/.omp/profiles/glen-harness-codex/agent\")" "$generated_profile"
   assert_contains 'sandbox resolves executable symlink chain' "(literal \"$(cd /bin && pwd -P)/cat\")" "$generated_profile"
   assert 'sandbox profile contains no unresolved fixture alias' test "$(grep -Fc sandbox-alias "$generated_profile" || true)" -eq 0
   # An opening quote followed by /var/ must never survive physical resolution.
@@ -149,32 +149,32 @@ if [ "$(uname -s)" = Darwin ] && command -v sandbox-exec >/dev/null 2>&1; then
   sed -n '/^(allow file-write\*/,/^)/p' "$generated_profile" > "$WORK/sandbox-writes"
   sed -n '/^(deny file-write\*/,/^)/p' "$generated_profile" > "$WORK/sandbox-write-denies"
   assert 'sandbox agent directory has no broad write subpath grant' test \
-    "$(grep -Fc "(subpath \"$sandbox_base/home/.omp/profiles/glen-harness/agent\")" "$WORK/sandbox-writes" || true)" -eq 0
+    "$(grep -Fc "(subpath \"$sandbox_base/home/.omp/profiles/glen-harness-codex/agent\")" "$WORK/sandbox-writes" || true)" -eq 0
   # Escape the full fixture path the same way sbpl_regex_literal does (every
   # dot, not just the one before "omp"): $WORK itself contains a literal dot
   # (mktemp's "glen-omp-smoke.XXXXXX"), which the real regex also escapes.
-  expected_agent_regex="$(printf '%s' "$sandbox_base/home/.omp/profiles/glen-harness/agent" | sed 's/\./\\./g')"
+  expected_agent_regex="$(printf '%s' "$sandbox_base/home/.omp/profiles/glen-harness-codex/agent" | sed 's/\./\\./g')"
   assert_contains 'sandbox grants only the named state-database family for SQLite' \
     "(regex #\"^$expected_agent_regex/(agent|models|skill-descriptions)\\.db(-wal|-shm|-journal)?\$\")" \
     "$WORK/sandbox-writes"
   assert_contains 'sandbox denies renaming or unlinking the agent directory itself' \
-    "(literal \"$sandbox_base/home/.omp/profiles/glen-harness/agent\")" "$WORK/sandbox-write-denies"
+    "(literal \"$sandbox_base/home/.omp/profiles/glen-harness-codex/agent\")" "$WORK/sandbox-write-denies"
   assert_contains 'sandbox denies renaming or unlinking the profile root itself' \
-    "(literal \"$sandbox_base/home/.omp/profiles/glen-harness\")" "$WORK/sandbox-write-denies"
+    "(literal \"$sandbox_base/home/.omp/profiles/glen-harness-codex\")" "$WORK/sandbox-write-denies"
   assert 'sandbox configuration denies follow directory write allow' awk \
     '/^\(allow file-write\*/ { allow=NR } /^\(deny file-write\*/ { deny=NR } END { exit !(allow>0 && deny>allow) }' "$generated_profile"
   assert 'sandbox native cache has no write grant' test "$(grep -Fc '/.omp/natives' "$WORK/sandbox-writes" || true)" -eq 0
   for name in config.yml config.yml.lock mcp.json; do
     assert_contains "sandbox denies writes to protected file $name" \
-      "(literal \"$sandbox_base/home/.omp/profiles/glen-harness/agent/$name\")" "$WORK/sandbox-write-denies"
+      "(literal \"$sandbox_base/home/.omp/profiles/glen-harness-codex/agent/$name\")" "$WORK/sandbox-write-denies"
   done
   for name in extensions skills unknown-future-file; do
     assert_contains "sandbox denies writes to protected entry $name" \
-      "(subpath \"$sandbox_base/home/.omp/profiles/glen-harness/agent/$name\")" "$WORK/sandbox-write-denies"
+      "(subpath \"$sandbox_base/home/.omp/profiles/glen-harness-codex/agent/$name\")" "$WORK/sandbox-write-denies"
   done
   for path in agent/sessions logs cache run; do
     assert_contains "sandbox permits runtime subtree $path" \
-      "(subpath \"$sandbox_base/home/.omp/profiles/glen-harness/$path\")" "$WORK/sandbox-writes"
+      "(subpath \"$sandbox_base/home/.omp/profiles/glen-harness-codex/$path\")" "$WORK/sandbox-writes"
   done
   # Fix cycle 6, HIGH-1: only the lease directory of shared ~/.omp/run.
   assert 'sandbox grants no read or write on all of shared ~/.omp/run' test \
@@ -182,9 +182,9 @@ if [ "$(uname -s)" = Darwin ] && command -v sandbox-exec >/dev/null 2>&1; then
   assert_contains 'sandbox grants writes to session-owner leases' \
     "(subpath \"$sandbox_base/home/.omp/run/session-owners\")" "$WORK/sandbox-writes"
   assert_contains 'sandbox denies writes to profile daemon records' \
-    "(subpath \"$sandbox_base/home/.omp/profiles/glen-harness/run/daemons\")" "$WORK/sandbox-write-denies"
+    "(subpath \"$sandbox_base/home/.omp/profiles/glen-harness-codex/run/daemons\")" "$WORK/sandbox-write-denies"
   assert_contains 'sandbox denies reads of profile daemon records' \
-    "(deny file-read* (subpath \"$sandbox_base/home/.omp/profiles/glen-harness/run/daemons\"))" "$generated_profile"
+    "(deny file-read* (subpath \"$sandbox_base/home/.omp/profiles/glen-harness-codex/run/daemons\"))" "$generated_profile"
   assert 'sandbox without an omp binary grants no daemon scope' test \
     "$(grep -Ec '/run/daemons/[0-9a-f]{16}/clients' "$generated_profile" || true)" -eq 0
   assert_contains 'sandbox denies removing a session directory itself' \
@@ -200,36 +200,36 @@ if [ "$(uname -s)" = Darwin ] && command -v sandbox-exec >/dev/null 2>&1; then
     "$(grep -Fc '(allow process-exec* (literal "'"$(cd /bin && pwd -P)"'/cat"))' "$generated_profile" || true)" -eq 1
   assert 'sandbox grants no blanket process-exec*' test "$(grep -Fxc '(allow process-exec*)' "$generated_profile" || true)" -eq 0
 
-  mkdir -p "$sandbox_base/home/custom-omp/profiles/glen-harness/agent"
-  sandbox_agent="$sandbox_alias/home/custom-omp/profiles/glen-harness/agent"
+  mkdir -p "$sandbox_base/home/custom-omp/profiles/glen-harness-codex/agent"
+  sandbox_agent="$sandbox_alias/home/custom-omp/profiles/glen-harness-codex/agent"
   run_sandbox sandbox_call /bin/cat "$sandbox_base/run/readable"
-  custom_profile="$(grep -Fl -- "$sandbox_base/home/custom-omp/profiles/glen-harness/agent" "$sandbox_base/run"/omp-sandbox.*)"
+  custom_profile="$(grep -Fl -- "$sandbox_base/home/custom-omp/profiles/glen-harness-codex/agent" "$sandbox_base/run"/omp-sandbox.*)"
   # Appears twice: the file-read* grant, and the explanatory comment above
   # the deny stanza that names the directory it protects from being renamed.
-  assert 'sandbox explicit profile path is canonical for reads' test "$(grep -Fc "(subpath \"$sandbox_base/home/custom-omp/profiles/glen-harness/agent\")" "$custom_profile")" -eq 2
-  assert_contains 'sandbox custom profile denies configuration writes' "(literal \"$sandbox_base/home/custom-omp/profiles/glen-harness/agent/config.yml\")" "$custom_profile"
-  assert_contains 'sandbox custom profile includes sibling logs' "(subpath \"$sandbox_base/home/custom-omp/profiles/glen-harness/logs\")" "$custom_profile"
-  assert 'sandbox explicit profile does not admit old profile root' test "$(grep -Fc '.omp/profiles/glen-harness' "$custom_profile" || true)" -eq 0
+  assert 'sandbox explicit profile path is canonical for reads' test "$(grep -Fc "(subpath \"$sandbox_base/home/custom-omp/profiles/glen-harness-codex/agent\")" "$custom_profile")" -eq 2
+  assert_contains 'sandbox custom profile denies configuration writes' "(literal \"$sandbox_base/home/custom-omp/profiles/glen-harness-codex/agent/config.yml\")" "$custom_profile"
+  assert_contains 'sandbox custom profile includes sibling logs' "(subpath \"$sandbox_base/home/custom-omp/profiles/glen-harness-codex/logs\")" "$custom_profile"
+  assert 'sandbox explicit profile does not admit old profile root' test "$(grep -Fc '.omp/profiles/glen-harness-codex' "$custom_profile" || true)" -eq 0
   unset sandbox_agent
 
   # Fix cycle 5, decision 2: the Mnemosyne MCP's own URL derives a loopback
   # outbound rule. A loopback host on a non-443 port is allowed; a
   # non-loopback, non-443 host refuses instead of granting it outbound.
-  mkdir -p "$sandbox_base/home/mnemosyne-ok/profiles/glen-harness/agent"
+  mkdir -p "$sandbox_base/home/mnemosyne-ok/profiles/glen-harness-codex/agent"
   printf '%s
-' '{"mcpServers":{"mnemosyne":{"type":"http","url":"http://127.0.0.1:9191/mcp","headers":{"Authorization":"Bearer secret-token-never-logged"}}}}'     > "$sandbox_base/home/mnemosyne-ok/profiles/glen-harness/agent/mcp.json"
-  sandbox_agent="$sandbox_alias/home/mnemosyne-ok/profiles/glen-harness/agent"
+' '{"mcpServers":{"mnemosyne":{"type":"http","url":"http://127.0.0.1:9191/mcp","headers":{"Authorization":"Bearer secret-token-never-logged"}}}}'     > "$sandbox_base/home/mnemosyne-ok/profiles/glen-harness-codex/agent/mcp.json"
+  sandbox_agent="$sandbox_alias/home/mnemosyne-ok/profiles/glen-harness-codex/agent"
   run_sandbox sandbox_call /bin/cat "$sandbox_base/run/readable"
-  mnemosyne_profile="$(grep -Fl -- "$sandbox_base/home/mnemosyne-ok/profiles/glen-harness/agent" "$sandbox_base/run"/omp-sandbox.*)"
+  mnemosyne_profile="$(grep -Fl -- "$sandbox_base/home/mnemosyne-ok/profiles/glen-harness-codex/agent" "$sandbox_base/run"/omp-sandbox.*)"
   assert_exit 'sandbox still runs with a loopback Mnemosyne MCP entry' 0
   assert_contains 'sandbox derives the Mnemosyne loopback outbound rule'     '(allow network-outbound (remote tcp "localhost:9191"))' "$mnemosyne_profile"
   assert 'sandbox never carries the Mnemosyne token into the profile' test     "$(grep -Fc 'secret-token-never-logged' "$mnemosyne_profile" || true)" -eq 0
   unset sandbox_agent
 
-  mkdir -p "$sandbox_base/home/mnemosyne-remote/profiles/glen-harness/agent"
+  mkdir -p "$sandbox_base/home/mnemosyne-remote/profiles/glen-harness-codex/agent"
   printf '%s
-' '{"mcpServers":{"mnemosyne":{"type":"http","url":"http://mnemosyne.example.com:9191/mcp"}}}'     > "$sandbox_base/home/mnemosyne-remote/profiles/glen-harness/agent/mcp.json"
-  sandbox_agent="$sandbox_alias/home/mnemosyne-remote/profiles/glen-harness/agent"
+' '{"mcpServers":{"mnemosyne":{"type":"http","url":"http://mnemosyne.example.com:9191/mcp"}}}'     > "$sandbox_base/home/mnemosyne-remote/profiles/glen-harness-codex/agent/mcp.json"
+  sandbox_agent="$sandbox_alias/home/mnemosyne-remote/profiles/glen-harness-codex/agent"
   run_sandbox sandbox_call /bin/cat "$sandbox_base/run/readable"
   assert_exit 'sandbox refuses a non-loopback, non-443 Mnemosyne MCP host' 1
   assert_contains 'non-loopback refusal names the reason' 'neither loopback nor on 443' "$STDERR"
@@ -240,12 +240,12 @@ if [ "$(uname -s)" = Darwin ] && command -v sandbox-exec >/dev/null 2>&1; then
   for mnemosyne_case in 'ipv6 http://[::1]:9192/mcp 9192' 'upper HTTP://LocalHost:9193/mcp 9193' 'userinfo http://u@127.0.0.1:9194/mcp -'; do
     # shellcheck disable=SC2086 # intentional word splitting of the case.
     set -- $mnemosyne_case
-    mkdir -p "$sandbox_base/home/mnemosyne-$1/profiles/glen-harness/agent"
+    mkdir -p "$sandbox_base/home/mnemosyne-$1/profiles/glen-harness-codex/agent"
     jq -cn --arg url "$2" '{mcpServers:{mnemosyne:{type:"http",url:$url}}}' \
-      > "$sandbox_base/home/mnemosyne-$1/profiles/glen-harness/agent/mcp.json"
-    sandbox_agent="$sandbox_alias/home/mnemosyne-$1/profiles/glen-harness/agent"
+      > "$sandbox_base/home/mnemosyne-$1/profiles/glen-harness-codex/agent/mcp.json"
+    sandbox_agent="$sandbox_alias/home/mnemosyne-$1/profiles/glen-harness-codex/agent"
     run_sandbox sandbox_call /bin/cat "$sandbox_base/run/readable"
-    case_profile="$(grep -Fl -- "$sandbox_base/home/mnemosyne-$1/profiles/glen-harness/agent" "$sandbox_base/run"/omp-sandbox.*)"
+    case_profile="$(grep -Fl -- "$sandbox_base/home/mnemosyne-$1/profiles/glen-harness-codex/agent" "$sandbox_base/run"/omp-sandbox.*)"
     [ "$sandbox_runtime" -eq 0 ] || assert_exit "sandbox runs with a $1 Mnemosyne URL" 0
     if [ "$3" = - ]; then
       assert "sandbox derives no rule from a $1 Mnemosyne URL" test \
@@ -263,8 +263,8 @@ if [ "$(uname -s)" = Darwin ] && command -v sandbox-exec >/dev/null 2>&1; then
   # cannot carry is refused before any policy is written.
   for odd_case in 'quote "' 'backslash \'; do
     odd_name="${odd_case#* }"
-    mkdir -p "$sandbox_base/home/odd${odd_name}dir/profiles/glen-harness/agent"
-    sandbox_agent="$sandbox_alias/home/odd${odd_name}dir/profiles/glen-harness/agent"
+    mkdir -p "$sandbox_base/home/odd${odd_name}dir/profiles/glen-harness-codex/agent"
+    sandbox_agent="$sandbox_alias/home/odd${odd_name}dir/profiles/glen-harness-codex/agent"
     run_sandbox sandbox_call /bin/cat "$sandbox_base/run/readable"
     assert_exit "sandbox refuses an agent path with a ${odd_case% *}" 1
     assert_contains "sandbox ${odd_case% *} refusal names the reason" 'SBPL regex literal cannot carry' "$STDERR"
@@ -274,19 +274,19 @@ if [ "$(uname -s)" = Darwin ] && command -v sandbox-exec >/dev/null 2>&1; then
 
   # Fix cycle 6, MED-3: a fresh profile without its runtime directories gets
   # them from the launcher; a symlinked one is refused before omp starts.
-  mkdir -p "$sandbox_base/home/fresh/profiles/glen-harness/agent"
-  sandbox_agent="$sandbox_alias/home/fresh/profiles/glen-harness/agent"
+  mkdir -p "$sandbox_base/home/fresh/profiles/glen-harness-codex/agent"
+  sandbox_agent="$sandbox_alias/home/fresh/profiles/glen-harness-codex/agent"
   run_sandbox sandbox_call /bin/cat "$sandbox_base/run/readable"
   [ "$sandbox_runtime" -eq 0 ] || assert_exit 'sandbox starts on a fresh profile without runtime directories' 0
   for path in agent/sessions logs cache run run/daemons; do
-    assert "launcher creates fresh-profile $path" test -d "$sandbox_base/home/fresh/profiles/glen-harness/$path" -a ! -L "$sandbox_base/home/fresh/profiles/glen-harness/$path"
+    assert "launcher creates fresh-profile $path" test -d "$sandbox_base/home/fresh/profiles/glen-harness-codex/$path" -a ! -L "$sandbox_base/home/fresh/profiles/glen-harness-codex/$path"
   done
   assert 'launcher creates the shared lease directory' test -d "$sandbox_base/home/.omp/run/session-owners"
   # Codex item-5 P2: an alternate config root keeps its own lease directory.
   alt_root_call() (
     cd "$sandbox_base/run" || exit 1
     fixture_omp_env PI_CONFIG_DIR=.omp-alt OMP_REAL_BIN=/bin/cat OMP_SANDBOX_RUN_ROOT="$sandbox_run" \
-      OMP_PROFILE_AGENT_DIR="$sandbox_alias/home/fresh/profiles/glen-harness/agent" \
+      OMP_PROFILE_AGENT_DIR="$sandbox_alias/home/fresh/profiles/glen-harness-codex/agent" \
       /bin/bash "$SANDBOX" "$sandbox_base/run/readable"
   )
   # A pipe, like run_sandbox: the sandbox may not write a file outside its roots.
@@ -297,13 +297,13 @@ if [ "$(uname -s)" = Darwin ] && command -v sandbox-exec >/dev/null 2>&1; then
   assert 'launcher creates the alternate root lease directory' test -d "$sandbox_base/home/.omp-alt/run/session-owners"
   assert 'launcher creates the private TMPDIR in the run root' test -d "$sandbox_base/run/tmp"
   if [ "$sandbox_runtime" -eq 1 ]; then
-    run_sandbox sandbox_call /bin/mkdir "$sandbox_base/home/fresh/profiles/glen-harness/agent/sessions/new-slug"
+    run_sandbox sandbox_call /bin/mkdir "$sandbox_base/home/fresh/profiles/glen-harness-codex/agent/sessions/new-slug"
     assert_exit 'sandbox child can create a session directory on a fresh profile' 0
   fi
   unset sandbox_agent
-  mkdir -p "$sandbox_base/home/symlinked/profiles/glen-harness/agent" "$sandbox_base/elsewhere-logs"
-  ln -s "$sandbox_base/elsewhere-logs" "$sandbox_base/home/symlinked/profiles/glen-harness/logs"
-  sandbox_agent="$sandbox_alias/home/symlinked/profiles/glen-harness/agent"
+  mkdir -p "$sandbox_base/home/symlinked/profiles/glen-harness-codex/agent" "$sandbox_base/elsewhere-logs"
+  ln -s "$sandbox_base/elsewhere-logs" "$sandbox_base/home/symlinked/profiles/glen-harness-codex/logs"
+  sandbox_agent="$sandbox_alias/home/symlinked/profiles/glen-harness-codex/agent"
   run_sandbox sandbox_call /bin/cat "$sandbox_base/run/readable"
   assert_exit 'sandbox refuses a symlinked runtime directory' 1
   assert_contains 'symlinked runtime directory refusal names the reason' 'refusing symlinked runtime directory' "$STDERR"
@@ -313,31 +313,31 @@ if [ "$(uname -s)" = Darwin ] && command -v sandbox-exec >/dev/null 2>&1; then
   # Fix cycle 7 (Codex P1): a relocated profile root, agent directory or omp
   # root is refused by name before any policy is written, never followed.
   mkdir -p "$sandbox_base/relocated-profile/agent" "$sandbox_base/relocated-agent" \
-    "$sandbox_base/relocated-omp/profiles/glen-harness/agent" \
-    "$sandbox_base/home/reloc-root/profiles" "$sandbox_base/home/reloc-agent/profiles/glen-harness"
-  ln -s "$sandbox_base/relocated-profile" "$sandbox_base/home/reloc-root/profiles/glen-harness"
-  ln -s "$sandbox_base/relocated-agent" "$sandbox_base/home/reloc-agent/profiles/glen-harness/agent"
+    "$sandbox_base/relocated-omp/profiles/glen-harness-codex/agent" \
+    "$sandbox_base/home/reloc-root/profiles" "$sandbox_base/home/reloc-agent/profiles/glen-harness-codex"
+  ln -s "$sandbox_base/relocated-profile" "$sandbox_base/home/reloc-root/profiles/glen-harness-codex"
+  ln -s "$sandbox_base/relocated-agent" "$sandbox_base/home/reloc-agent/profiles/glen-harness-codex/agent"
   ln -s "$sandbox_base/relocated-omp" "$sandbox_base/home/reloc-omp"
-  for reloc_case in "reloc-root $sandbox_base/home/reloc-root/profiles/glen-harness" \
-    "reloc-agent $sandbox_base/home/reloc-agent/profiles/glen-harness/agent" \
+  for reloc_case in "reloc-root $sandbox_base/home/reloc-root/profiles/glen-harness-codex" \
+    "reloc-agent $sandbox_base/home/reloc-agent/profiles/glen-harness-codex/agent" \
     "reloc-omp $sandbox_base/home/reloc-omp"; do
     reloc_name="${reloc_case%% *}" reloc_link="${reloc_case#* }"
-    sandbox_agent="$sandbox_alias/home/$reloc_name/profiles/glen-harness/agent"
+    sandbox_agent="$sandbox_alias/home/$reloc_name/profiles/glen-harness-codex/agent"
     policies_before="$(find "$sandbox_base/run" -maxdepth 1 -name 'omp-sandbox.*' | wc -l)"
     run_sandbox sandbox_call /bin/cat "$sandbox_base/run/readable"
     assert_exit "sandbox refuses a relocated profile ($reloc_name)" 1
     assert_contains "relocated profile ($reloc_name) refusal names the symlink" \
-      "refusing symlinked glen-harness profile path: $reloc_link" "$STDERR"
+      "refusing symlinked glen-harness-codex profile path: $reloc_link" "$STDERR"
     assert "relocated profile ($reloc_name) refusal runs nothing" test ! -s "$STDOUT"
     assert "relocated profile ($reloc_name) refusal writes no policy" test \
       "$(find "$sandbox_base/run" -maxdepth 1 -name 'omp-sandbox.*' | wc -l)" -eq "$policies_before"
     unset sandbox_agent
   done
-  sandbox_agent="$sandbox_alias/home/custom-omp/glen-harness/agent"
-  mkdir -p "$sandbox_base/home/custom-omp/glen-harness/agent"
+  sandbox_agent="$sandbox_alias/home/custom-omp/glen-harness-codex/agent"
+  mkdir -p "$sandbox_base/home/custom-omp/glen-harness-codex/agent"
   run_sandbox sandbox_call /bin/cat "$sandbox_base/run/readable"
-  assert_exit 'sandbox refuses an agent directory outside profiles/glen-harness' 1
-  assert_contains 'misplaced agent directory refusal names the shape' 'must be <omp root>/profiles/glen-harness/agent' "$STDERR"
+  assert_exit 'sandbox refuses an agent directory outside profiles/glen-harness-codex' 1
+  assert_contains 'misplaced agent directory refusal names the shape' 'must be <omp root>/profiles/glen-harness-codex/agent' "$STDERR"
   unset sandbox_agent
 
   # Fix cycle 7, Claude LOW-8: other loopback spellings are refused by name.
@@ -345,10 +345,10 @@ if [ "$(uname -s)" = Darwin ] && command -v sandbox-exec >/dev/null 2>&1; then
     'v6mapped http://[::ffff:127.0.0.1]:7777/mcp' 'dotted http://localhost.:7777/mcp'; do
     # shellcheck disable=SC2086 # intentional word splitting of the case.
     set -- $loopback_case
-    mkdir -p "$sandbox_base/home/loopback-$1/profiles/glen-harness/agent"
+    mkdir -p "$sandbox_base/home/loopback-$1/profiles/glen-harness-codex/agent"
     jq -cn --arg url "$2" '{mcpServers:{mnemosyne:{type:"http",url:$url}}}' \
-      > "$sandbox_base/home/loopback-$1/profiles/glen-harness/agent/mcp.json"
-    sandbox_agent="$sandbox_alias/home/loopback-$1/profiles/glen-harness/agent"
+      > "$sandbox_base/home/loopback-$1/profiles/glen-harness-codex/agent/mcp.json"
+    sandbox_agent="$sandbox_alias/home/loopback-$1/profiles/glen-harness-codex/agent"
     run_sandbox sandbox_call /bin/cat "$sandbox_base/run/readable"
     assert_exit "sandbox refuses a $1 loopback spelling" 1
     assert_contains "sandbox $1 loopback refusal names the reason" 'loopback address in an unsupported spelling' "$STDERR"
@@ -372,7 +372,7 @@ EOF
   chmod +x "$sandbox_base/bin/omp-darwin-arm64" "$sandbox_base/bin/omp-hangs"
   run_sandbox sandbox_call "$sandbox_base/bin/omp-darwin-arm64" --version
   assert 'sandbox derives the scope from a differently named omp binary' grep -Fq \
-    "(subpath \"$sandbox_base/home/.omp/profiles/glen-harness/run/daemons/abcdefabcdef0123/clients\")" \
+    "(subpath \"$sandbox_base/home/.omp/profiles/glen-harness-codex/run/daemons/abcdefabcdef0123/clients\")" \
     "$sandbox_base/run"/omp-sandbox.*
   run_sandbox sandbox_call /bin/cat "$sandbox_base/run/readable"
   assert_contains 'sandbox warns, naming the binary, when no scope can be derived' \
@@ -448,7 +448,7 @@ PY
       assert_contains "sandbox outside read is EPERM $denied" "cat: $sandbox_base/$denied: Operation not permitted" "$STDERR"
     done
     for denied in config.yml config.yml.lock mcp.json extensions/x.ts skills/x.md unknown-future-file; do
-      path="$sandbox_base/home/.omp/profiles/glen-harness/agent/$denied"
+      path="$sandbox_base/home/.omp/profiles/glen-harness-codex/agent/$denied"
       run_sandbox sandbox_call /usr/bin/tee "$path" <<< 'must not overwrite'
       assert "sandbox refuses configuration write $denied" test "$CODE" -ne 0
       assert_contains "configuration write denial is EPERM $denied" 'Operation not permitted' "$STDERR"
@@ -463,20 +463,20 @@ PY
     for database in agent.db models.db skill-descriptions.db; do
       for journal in delete wal; do
         run_sandbox sandbox_call /usr/bin/sqlite3 -batch -bail \
-          "$sandbox_base/home/.omp/profiles/glen-harness/agent/$database" \
+          "$sandbox_base/home/.omp/profiles/glen-harness-codex/agent/$database" \
           "PRAGMA journal_mode=$journal; CREATE TABLE IF NOT EXISTS t(x INTEGER); DELETE FROM t; INSERT INTO t VALUES(42); SELECT x FROM t;"
         assert_exit "sandbox SQLite $database $journal round-trip succeeds" 0
         assert_eq "sandbox SQLite $database $journal returns inserted row" "$(cat "$STDOUT")" "$(printf '%s\n42' "$journal")"
       done
     done
     for writable in "$sandbox_base/run/writable" \
-      "$sandbox_base/home/.omp/profiles/glen-harness/agent/agent.db" \
-      "$sandbox_base/home/.omp/profiles/glen-harness/agent/models.db-wal" \
-      "$sandbox_base/home/.omp/profiles/glen-harness/agent/skill-descriptions.db-shm" \
-      "$sandbox_base/home/.omp/profiles/glen-harness/agent/sessions/writable" \
-      "$sandbox_base/home/.omp/profiles/glen-harness/logs/writable" \
-      "$sandbox_base/home/.omp/profiles/glen-harness/cache/writable" \
-      "$sandbox_base/home/.omp/profiles/glen-harness/run/writable"; do
+      "$sandbox_base/home/.omp/profiles/glen-harness-codex/agent/agent.db" \
+      "$sandbox_base/home/.omp/profiles/glen-harness-codex/agent/models.db-wal" \
+      "$sandbox_base/home/.omp/profiles/glen-harness-codex/agent/skill-descriptions.db-shm" \
+      "$sandbox_base/home/.omp/profiles/glen-harness-codex/agent/sessions/writable" \
+      "$sandbox_base/home/.omp/profiles/glen-harness-codex/logs/writable" \
+      "$sandbox_base/home/.omp/profiles/glen-harness-codex/cache/writable" \
+      "$sandbox_base/home/.omp/profiles/glen-harness-codex/run/writable"; do
       run_sandbox sandbox_call /usr/bin/tee "$writable" <<< 'sandbox write'
       assert_exit 'sandbox allows write in permitted directory' 0
       run_sandbox sandbox_call /bin/cat "$writable"
@@ -486,12 +486,12 @@ PY
 
     # Fix cycle 5, decision 4 (Claude MED-2): no symlink creation anywhere,
     # and the sessions/logs/cache/run directories cannot be renamed away.
-    for planted in       "$sandbox_base/home/.omp/profiles/glen-harness/agent/sessions/evil-link"       "$sandbox_base/home/.omp/profiles/glen-harness/logs/evil-link"; do
+    for planted in       "$sandbox_base/home/.omp/profiles/glen-harness-codex/agent/sessions/evil-link"       "$sandbox_base/home/.omp/profiles/glen-harness-codex/logs/evil-link"; do
       run_sandbox sandbox_call /bin/ln -s "$sandbox_base/home/glen-canary.txt" "$planted"
       assert_exit 'sandbox refuses planting a symlink in a writable directory' 1
       assert 'sandbox refused symlink never actually appears' test ! -L "$planted"
     done
-    harness_profile="$sandbox_base/home/.omp/profiles/glen-harness"
+    harness_profile="$sandbox_base/home/.omp/profiles/glen-harness-codex"
     for renamed_pair in "$harness_profile/agent/sessions sessions.bak" "$harness_profile/logs logs.bak" \
       "$harness_profile/cache cache.bak" "$harness_profile/run run.bak" "$harness_profile/agent agent.bak" \
       "$harness_profile profile.bak" "$sandbox_base/home/.omp/run/session-owners owners.bak"; do
@@ -548,7 +548,7 @@ PY
     xdg_call() (
       cd "$sandbox_base/run" || exit 1
       fixture_omp_env XDG_STATE_HOME="$sandbox_base/xdg-state" OMP_REAL_BIN=/usr/bin/printenv \
-        OMP_SANDBOX_RUN_ROOT="$sandbox_run" OMP_PROFILE_AGENT_DIR="$sandbox_home/.omp/profiles/glen-harness/agent" \
+        OMP_SANDBOX_RUN_ROOT="$sandbox_run" OMP_PROFILE_AGENT_DIR="$sandbox_home/.omp/profiles/glen-harness-codex/agent" \
         /bin/bash "$SANDBOX" XDG_STATE_HOME
     )
     run_sandbox xdg_call
@@ -599,7 +599,7 @@ with socket.socket(socket.AF_UNIX) as server:
             connected = True
         env = dict(os.environ, HOME=base + "/home", OMP_REAL_BIN="/usr/bin/perl",
                    OMP_SANDBOX_RUN_ROOT=base + "/run",
-                   OMP_PROFILE_AGENT_DIR=base + "/home/.omp/profiles/glen-harness/agent")
+                   OMP_PROFILE_AGENT_DIR=base + "/home/.omp/profiles/glen-harness-codex/agent")
         child = subprocess.run(["/bin/bash", launcher, probe_pl, foreign], env=env, cwd=base + "/run",
                                stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE, timeout=5)
@@ -630,20 +630,20 @@ PY
   # Model listing must start from a configured profile, as it does after setup.
   # S3 intentionally prevents a sandboxed first run from creating config/MCP.
   real_sandbox_base="$WORK/real-omp-sandbox"
-  mkdir -p "$real_sandbox_base/home/.omp/profiles/glen-harness/agent" "$real_sandbox_base/run"
-  cat > "$real_sandbox_base/home/.omp/profiles/glen-harness/agent/config.yml" <<'EOF'
+  mkdir -p "$real_sandbox_base/home/.omp/profiles/glen-harness-codex/agent" "$real_sandbox_base/run"
+  cat > "$real_sandbox_base/home/.omp/profiles/glen-harness-codex/agent/config.yml" <<'EOF'
 modelRoles:
-  default: cursor/grok-4.7
+  default: openai-codex/gpt-6.1-sol
 tools:
   approvalMode: always-ask
 mcp:
   enableProjectConfig: false
 EOF
-  printf '%s\n' '{"mcpServers":{}}' > "$real_sandbox_base/home/.omp/profiles/glen-harness/agent/mcp.json"
-  assert_contains 'real omp fixture seeds model configuration before sandbox startup' 'default: cursor/grok-4.7' "$real_sandbox_base/home/.omp/profiles/glen-harness/agent/config.yml"
-  assert 'real omp fixture seeds MCP without external services' jq -e '.mcpServers == {}' "$real_sandbox_base/home/.omp/profiles/glen-harness/agent/mcp.json"
-  cp "$real_sandbox_base/home/.omp/profiles/glen-harness/agent/config.yml" "$real_sandbox_base/config-before"
-  cp "$real_sandbox_base/home/.omp/profiles/glen-harness/agent/mcp.json" "$real_sandbox_base/mcp-before"
+  printf '%s\n' '{"mcpServers":{}}' > "$real_sandbox_base/home/.omp/profiles/glen-harness-codex/agent/mcp.json"
+  assert_contains 'real omp fixture seeds model configuration before sandbox startup' 'default: openai-codex/gpt-6.1-sol' "$real_sandbox_base/home/.omp/profiles/glen-harness-codex/agent/config.yml"
+  assert 'real omp fixture seeds MCP without external services' jq -e '.mcpServers == {}' "$real_sandbox_base/home/.omp/profiles/glen-harness-codex/agent/mcp.json"
+  cp "$real_sandbox_base/home/.omp/profiles/glen-harness-codex/agent/config.yml" "$real_sandbox_base/config-before"
+  cp "$real_sandbox_base/home/.omp/profiles/glen-harness-codex/agent/mcp.json" "$real_sandbox_base/mcp-before"
 
   if [ -n "$real_omp" ]; then
     # S3 makes natives read-only: populate the scratch HOME's cache unsandboxed
@@ -652,15 +652,15 @@ EOF
     sandbox_home="$sandbox_base/home" sandbox_run="$sandbox_base/run"
     real_omp_prewarm() (
       cd "$sandbox_base/run" || exit 1
-      fixture_omp_env "$real_omp" --profile glen-harness toks glen-native-warmup --json
+      fixture_omp_env "$real_omp" --profile glen-harness-codex toks glen-native-warmup --json
     )
     run real_omp_prewarm
     assert_exit 'real omp unsandboxed native prewarm succeeds' 0
     natives_dir="$sandbox_home/.omp/natives"
     native_addon="$(find "$natives_dir" -type f -name '*.node' -print -quit 2>/dev/null || true)"
     assert 'real omp prewarm populates default HOME native cache' test -n "$native_addon"
-    # Always select glen-harness, including --version. Only scratch HOME is used.
-    run_sandbox sandbox_call "$real_omp" --profile glen-harness --version
+    # Always select glen-harness-codex, including --version. Only scratch HOME is used.
+    run_sandbox sandbox_call "$real_omp" --profile glen-harness-codex --version
     if [ "$sandbox_runtime" -eq 1 ]; then assert_exit 'sandbox real omp version completes' 0; fi
     real_profiles=("$sandbox_base/run"/omp-sandbox.*)
     sed -n '/^(allow file-read\*/,/^)/p' "${real_profiles[0]}" > "$WORK/real-omp-reads"
@@ -671,18 +671,18 @@ EOF
       'process.stdout.write(Bun.hash.wyhash(process.env.GLEN_SCOPE_DIR).toString(16).padStart(16, "0"))' < /dev/null 2>/dev/null || true)"
     assert 'real omp scope hash is 16 hex digits' grep -Eqx '[0-9a-f]{16}' <<< "$expected_scope"
     assert_contains 'sandbox grants real omp its own presence directory' \
-      "(allow file-write* (subpath \"$sandbox_base/home/.omp/profiles/glen-harness/run/daemons/$expected_scope/clients\"))" "${real_profiles[0]}"
+      "(allow file-write* (subpath \"$sandbox_base/home/.omp/profiles/glen-harness-codex/run/daemons/$expected_scope/clients\"))" "${real_profiles[0]}"
     assert 'sandbox grants real omp exactly one presence directory' test \
       "$(grep -Ec 'allow file-write\* \(subpath "[^"]*/run/daemons/[0-9a-f]{16}/clients"\)\)' "${real_profiles[0]}" || true)" -eq 1
     assert 'launcher precreates the real omp presence directory' \
-      test -d "$sandbox_base/home/.omp/profiles/glen-harness/run/daemons/$expected_scope/clients"
+      test -d "$sandbox_base/home/.omp/profiles/glen-harness-codex/run/daemons/$expected_scope/clients"
     assert_contains 'sandbox reads the same native cache populated by prewarm' "(subpath \"$natives_dir\")" "$WORK/real-omp-reads"
     assert 'sandbox keeps the populated native cache read-only' test "$(grep -Fc "$natives_dir" "$WORK/real-omp-writes" || true)" -eq 0
     if [ "$sandbox_runtime" -eq 1 ]; then
-      run_sandbox sandbox_call "$real_omp" --profile glen-harness models --json
+      run_sandbox sandbox_call "$real_omp" --profile glen-harness-codex models --json
       assert_exit 'sandbox real omp models completes without login' 0
-      assert 'sandbox real omp leaves seeded config unchanged' cmp -s "$sandbox_home/.omp/profiles/glen-harness/agent/config.yml" "$sandbox_base/config-before"
-      assert 'sandbox real omp leaves seeded MCP unchanged' cmp -s "$sandbox_home/.omp/profiles/glen-harness/agent/mcp.json" "$sandbox_base/mcp-before"
+      assert 'sandbox real omp leaves seeded config unchanged' cmp -s "$sandbox_home/.omp/profiles/glen-harness-codex/agent/config.yml" "$sandbox_base/config-before"
+      assert 'sandbox real omp leaves seeded MCP unchanged' cmp -s "$sandbox_home/.omp/profiles/glen-harness-codex/agent/mcp.json" "$sandbox_base/mcp-before"
     fi
   else
     printf 'NOTE sandbox real omp startup skipped: omp not on PATH\n'
@@ -695,7 +695,7 @@ fi
 # This checks policy construction, not live Linux mount/SQLite compatibility.
 linux_policy="$WORK/linux-policy"
 mkdir -p "$linux_policy/bin" "$linux_policy/home/.omp/natives" \
-  "$linux_policy/home/custom/profiles/glen-harness/agent" "$linux_policy/run"
+  "$linux_policy/home/custom/profiles/glen-harness-codex/agent" "$linux_policy/run"
 cat > "$linux_policy/bin/uname" <<'EOF'
 #!/bin/sh
 printf 'Linux\n'
@@ -705,7 +705,7 @@ cat > "$linux_policy/bin/bwrap" <<'EOF'
 jq -cn --args '$ARGS.positional' -- "$@"
 EOF
 chmod +x "$linux_policy/bin/uname" "$linux_policy/bin/bwrap"
-linux_agent="$linux_policy/home/custom/profiles/glen-harness/agent"
+linux_agent="$linux_policy/home/custom/profiles/glen-harness-codex/agent"
 printf 'existing SQLite bytes\n' > "$linux_agent/agent.db"
 cp "$linux_agent/agent.db" "$linux_policy/database-before"
 run env HOME="$linux_policy/home" PATH="$linux_policy/bin:$PATH" \
@@ -732,7 +732,7 @@ for database in agent.db models.db skill-descriptions.db; do
   done
 done
 for path in agent/sessions logs cache run; do
-  assert "Linux permits runtime subtree $path" has_linux_bind --bind "$linux_policy/home/custom/profiles/glen-harness/$path"
+  assert "Linux permits runtime subtree $path" has_linux_bind --bind "$linux_policy/home/custom/profiles/glen-harness-codex/$path"
 done
 assert 'Linux file preparation preserves existing database contents' cmp -s "$linux_agent/agent.db" "$linux_policy/database-before"
 
@@ -764,7 +764,7 @@ for tool in date git dirname jq omp; do
   ln -s "$(command -v "$tool")" "$linux_probe_bin/$tool"
 done
 run env HOME="$WORK/linux-probe-home" PI_CONFIG_DIR=.omp GLEN_OMP_ENGINE=on \
-  PATH="$linux_probe_bin" /bin/bash "$ENGINE" probe
+  PATH="$linux_probe_bin" /bin/bash "$ENGINE" probe --engine omp:codex
 assert_exit 'Linux probe without bwrap refuses before any tool check' 3
 assert 'Linux probe without bwrap has skipped status' jq -e '.status == "skipped"' "$STDOUT"
 assert_contains 'Linux probe without bwrap names the unavailable reason' \
@@ -773,7 +773,7 @@ assert_contains 'Linux probe without bwrap names the unavailable reason' \
 cp "$WORK/bin/glen" "$linux_probe_bin/bwrap"
 chmod +x "$linux_probe_bin/bwrap"
 run env HOME="$WORK/linux-probe-home" PI_CONFIG_DIR=.omp GLEN_OMP_ENGINE=on \
-  PATH="$linux_probe_bin" /bin/bash "$ENGINE" probe
+  PATH="$linux_probe_bin" /bin/bash "$ENGINE" probe --engine omp:codex
 assert_exit 'Linux probe with bwrap present still refuses' 3
 assert_contains 'Linux probe with bwrap present names the same reason' \
   'unavailable: linux abstract-socket isolation not supported' "$STDOUT"
@@ -794,7 +794,7 @@ else
   no_sandbox_reason='unavailable: linux abstract-socket isolation not supported'
 fi
 run env HOME="$WORK/home" PI_CONFIG_DIR=.omp GLEN_OMP_ENGINE=on \
-  PATH="$WORK/no-sandbox-bin" /bin/bash "$ENGINE" probe
+  PATH="$WORK/no-sandbox-bin" /bin/bash "$ENGINE" probe --engine omp:codex
 assert_exit 'probe without sandbox skips' 3
 assert 'probe without sandbox has skipped status' jq -e '.status == "skipped"' "$STDOUT"
 assert_contains 'probe without sandbox names the reason' "$no_sandbox_reason" "$STDOUT"
@@ -839,6 +839,17 @@ assert 'probe disabled status' jq -e '.status == "skipped"' "$STDOUT"
 assert_contains 'probe disabled reason' GLEN_OMP_ENGINE "$STDOUT"
 assert "probe disabled takes under two seconds (${elapsed}ms)" test "$elapsed" -lt 2000
 
+# No default profile: the dispatching modes and probe need --engine, and only the two engine profiles exist.
+printf 'brief\n' > "$WORK/usage-brief.md"
+for usage_args in "probe" "review --uncommitted --out $WORK/usage-out.md" "debug --brief $WORK/usage-brief.md --out $WORK/usage-out.md" \
+  "ask --brief $WORK/usage-brief.md --out $WORK/usage-out.md"; do
+  # shellcheck disable=SC2086 # the words are deliberately split into arguments
+  run env HOME="$WORK/home" PI_CONFIG_DIR=.omp GLEN_OMP_ENGINE=on /bin/bash "$ENGINE" $usage_args
+  assert_exit "${usage_args%% *} without --engine is a usage error" 2
+done
+run env GLEN_OMP_ENGINE=on /bin/bash "$ENGINE" probe --engine omp:cursor
+assert_exit 'the retired cursor engine is a usage error' 2
+
 # Codex P2 / Claude LOW-1: on real Linux, probe_checks refuses before any
 # profile or run-root check, so those reasons are macOS-only expectations.
 if [ "$(uname -s)" = Darwin ]; then
@@ -849,14 +860,14 @@ else
   missing_profile_reason='unavailable: linux abstract-socket isolation not supported'
   home_root_reason="$missing_profile_reason"
 fi
-run env HOME="$WORK/home" PI_CONFIG_DIR=.omp GLEN_OMP_ENGINE=on /bin/bash "$ENGINE" probe
+run env HOME="$WORK/home" PI_CONFIG_DIR=.omp GLEN_OMP_ENGINE=on /bin/bash "$ENGINE" probe --engine omp:codex
 assert_exit 'probe missing profile exit' 3
 assert_contains 'probe missing profile reason' "$missing_profile_reason" "$STDOUT"
 assert 'probe missing profile creates no run root or jobs' test ! -e "$WORK/tmp/glen-omp-engine"
 
-mkdir -p "$WORK/home/.omp/profiles/glen-harness/agent" "$WORK/home/.omp/natives" "$WORK/home/tmproot"
-printf 'tools:\n  approvalMode: always-ask\n' > "$WORK/home/.omp/profiles/glen-harness/agent/config.yml"
-run env HOME="$WORK/home" PI_CONFIG_DIR=.omp TMPDIR="$WORK/home/tmproot" GLEN_OMP_ENGINE=on /bin/bash "$ENGINE" probe
+mkdir -p "$WORK/home/.omp/profiles/glen-harness-codex/agent" "$WORK/home/.omp/natives" "$WORK/home/tmproot"
+printf 'tools:\n  approvalMode: always-ask\n' > "$WORK/home/.omp/profiles/glen-harness-codex/agent/config.yml"
+run env HOME="$WORK/home" PI_CONFIG_DIR=.omp TMPDIR="$WORK/home/tmproot" GLEN_OMP_ENGINE=on /bin/bash "$ENGINE" probe --engine omp:codex
 assert_exit 'probe run root under home exit' 3
 assert_contains 'probe run root under home reason' "$home_root_reason" "$STDOUT"
 assert 'probe fast paths invoke neither glen nor omp' test ! -e "$SMOKE_UNEXPECTED_CALL"
@@ -1091,7 +1102,7 @@ if [ "$(uname -s)" != Darwin ]; then
   assert_exit 'Linux launcher resolution refuses' 4
   assert_contains 'Linux launcher refusal names the reason' 'unavailable: linux abstract-socket isolation not supported' "$STDERR"
   assert 'Linux launcher refusal returns no launcher path' test ! -s "$STDOUT"
-  run env HOME="$WORK/home" PI_CONFIG_DIR=.omp GLEN_OMP_ENGINE=on /bin/bash "$ENGINE" probe
+  run env HOME="$WORK/home" PI_CONFIG_DIR=.omp GLEN_OMP_ENGINE=on /bin/bash "$ENGINE" probe --engine omp:codex
   assert_exit 'Linux probe with a set-up profile still refuses' 3
   assert_contains 'Linux probe with a set-up profile names the reason' 'unavailable: linux abstract-socket isolation not supported' "$STDOUT"
   assert 'Linux probe never calls glen or omp' test ! -e "$SMOKE_UNEXPECTED_CALL"
@@ -1140,12 +1151,12 @@ assert 'symlinked run directory refusal returns no launcher path' test ! -s "$ST
 # after resolution, not only run-* names: profile siblings, shared ~/.omp/run,
 # an engine probe root, and an active run root of any name, also via symlink.
 containment_home="$WORK/containment-home"
-mkdir -p "$containment_home/.omp/profiles/glen-harness/logs" "$containment_home/.omp/profiles/glen-harness/cache" \
+mkdir -p "$containment_home/.omp/profiles/glen-harness-codex/logs" "$containment_home/.omp/profiles/glen-harness-codex/cache" \
   "$containment_home/.omp/run" "$WORK/containment-tmp/glen-omp-engine/probe.fixture" "$WORK/containment-active/omp.fixture"
-ln -s "$containment_home/.omp/profiles/glen-harness/logs" "$WORK/containment-logs-link"
+ln -s "$containment_home/.omp/profiles/glen-harness-codex/logs" "$WORK/containment-logs-link"
 ln -s "$WORK/containment-active/omp.fixture" "$WORK/containment-active-link"
-for containment_case in "profile-logs $containment_home/.omp/profiles/glen-harness/logs" \
-  "profile-cache $containment_home/.omp/profiles/glen-harness/cache" "shared-run $containment_home/.omp/run" \
+for containment_case in "profile-logs $containment_home/.omp/profiles/glen-harness-codex/logs" \
+  "profile-cache $containment_home/.omp/profiles/glen-harness-codex/cache" "shared-run $containment_home/.omp/run" \
   "logs-symlink $WORK/containment-logs-link" "probe-root $WORK/containment-tmp/glen-omp-engine/probe.fixture" \
   "active-root-symlink $WORK/containment-active-link"; do
   label="${containment_case%% *}" target="${containment_case#* }"
@@ -1155,14 +1166,14 @@ for containment_case in "profile-logs $containment_home/.omp/profiles/glen-harne
   assert_contains "launcher $label refusal names a writable root" 'sandbox launcher must not resolve' "$STDERR"
   assert "launcher $label refusal returns no launcher path" test ! -s "$STDOUT"
 done
-run env HOME="$containment_home" TMPDIR="$containment_home/.omp/profiles/glen-harness/cache" \
+run env HOME="$containment_home" TMPDIR="$containment_home/.omp/profiles/glen-harness-codex/cache" \
   /bin/bash "$ENGINE" launcher "$POLICY_REPO"
 assert_exit 'launcher refuses a default cache under a TMPDIR inside the profile' 4
 # Claude LOW-5: a refused destination is never created first.
 run env HOME="$containment_home" /bin/bash "$ENGINE" launcher "$POLICY_REPO" \
-  "$containment_home/.omp/profiles/glen-harness/logs/never/created"
+  "$containment_home/.omp/profiles/glen-harness-codex/logs/never/created"
 assert_exit 'launcher refuses a missing destination inside the profile' 4
-assert 'refused launcher destination is never created' test ! -e "$containment_home/.omp/profiles/glen-harness/logs/never"
+assert 'refused launcher destination is never created' test ! -e "$containment_home/.omp/profiles/glen-harness-codex/logs/never"
 
 # Fix cycle 7 (Codex P1): a relocated profile is refused by name at launcher
 # resolution and at probe, whichever component is the symlink, even when the
@@ -1173,41 +1184,41 @@ for relocated_case in profile-root omp-root agent profiles-dir logs-child shared
   case "$relocated_case" in
     profile-root)
       mkdir -p "$relocated_home/.omp/profiles"
-      ln -s "$relocated_out/harness" "$relocated_home/.omp/profiles/glen-harness"
-      relocated_link="$relocated_home/.omp/profiles/glen-harness" ;;
+      ln -s "$relocated_out/harness" "$relocated_home/.omp/profiles/glen-harness-codex"
+      relocated_link="$relocated_home/.omp/profiles/glen-harness-codex" ;;
     omp-root)
-      mkdir -p "$relocated_out/omp/profiles/glen-harness/agent"
+      mkdir -p "$relocated_out/omp/profiles/glen-harness-codex/agent"
       ln -s "$relocated_out/omp" "$relocated_home/.omp"
       relocated_link="$relocated_home/.omp" ;;
     agent)
-      mkdir -p "$relocated_home/.omp/profiles/glen-harness"
-      ln -s "$relocated_out/harness/agent" "$relocated_home/.omp/profiles/glen-harness/agent"
-      relocated_link="$relocated_home/.omp/profiles/glen-harness/agent" ;;
+      mkdir -p "$relocated_home/.omp/profiles/glen-harness-codex"
+      ln -s "$relocated_out/harness/agent" "$relocated_home/.omp/profiles/glen-harness-codex/agent"
+      relocated_link="$relocated_home/.omp/profiles/glen-harness-codex/agent" ;;
     profiles-dir)
-      mkdir -p "$relocated_home/.omp" "$relocated_out/profiles/glen-harness/agent"
+      mkdir -p "$relocated_home/.omp" "$relocated_out/profiles/glen-harness-codex/agent"
       ln -s "$relocated_out/profiles" "$relocated_home/.omp/profiles"
       relocated_link="$relocated_home/.omp/profiles" ;;
     logs-child)
-      mkdir -p "$relocated_home/.omp/profiles/glen-harness/agent"
-      ln -s "$relocated_out/harness/cache" "$relocated_home/.omp/profiles/glen-harness/logs"
-      relocated_link="$relocated_home/.omp/profiles/glen-harness/logs" ;;
+      mkdir -p "$relocated_home/.omp/profiles/glen-harness-codex/agent"
+      ln -s "$relocated_out/harness/cache" "$relocated_home/.omp/profiles/glen-harness-codex/logs"
+      relocated_link="$relocated_home/.omp/profiles/glen-harness-codex/logs" ;;
     shared-owners)
-      mkdir -p "$relocated_home/.omp/profiles/glen-harness/agent" "$relocated_home/.omp/run"
+      mkdir -p "$relocated_home/.omp/profiles/glen-harness-codex/agent" "$relocated_home/.omp/run"
       ln -s "$relocated_out/harness/cache" "$relocated_home/.omp/run/session-owners"
       relocated_link="$relocated_home/.omp/run/session-owners" ;;
   esac
   run env HOME="$relocated_home" /bin/bash "$ENGINE" launcher "$POLICY_REPO" "$relocated_out/harness/cache/launcher"
   assert_exit "launcher refuses a relocated $relocated_case" 4
   assert_contains "relocated $relocated_case refusal names the symlink" \
-    "refusing symlinked glen-harness profile path: $(cd "$(dirname "$relocated_link")" && pwd -P)/${relocated_link##*/}" "$STDERR"
+    "refusing symlinked glen-harness-codex profile path: $(cd "$(dirname "$relocated_link")" && pwd -P)/${relocated_link##*/}" "$STDERR"
   assert "relocated $relocated_case refusal returns no launcher path" test ! -s "$STDOUT"
   assert "relocated $relocated_case refusal creates nothing" test ! -e "$relocated_out/harness/cache/launcher"
 done
 mkdir -p "$WORK/relocated-profile-root/outside/harness/agent"
 printf 'modelRoles: {}\n' > "$WORK/relocated-profile-root/outside/harness/agent/config.yml"
-run env HOME="$WORK/relocated-profile-root/home" PI_CONFIG_DIR=.omp GLEN_OMP_ENGINE=on /bin/bash "$ENGINE" probe
+run env HOME="$WORK/relocated-profile-root/home" PI_CONFIG_DIR=.omp GLEN_OMP_ENGINE=on /bin/bash "$ENGINE" probe --engine omp:codex
 assert_exit 'probe skips a relocated profile' 3
-assert_contains 'relocated profile probe names the reason' 'refusing symlinked glen-harness profile path' "$STDOUT"
+assert_contains 'relocated profile probe names the reason' 'refusing symlinked glen-harness-codex profile path' "$STDOUT"
 assert 'relocated profile probe never calls glen or omp' test ! -e "$SMOKE_UNEXPECTED_CALL"
 
 # A cached launcher is reused only as a regular file with the same bytes.
@@ -1255,15 +1266,22 @@ for name in CLAUDE_CONFIG_DIR COPILOT_CUSTOM_INSTRUCTIONS_DIRS PI_PY PI_JS PI_CO
 done
 assert 'dispatch retains token variable name' grep -q '^MNEMOSYNE_TOKEN=' "$WORK/env.out"
 assert 'dispatch selects captured platform launcher' grep -Eq "^GLEN_OMP_BIN=.*/$launcher_name\.[^/]+$" "$WORK/env.out"
-assert_contains 'dispatch passes explicit profile agent path' "OMP_PROFILE_AGENT_DIR=$WORK/home/.omp/profiles/glen-harness/agent" "$WORK/env.out"
+assert_contains 'dispatch passes explicit profile agent path' "OMP_PROFILE_AGENT_DIR=$WORK/home/.omp/profiles/glen-harness-codex/agent" "$WORK/env.out"
 assert_contains 'dispatch overwrites inherited real binary' "OMP_REAL_BIN=$WORK/bin/omp" "$WORK/env.out"
+# The OpenCode key reaches only the opencode engine; codex and the engine-less helper scrub it.
+for key_case in omp:opencode:yes omp:codex:no none:no; do
+  key_engine="${key_case%:*}" key_want="${key_case##*:}"
+  if [ "$key_engine" = none ]; then key_args=(); else key_args=(--engine "$key_engine"); fi
+  key_out="$(OPENCODE_API_KEY=smoke-placeholder HOME="$WORK/home" /bin/bash "$ENGINE" envcheck ${key_args[@]+"${key_args[@]}"} -- /bin/sh -c 'test -n "${OPENCODE_API_KEY:-}" && echo yes || echo no' 2>/dev/null | tail -n 1)"
+  assert_eq "envcheck $key_engine passes the opencode key: $key_want" "$key_out" "$key_want"
+done
 
 # Successful production paths use offline stubs, never the owner's omp/profile.
 export SMOKE_OMP_CALLS="$WORK/omp-calls" SMOKE_DISPATCH_CALLS="$WORK/dispatch-calls"
 export SMOKE_OMP_FDS="$WORK/omp-fds" SMOKE_DISPATCH_FDS="$WORK/dispatch-fds"
 export SMOKE_SESSION="$WORK/session.jsonl" SMOKE_SEND_ARGV="$WORK/send-argv"
 : > "$SMOKE_SEND_ARGV"
-printf '%s\n' '{"type":"message","message":{"role":"assistant","model":"fixture","provider":"cursor","usage":{"input":1,"output":1}}}' > "$SMOKE_SESSION"
+printf '%s\n' '{"type":"message","message":{"role":"assistant","model":"gpt-6.1-sol","provider":"openai-codex","usage":{"input":1,"output":1}}}' > "$SMOKE_SESSION"
 cat > "$WORK/bin/omp" <<'EOF'
 #!/bin/sh
 # The launcher's unsandboxed daemon-scope hash (Bun runtime mode).
@@ -1273,11 +1291,7 @@ if [ -e /dev/fd/3 ]; then printf 'open\n' >> "$SMOKE_OMP_FDS"; exit 99; fi
 printf 'closed\n' >> "$SMOKE_OMP_FDS"
 printf '%s\n' "$*" >> "$SMOKE_OMP_CALLS"
 case "$*" in
-  '--profile glen-harness models cursor --json') printf '%s\n' '{"models":[{"id":"fixture"}]}' ;;
-  '--profile glen-harness config get modelRoles --json')
-    [ "${SMOKE_REJECT_MODEL_ROLES:-0}" = 0 ] || exit 99
-    printf '%s\n' "{\"value\":{\"default\":\"${SMOKE_MODEL_ROLES_DEFAULT:-cursor/fixture}\",\"task\":\"cursor/other\"}}"
-    ;;
+  '--profile glen-harness-codex models openai-codex --json') printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6.1-sol"}]}' ;;
   *) exit 99 ;;
 esac
 EOF
@@ -1300,7 +1314,7 @@ printf '%s %s\n' "$command" "$fd3" >> "$SMOKE_DISPATCH_FDS"
 # lives in a fixed, per-TMPDIR cache dir outside any such root.
 case "$GLEN_OMP_BIN" in "$TMPDIR"/glen-omp-engine-launcher/omp-sandboxed*.sh.*) ;; *) exit 99 ;; esac
 case "$GLEN_OMP_BIN" in "$OMP_SANDBOX_RUN_ROOT"/*) exit 99 ;; esac
-[ "$OMP_PROFILE_AGENT_DIR" = "$HOME/.omp/profiles/glen-harness/agent" ] || exit 99
+[ "$OMP_PROFILE_AGENT_DIR" = "$HOME/.omp/profiles/glen-harness-codex/agent" ] || exit 99
 [ -d "${OMP_SANDBOX_RUN_ROOT:-}/tree" ] || exit 99
 printf '%s scrubbed\n' "$command" >> "$SMOKE_DISPATCH_CALLS"
 case "$command" in
@@ -1326,18 +1340,18 @@ jq -cn --arg answer "$answer" --arg session "$SMOKE_SESSION" \
 exit "$code"
 EOF
 printf 'Debug fixture\n' > "$WORK/brief.md"
-run env HOME="$WORK/home" PI_CONFIG_DIR=.omp GLEN_OMP_ENGINE=on /bin/bash "$ENGINE" probe
+run env HOME="$WORK/home" PI_CONFIG_DIR=.omp GLEN_OMP_ENGINE=on /bin/bash "$ENGINE" probe --engine omp:codex
 assert_exit 'probe safe private run root exit' 0
 assert_eq 'probe safe private run root status' "$(jq -r .status "$STDOUT")" ready
 assert_eq 'probe private run root permissions' "$(perl -e 'printf "%04o\n", (stat shift)[2] & 07777' "$WORK/tmp/glen-omp-engine")" 0700
 assert 'fd3 fixture detects an intentionally open descriptor' /bin/bash -c 'test -e /dev/fd/3' 3> "$WORK/fd3-control"
-assert_eq 'probe omp children start with fd3 closed' "$(cat "$SMOKE_OMP_FDS")" $'closed\nclosed'
-assert_contains 'probe queries registered modelRoles record key' 'config get modelRoles --json' "$SMOKE_OMP_CALLS"
-assert_eq 'probe never queries invalid modelRoles.default key' "$(grep -c 'config get modelRoles.default' "$SMOKE_OMP_CALLS" || true)" 0
+assert_eq 'probe omp children start with fd3 closed' "$(cat "$SMOKE_OMP_FDS")" closed
+assert_contains 'probe queries the engine provider catalog' 'models openai-codex --json' "$SMOKE_OMP_CALLS"
+assert_eq 'probe never reads a saved model role' "$(grep -c 'config get' "$SMOKE_OMP_CALLS" || true)" 0
 # shellcheck disable=SC2016 # jq receives these variables through --arg.
-assert 'probe routes both calls through launcher with private cwd and explicit paths' jq -es \
-  --arg agent "$WORK/home/.omp/profiles/glen-harness/agent" --arg binary "$WORK/bin/omp" \
-  'length==2 and all(.[]; .root==.cwd and .agent==$agent and .binary==$binary)' "$SMOKE_SANDBOX_CALLS"
+assert 'probe routes its call through launcher with private cwd and explicit paths' jq -es \
+  --arg agent "$WORK/home/.omp/profiles/glen-harness-codex/agent" --arg binary "$WORK/bin/omp" \
+  'length==1 and all(.[]; .root==.cwd and .agent==$agent and .binary==$binary)' "$SMOKE_SANDBOX_CALLS"
 assert 'probe reports launcher source' jq -e '.launcher_source == "main" or .launcher_source == "worktree"' "$STDOUT"
 
 # Exercise both bounded_omp branches, independent of which timeout tools the
@@ -1359,9 +1373,9 @@ for branch in timeout perl; do
   [ "$branch" != timeout ] || probe_path="$WORK/with-timeout-bin:$probe_path"
   : > "$SMOKE_OMP_FDS"
   run env HOME="$WORK/home" PI_CONFIG_DIR=.omp GLEN_OMP_ENGINE=on \
-    PATH="$probe_path" /bin/bash "$ENGINE" probe
+    PATH="$probe_path" /bin/bash "$ENGINE" probe --engine omp:codex
   assert_exit "probe $branch fd3 check succeeds" 0
-  assert_eq "probe $branch closes fd3 for both omp calls" "$(cat "$SMOKE_OMP_FDS")" $'closed\nclosed'
+  assert_eq "probe $branch closes fd3 for its omp call" "$(cat "$SMOKE_OMP_FDS")" closed
   if [ "$branch" = timeout ]; then
     assert 'probe timeout fixture actually ran' test -e "$SMOKE_TIMEOUT_USED"
     rm "$SMOKE_TIMEOUT_USED"
@@ -1369,10 +1383,6 @@ for branch in timeout perl; do
     assert 'probe perl branch does not run timeout' test ! -e "$SMOKE_TIMEOUT_USED"
   fi
 done
-
-run env HOME="$WORK/home" PI_CONFIG_DIR=.omp GLEN_OMP_ENGINE=on SMOKE_REJECT_MODEL_ROLES=1 /bin/bash "$ENGINE" probe
-assert_exit 'probe rejected modelRoles query skips' 3
-assert_contains 'probe rejected modelRoles query reason' 'config check failed' "$STDOUT"
 
 # A leaked orchestrator hook must not execute inside the production snapshot,
 # while both review/debug still reach a send AND a wait with scrubbed env.
@@ -1388,7 +1398,7 @@ for mode in review debug; do
       fi
       run env HOME="$WORK/home" PI_CONFIG_DIR=.omp GLEN_OMP_ENGINE=on CLAUDE_CONFIG_DIR=hostile \
         SMOKE_ENGINE_MODE="$mode" SMOKE_MUTATION_MARKER="$WORK/production-mutation-$mode" \
-        /bin/bash "$ENGINE" "$mode" --repo "$SRC" "${mode_args[@]}" --out "$WORK/$mode-$hook.md"
+        /bin/bash "$ENGINE" "$mode" --engine omp:codex --role review --repo "$SRC" "${mode_args[@]}" --out "$WORK/$mode-$hook.md"
       printf '%s\n' "$CODE" > "$WORK/production-code"
     )
     CODE="$(cat "$WORK/production-code")"
@@ -1411,9 +1421,9 @@ for permissions in 0770 0702; do
   chmod "$permissions" "$WORK/tmp/glen-omp-engine"
   for mode in probe review debug; do
     case "$mode" in
-      probe) mode_args=(probe) ;;
-      review) mode_args=(review --repo "$SRC" --uncommitted --out "$WORK/unsafe-review.md") ;;
-      debug) mode_args=(debug --repo "$SRC" --brief "$WORK/brief.md" --out "$WORK/unsafe-debug.md") ;;
+      probe) mode_args=(probe --engine omp:codex) ;;
+      review) mode_args=(review --engine omp:codex --role review --repo "$SRC" --uncommitted --out "$WORK/unsafe-review.md") ;;
+      debug) mode_args=(debug --engine omp:codex --role review --repo "$SRC" --brief "$WORK/brief.md" --out "$WORK/unsafe-debug.md") ;;
     esac
     run env HOME="$WORK/home" PI_CONFIG_DIR=.omp GLEN_OMP_ENGINE=on /bin/bash "$ENGINE" "${mode_args[@]}"
     assert_exit "$mode refuses unsafe root permissions $permissions" 3
@@ -1426,7 +1436,7 @@ chmod 0700 "$WORK/tmp/glen-omp-engine"
 mkdir -p "$WORK/symlink-tmp" "$WORK/symlink-target/glen-omp-engine"
 chmod 0770 "$WORK/symlink-target/glen-omp-engine"
 ln -s "$WORK/symlink-target/glen-omp-engine" "$WORK/symlink-tmp/glen-omp-engine"
-run env HOME="$WORK/home" PI_CONFIG_DIR=.omp TMPDIR="$WORK/symlink-tmp" GLEN_OMP_ENGINE=on /bin/bash "$ENGINE" probe
+run env HOME="$WORK/home" PI_CONFIG_DIR=.omp TMPDIR="$WORK/symlink-tmp" GLEN_OMP_ENGINE=on /bin/bash "$ENGINE" probe --engine omp:codex
 assert_exit 'probe refuses unsafe symlink target run root' 3
 assert_contains 'probe unsafe symlink target reason names root' "$(cd "$WORK/symlink-target/glen-omp-engine" && pwd -P)" "$STDOUT"
 assert_eq 'unsafe run roots invoke no omp probes or jobs' "$(wc -l < "$SMOKE_OMP_CALLS")" "$omp_calls_before"
@@ -1471,7 +1481,7 @@ chmod +x "$DISPATCH_BIN/date" "$DISPATCH_BIN/sleep" "$DISPATCH_BIN/du"
 
 dispatch_fixture() {
   STATE="$WORK/dispatch/$1" CASE_MODE="${2:-review}" CASE_DEADLINE=15m
-  CASE_PROVIDER="${3:-cursor}"
+  CASE_PROVIDER="${3:-openai-codex}"
   mkdir "$STATE"
   CASE_OUT="$STATE/answer.md"
   printf '100000\n' > "$STATE/clock"
@@ -1480,9 +1490,9 @@ dispatch_fixture() {
   : > "$STATE/sleeps"
   for job in j0000001 j0000002; do
     jq -cn --arg provider "$CASE_PROVIDER" '
-      {type:"message",message:{role:"assistant",model:"fixture-model",provider:$provider,
+      {type:"message",message:{role:"assistant",model:"gpt-6.1-sol",provider:$provider,
         usage:{input:2,output:3,cacheRead:4,cacheWrite:5,totalTokens:14,cost:{total:1}}}},
-      {type:"message",message:{role:"assistant",model:"fixture-model",provider:$provider,
+      {type:"message",message:{role:"assistant",model:"gpt-6.1-sol",provider:$provider,
         usage:{input:7,output:11,cacheRead:13,cacheWrite:17,totalTokens:48,cost:{total:2}}}}
     ' > "$STATE/session-$job.jsonl"
   done
@@ -1521,13 +1531,13 @@ dispatch_command() {
   [ "$mode" = review ] || mode_args=(--brief "$WORK/brief.md")
   env HOME="$WORK/home" PI_CONFIG_DIR=.omp GLEN_OMP_ENGINE=on \
     FAKE_GLEN_STATE="$STATE" PATH="${DISPATCH_EXTRA_PATH:-}$DISPATCH_BIN:$PATH" \
-    GLEN_BIN="$TEST_DIR/support/glen" /bin/bash "$ENGINE" "$mode" --repo "$DISPATCH_SRC" \
+    GLEN_BIN="$TEST_DIR/support/glen" /bin/bash "$ENGINE" "$mode" --engine omp:codex --role review --repo "$DISPATCH_SRC" \
     "${mode_args[@]}" --out "$CASE_OUT" --deadline "$CASE_DEADLINE" "$@"
 }
 dispatch_run() {
   jq -s . "$STATE/plan.jsonl" > "$STATE/steps.json"
   run dispatch_command "$CASE_MODE" "$@"
-  assert "dispatch $(basename "$STATE") emits one public result" jq -es 'length==1 and .[0].v==1 and .[0].engine=="omp"' "$STDOUT"
+  assert "dispatch $(basename "$STATE") emits one public result" jq -es 'length==1 and .[0].v==1 and .[0].engine=="omp:codex"' "$STDOUT"
 }
 assert_tree() {
   local label="$1" expected="$2" tree
@@ -1566,7 +1576,7 @@ for terminal in ok failed; do
   assert "dispatch $terminal tree exists during wait" test -d "$checkpoint_tree"
   : > "$STATE/release"
   if wait "$ENGINE_PID"; then CODE=0; else CODE="$?"; fi
-  assert "dispatch $terminal emits one public result" jq -es 'length==1 and .[0].v==1 and .[0].engine=="omp"' "$STDOUT"
+  assert "dispatch $terminal emits one public result" jq -es 'length==1 and .[0].v==1 and .[0].engine=="omp:codex"' "$STDOUT"
   if [ "$terminal" = ok ]; then expected=0; else expected=4; fi
   assert_exit "dispatch $terminal terminal exit" "$expected"
   assert_eq "dispatch $terminal terminal status" "$(jq -r .status "$STDOUT")" "$terminal"
@@ -1575,38 +1585,10 @@ for terminal in ok failed; do
   if [ "$terminal" = ok ]; then
     assert_eq 'dispatch captures exact final answer' "$(cat "$CASE_OUT")" "$ANSWER"
     assert 'dispatch sums session usage and replies' jq -e '.replies==1 and .usage=={input:9,output:14,cacheRead:17,cacheWrite:22,totalTokens:62,cost_total:3}' "$STDOUT"
-    # Items 11 and 7 (fix cycle 4/5): the fixture model (cursor/fixture) is
-    # off-ladder (an explicit --model stand-in), so no --thinking at all
-    # reaches the real send argv ($STATE/calls.jsonl, written by
+    # The slot's routing effort (codex: high) reaches the real send argv ($STATE/calls.jsonl, written by
     # tests/support/glen's own argv capture, not $WORK/bin/glen's).
-    assert 'off-ladder model sends no --thinking at all' jq -es \
-      'all(.[]; (.argv | index("--thinking")) == null)' "$STATE/calls.jsonl"
-  fi
-done
-
-# Items 11 and 7, fix cycle 6 MED-2: --thinking repeats exactly the persisted
-# suffix, including the grok rung's "high" and a suffix that differs from
-# the ladder, and is omitted for a bare id even when that id is on the ladder
-# (setup --model cursor/grok-4.7 persists no suffix).
-for ladder_case in grok override bare; do
-  case "$ladder_case" in
-    grok) ladder_model=cursor/grok-4.7:high expected_level=high ;;
-    override) ladder_model=cursor/grok-4.7:low expected_level=low ;;
-    bare) ladder_model=cursor/grok-4.7 expected_level='' ;;
-  esac
-  dispatch_fixture "ladder-$ladder_case"
-  dispatch_step send 0 "$DONE"
-  SMOKE_MODEL_ROLES_DEFAULT="$ladder_model" dispatch_run
-  assert_exit "model role $ladder_model dispatch succeeds" 0
-  if [ -n "$expected_level" ]; then
-    # shellcheck disable=SC2016 # jq binds $level through --arg.
-    assert "model role $ladder_model sends its persisted thinking level" jq -es \
-      --arg level "$expected_level" \
-      'length > 0 and all(.[]; (.argv | index("--thinking")) as $i | $i != null and .argv[$i+1] == $level)' \
-      "$STATE/calls.jsonl"
-  else
-    assert "model role $ladder_model sends no --thinking at all" jq -es \
-      'length > 0 and all(.[]; (.argv | index("--thinking")) == null)' "$STATE/calls.jsonl"
+    assert 'the slot effort reaches send as --thinking' jq -es \
+      'map(select(.argv | index("send"))) | length > 0 and all(.[]; (.argv | index("--thinking")) as $i | $i != null and .argv[$i+1] == "high")' "$STATE/calls.jsonl"
   fi
 done
 
@@ -1617,8 +1599,8 @@ dispatch_fixture empty-transcript
 dispatch_step send 0 "$DONE"
 dispatch_run
 assert_exit 'empty-transcript result exits 4' 4
-assert_eq 'empty-transcript result reason' "$(jq -r .reason "$STDOUT")" 'ran on unknown, not cursor'
-assert_eq 'empty-transcript failure keeps the probed model' "$(jq -r .model "$STDOUT")" cursor/fixture
+assert_eq 'empty-transcript result reason' "$(jq -r .reason "$STDOUT")" 'ran on unknown, not openai-codex'
+assert_eq 'empty-transcript failure keeps the probed model' "$(jq -r .model "$STDOUT")" openai-codex/gpt-6.1-sol
 
 dispatch_fixture running-no-job
 dispatch_step send 10 "$(printf '%s' "$RUNNING" | jq '.data.job=null')"
@@ -1706,16 +1688,16 @@ for spill in valid missing invalid; do
   fi
 done
 
-for provider in cursor anthropic; do
+for provider in openai-codex anthropic; do
   for keep in no yes; do
     dispatch_fixture "provider-$provider-$keep" review "$provider"
     dispatch_step send 0 "$DONE"
     if [ "$keep" = yes ]; then dispatch_run --keep; else dispatch_run; fi
-    if [ "$provider" = cursor ]; then
-      assert_exit "cursor provider $keep accepted" 0
+    if [ "$provider" = openai-codex ]; then
+      assert_exit "codex provider $keep accepted" 0
     else
       assert_exit "foreign provider $keep rejected" 4
-      assert_eq "foreign provider $keep failure reason" "$(jq -r .reason "$STDOUT")" 'ran on anthropic, not cursor'
+      assert_eq "foreign provider $keep failure reason" "$(jq -r .reason "$STDOUT")" 'ran on anthropic, not openai-codex'
     fi
     if [ "$keep" = yes ]; then expected=retained; else expected=removed; fi
     assert_tree "provider $provider keep=$keep cleanup" "$expected"

@@ -51,7 +51,7 @@ reader who didn't watch the work.
 
 ## Scope contract for declared waves
 
-Within a declared `/auto-mode` or `/goal` wave, scope is fixed by the goal
+Within a declared `/auto-mode` wave, scope is fixed by the goal
 contract — build the full declared feature set and do not narrow it. The
 surgical-change and no-tidying constraints govern _how_ you edit, not _whether_
 you deliver the whole wave. Never ship a reduced/MVP slice of a declared wave;

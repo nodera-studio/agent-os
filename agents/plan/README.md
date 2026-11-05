@@ -1,21 +1,22 @@
 # Plan Workflow
 
 Turns a task description into a ready-to-implement plan: explore the codebase, research
-what's unfamiliar, generate competing architectures from two independent models, pick a
-winner, turn it into a step-by-step plan (again from two models on harder tasks), and
+what's unfamiliar, generate competing architectures from independent models, pick a
+winner, turn it into a step-by-step plan (again from several models), and
 save it for `/implement` to pick up. The most complex pipeline in the suite — two
-distinct dual-engine-generate-then-judge-select rounds, gated by an automatic triage
-step so trivial tasks don't pay for machinery they don't need.
+multi-engine generate-then-judge-select rounds, preceded by a discovery triage
+that sets how far the researcher looks. There is no minimal discovery depth and no
+single-planner shortcut.
 
-## Why dual-engine, twice
+## Why multi-engine, twice
 
 One model proposing and reviewing its own architecture has no outside view. Two
-independent models (Claude + Codex) generating from the *same* explorer/researcher
+independent models (Claude plus the omp engines `routing.sh engines` names) generating from the *same* explorer/researcher
 findings surface genuinely different approaches — the diversity is the value, not an
 average of the two. A fresh **judge-selector**, which generated neither, picks the
 stronger spine and grafts only the *separable*, low-risk improvements from the
 runner-up — never blends the two into a new hybrid nobody actually designed. The same
-select-then-graft pattern repeats at the plan-detail step for non-trivial tasks.
+select-then-graft pattern repeats at the plan-detail step.
 
 ## Pipeline
 
@@ -23,29 +24,23 @@ select-then-graft pattern repeats at the plan-detail step for non-trivial tasks.
 flowchart TD
     T["Task description"] --> TR{{"Step 2 — Discovery triage<br/>novelty × ambiguity × scope"}}
 
-    TR -->|minimal| EX1["Explorer only"]
     TR -->|standard| EX2["Explorer ‖ Researcher"]
     TR -->|deep| EX3["Explorer ‖ Researcher (expanded scope)"]
 
-    EX1 --> ARCH
     EX2 --> ARCH
     EX3 --> ARCH
 
-    subgraph ARCH["Step 4 — Architecture (always dual-engine)"]
+    subgraph ARCH["Step 4 — Architecture (always multi-engine)"]
         direction LR
         A1["Claude architect<br/>2-3 approaches"]
-        A2["Codex architect<br/>2-3 approaches"]
-        A3["Gemini architect<br/>(high-stakes specs only,<br/>if CLI present)"]
+        A2["omp architect (omp:codex)<br/>2-3 approaches"]
+        A3["omp:opencode/argon<br/>(high-stakes specs only,<br/>if available)"]
     end
 
     ARCH --> J1["Step 4.5 — Judge-selector<br/>picks the stronger spine,<br/>grafts separable improvements"]
     J1 --> GATE1{{"Step 5 — User picks the<br/>winning approach + grafts<br/>(skipped in /auto-mode)"}}
 
-    GATE1 --> PG{{"Step 6 — Plan engine gate<br/>(reuses Step 2 triage)"}}
-    PG -->|minimal triage| P1["Single planner (Claude)"]
-    PG -->|standard/deep triage| P2["Claude planner ‖ Codex planner"]
-
-    P1 --> STEP7
+    GATE1 --> P2["Step 6 — Claude planner ‖ omp planner(s)"]
     P2 --> J2["Judge-selector<br/>picks stronger plan,<br/>grafts separable steps"]
     J2 --> STEP7
 
@@ -69,10 +64,11 @@ human between waves.
 | --- | --- |
 | `orchestrator.md` | Pipeline manager — triage, dispatch, gates, save |
 | `explorer.md` | Deep codebase scan for related code, patterns, existing conventions |
-| `researcher.md` | Context7 + web search for best practices, library docs, pitfalls |
-| `architect.md` | One of two (or three) independent architects — 2-3 approaches with trade-offs |
+| `architect.md` | One of two (or three) independent architects (the Claude one) — 2-3 approaches with trade-offs |
 | `judge-selector.md` | Select-then-graft: picks the stronger of two parallel passes, grafts separable improvements — used twice (architecture, then plan) |
 | `planner.md` | Turns the chosen approach into an ordered, verifiable step plan |
+
+The researcher is `../research/agent.md` run with `mode: plan` (Libraries, Best practices, Pitfalls, Recommended patterns).
 
 ## Entry point
 
@@ -81,8 +77,11 @@ per-wave pipeline. Read `orchestrator.md` directly for the full step-by-step pro
 
 ## Engines
 
-Explorer, researcher, single-mode planner, and the judge-selector are Claude subagents.
-The architecture step is **always** dual-engine (Claude + Codex, +Gemini for high-stakes
-specs if available) regardless of triage depth — it's the highest-leverage decision in
-the pipeline. The plan-detail step is dual-engine only for standard/deep-triage tasks;
-minimal-triage tasks get a single Claude planner and skip straight to the review gate.
+Explorer, researcher (`research/agent.md`, `mode: plan`), the planner and the judge-selector are Claude
+subagents. The orchestrator asks `bash .claude/scripts/routing.sh engines architect` and
+`routing.sh engines planning` for the second (and third) engine instead of hard-coding one: by default
+`omp:codex` for both, plus `omp:opencode/argon` as plan critique and as the high-stakes third architect.
+Both steps run multi-engine regardless of triage depth, and the researcher always runs. omp engines are
+read-only: they return analysis text that Claude saves, anonymises with `scripts/blind-candidates.sh` and
+verifies; a capped or unavailable engine degrades the round and the plan says so (see
+`../../skills/second-engine/SKILL.md`).

@@ -1,18 +1,16 @@
 ---
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, Agent, Skill
-description: Documentation accuracy audit -- cross-references docs against actual code (2 Claude + 1 Codex)
+description: Documentation accuracy audit -- cross-references docs against actual code (scripted reference scan, Claude and omp docs passes)
 argument-hint: (no arguments)
 model: inherit
 ---
 
 Read `.claude/agents/codebase/docs-audit/orchestrator.md` and follow its instructions exactly.
 
-Run the full documentation accuracy audit: dispatch all 3 agents (2 Claude domain auditors +
-1 Codex stale reference scanner), synthesize findings, and produce the audit report at
+Run the full documentation accuracy audit: the stale-reference scan is `scripts/stale-reference-scan.sh`;
+the claim-by-claim API and architecture passes run on Claude and on the omp docs engine
+(`routing.sh engines docs`). Synthesize findings and produce the audit report at
 `.claude/reviews/docs-audit-{date}.md`.
 
-**Verification (overrides the orchestrator's single-pass validation).** Every finding of every
-severity, LOW included, gets two independent verifier lenses before it enters the report:
-REPRODUCE (run it, or cite the exact `path:line`) and REFUTE (look for the guard, test or
-convention that makes it a non-issue). Keep a finding only when REPRODUCE confirms it and REFUTE
-fails to refute it, and record the kill rate per lens in the report.
+**Verification.** Every finding of every severity, LOW included, goes through the REPRODUCE and REFUTE
+lenses in `.claude/agents/codebase/verification.md` before it enters the report; record the kill rate per lens.

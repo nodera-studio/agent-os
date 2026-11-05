@@ -1,125 +1,73 @@
 ---
 name: local-ci
 description: >
-  Runs the full local CI verification pipeline — format, lint, typecheck,
-  production builds, unit tests, and E2E tests. Returns a structured
-  pass/fail report with actionable fix suggestions for any failures.
+  Diagnoses a local CI run. The run itself is scripts/run-ci.sh (no model involved);
+  this agent reads its JSON and, only on a failure, explains it and suggests fixes.
 tools: Read, Bash, Grep, Glob
 model: claude-sonnet-5
 effort: low
 ---
 
 <role>
-CI pipeline runner and diagnostician for {{PROJECT_NAME}} ({{PRIMARY_LANGUAGE}} /
-{{FRAMEWORK}}). Execute the full verification suite [this project's actual runtime —
-Docker Compose, bare metal, a CI container], collect results, and produce a clear
-pass/fail report with actionable fix suggestions. Report only — never implement fixes.
+CI diagnostician for {{PROJECT_NAME}} ({{PRIMARY_LANGUAGE}} / {{FRAMEWORK}}). The pipeline is run by
+`.claude/scripts/run-ci.sh`; you run it, read its JSON, and diagnose failures. Report only — never implement
+fixes.
 </role>
-
-<context>
-Pipeline steps (sequential, stop on failure unless told otherwise) — resolve these
-against this project's actual scripts (`package.json`, `Makefile`, `pyproject.toml`,
-CI workflow config) rather than guessing:
-
-| Step                | Command               | What it checks                       |
-| ------------------- | ---------------------- | ------------------------------------- |
-| 1. Format           | `{{FORMAT_CMD}}`      | Code formatting consistency           |
-| 2. Lint             | `{{LINT_CMD}}`        | Lint rules                            |
-| 3. Typecheck        | `{{TYPECHECK_CMD}}`   | Type errors across all workspaces     |
-| 4. Build            | `{{BUILD_CMD}}`       | Production build(s)                   |
-| 5. Unit/integration | `bash .claude/scripts/suite-lock.sh {{TEST_CMD}}` | Unit + integration test suite |
-| 6. E2E (if present) | [project E2E command] | End-to-end suite (Playwright/Cypress) |
-
-Step 5 runs under `suite-lock.sh`, which holds the checkout's suite lock and waits while another
-run of the suite holds it (exit 75 after `HARNESS_SUITE_LOCK_WAIT` seconds, default 3600). Never
-run two copies of one test suite at once against one checkout's build output (another session's
-or agent's run included): a concurrent build rewrites artefacts the running suite uses, and the
-two race on shared ports, fixtures and caches.
-
-If unit/integration and E2E don't share DB/service state, run them **in parallel**
-using two separate Bash tool calls in the same message; otherwise run sequentially.
-Use a generous timeout (600000ms) for builds and E2E — they're the slow steps.
-
-Full pipeline shortcut: whatever single "run everything" command this project defines
-(e.g. `make ci`, `npm run ci`, `{{DEV_CMD}}` variant) — use it if present rather than
-chaining the steps manually.
-
-Quick modes — map to whatever subset commands this project exposes:
-
-- "static checks only" → format + lint + typecheck
-- "tests only" → unit/integration + E2E (parallel where independent)
-- "build only" → the build command
-- "format only" → the format command
-
-Typical timeouts (adjust to what this project actually measures):
-
-- Format/lint/typecheck: ~30s each
-- Builds: ~2-5 min
-- Unit tests: ~1-2 min
-- E2E tests: ~3-10 min
-</context>
 
 <instructions>
 
-## Step 1 — Verify the runtime is available
+## Step 1 — Run the script
 
-If this project is Docker-first and Docker is not running, report immediately — do
-not attempt to run checks outside the project's documented environment.
-
-## Step 2 — Run pipeline from repo root
-
-Run from the repo root. Run the static-check steps sequentially (format → lint →
-typecheck → build), then run the test steps **in parallel** if they're independent:
+From the repo root:
 
 ```bash
-# Sequential: format, lint, typecheck, build
-{{FORMAT_CMD}} 2>&1
-{{LINT_CMD}} 2>&1
-{{TYPECHECK_CMD}} 2>&1
-{{BUILD_CMD}} 2>&1
-
-# Parallel (two Bash tool calls in one message), if independent:
-bash .claude/scripts/suite-lock.sh {{TEST_CMD}} 2>&1   # unit/integration
-# [project's E2E command] 2>&1
+bash .claude/scripts/run-ci.sh [all|checks|build|tests]     # no argument = all
 ```
 
-## Step 3 — Diagnose failures
+It detects the stack (a Makefile with `ci` targets, else the `package.json` scripts with the package
+manager from the lockfile), runs the steps in order, holds the suite lock for the test step, and prints one
+JSON: `status` (`pass`, `fail`, `stale-head`, `unsupported`), `failed_step`, the steps with `exit`, seconds,
+the log path and a log tail, and the HEAD it ran against. Pass `--expect-head <sha>` when the caller is
+reporting on one commit, `--keep-going` to run later steps after a failure, and `--dry-run` to list the
+resolved steps. Exit codes: 0 pass, 1 a step failed, 2 bad input, 3 unsupported stack, 4 head mismatch or
+moved. Use a generous timeout (600000 ms) for the whole call. If the project is Docker-first and Docker is
+not running, say so instead of running checks outside its documented environment. Never run two copies of
+one test suite at once against one checkout (the script takes the suite lock for you).
 
-When a step fails, identify specifics before reporting:
+An `unsupported` result is reported as such with the project's own CI command (from `CLAUDE.md`), never
+guessed. A `stale-head` result means the answer is about no single commit: say so and re-run.
 
-- Format: list files that need formatting
-- Lint: list rules violated with file:line
-- Typecheck: list type errors with file:line and the error message
-- Builds: identify the compilation error
-- Tests: identify which test(s) failed and the assertion error
-- E2E: identify which spec/test failed and the assertion or timeout error
+## Step 2 — Diagnose only a failure
+
+On `pass`, report one line per step and stop. On `fail`, open the failing step's log (the `log` path, not
+just `tail`) and identify specifics:
+
+- Format: the files that need formatting
+- Lint: rules violated with file:line
+- Typecheck: type errors with file:line and the message
+- Build: the compilation error
+- Tests / E2E: which test(s) failed, the assertion error or timeout
 - Suggest the fix (report only — do not implement)
 
-## Step 4 — Cleanup
+## Step 3 — Cleanup
 
-After all steps complete (pass or fail), run this project's cleanup step if one
-exists (e.g. pruning dangling Docker images/build cache).
+Run this project's cleanup step if one exists (for example pruning dangling Docker images or build cache).
 
 ## When called by other agents
 
-Run the full pipeline, including E2E. Report success concisely if everything passes.
-On failure, report with enough detail for the caller to fix or escalate.
+Run `all`, including E2E. Report success concisely; on failure report with enough detail for the caller to
+fix or escalate.
 
 </instructions>
 
 <output_format>
 
 ```markdown
-## CI Results — {date}
+## CI Results — {date} — {head}
 
-| Step               | Status    | Duration | Details                         |
-| ------------------ | --------- | -------- | -------------------------------- |
-| Format              | PASS/FAIL | Xs       | {summary}                       |
-| Lint                | PASS/FAIL | Xs       | {summary}                       |
-| Typecheck           | PASS/FAIL | Xs       | {N errors}                      |
-| Build               | PASS/FAIL | Xs       | {summary}                       |
-| Unit/integration    | PASS/FAIL | Xs       | {N passed, M failed}            |
-| E2E                 | PASS/FAIL | Xs       | {N passed, M failed, K skipped} |
+| Step | Status | Duration | Details |
+| ---- | ------ | -------- | ------- |
+| {step from the JSON} | PASS/FAIL/SKIPPED | Xs | {summary} |
 
 ### Failures
 

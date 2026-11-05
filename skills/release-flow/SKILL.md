@@ -1,0 +1,69 @@
+---
+name: release-flow
+description: >-
+  The staging-trunk branching rules and the staging → release promotion runbook — consult
+  this WHENEVER you cut a branch, open a PR, merge a PR, pick a base branch, or ship to prod,
+  even in passing ("open a PR for this", "what do I branch off?", "merge it", "ship this fix",
+  "ship to prod", "promote to main", "cut a prod release"). The rules exist to prevent two
+  specific failures: work originating on the release branch, and squash-promotions that drift
+  the release branch from the staging trunk. In short: branch off your staging trunk, PR into
+  it (squash-merge), never start work on the release branch; capture a durable memory before
+  merging any green PR (if you have a memory system); reach prod only by promoting
+  staging → release with a merge commit, following the runbook in
+  references/promote-runbook.md. Use it before doing git/PR/merge work so the base branch and
+  merge method are right the first time.
+---
+
+# Release flow — staging is the trunk, the release branch is release-only
+
+
+Two rules keep your release branch (e.g. `main`) and your staging trunk (e.g. `staging`) from
+drifting. If your project has a fuller written doc for this model, link it here as the
+authoritative source; this skill is the operating summary. Substitute your actual branch names
+for `{{STAGING_BRANCH}}` / `{{PROD_BRANCH}}` below.
+
+## The two rules
+
+1. **Nothing originates on `{{PROD_BRANCH}}`.** Every branch cuts from `{{STAGING_BRANCH}}`;
+   every feature PR targets `{{STAGING_BRANCH}}`. `{{PROD_BRANCH}}` only ever receives a
+   `{{STAGING_BRANCH}} → {{PROD_BRANCH}}` promotion. So `{{PROD_BRANCH}}` is always a subset of
+   `{{STAGING_BRANCH}}` and divergent work is impossible.
+2. **Feature → `{{STAGING_BRANCH}}` is a squash-merge; `{{STAGING_BRANCH}} → {{PROD_BRANCH}}` is
+   a merge commit.** Squash collapses a feature into one clean commit on the staging trunk. But
+   squashing the long-lived staging branch into the release branch writes a new commit the
+   release branch doesn't share with staging — which drifts them and makes the next promotion
+   conflict. Promotions are **merge commits**, never squash/rebase.
+
+## Day-to-day
+
+- **Start a branch:** `git fetch && git checkout {{STAGING_BRANCH}} && git pull`, then
+  `git checkout -b feat/<slug>` (or `fix/<slug>`). Default base is `{{STAGING_BRANCH}}` — if it's
+  your repo's default branch, `gh pr create` targets it automatically.
+- **Open a PR:** into `{{STAGING_BRANCH}}`. Keep each PR independently green — the staging trunk
+  typically auto-deploys to a staging env on merge, so don't land a half-broken state (gate
+  incomplete surfaces behind a flag).
+- **Before merging a green PR:** if you run a durable-memory system, store the decisions/learnings,
+  referencing the PR (`PR #<n>` or the branch in title/content/tags). A pre-merge hook can enforce
+  this — the code is preserved by the merge, but the *knowledge* is lost unless you write it. A
+  one-line note is fine for a trivial PR.
+- **Owner waiver:** the owner can waive that memory for one PR by saying so in chat, e.g. "no
+  memory for PR #42" (it must name the PR). The `capture-before-merge` hook honours it only in the
+  main session, never in a subagent, and only from the owner's own message, not from tool output,
+  notifications or a compaction summary. On a waiver the hook asks the owner to confirm the merge
+  (a prompt even under `bypassPermissions`); record the waiver in the state file's decision log.
+- **Merge:** `gh pr merge <n> --squash`. Don't auto-delete the branch in the same step if you want
+  deletion to stay a deliberate, post-capture step; delete it yourself once the PR is closed out.
+- **Ship to prod:** never push to `{{PROD_BRANCH}}` directly. Follow
+  [`references/promote-runbook.md`](./references/promote-runbook.md) — open ONE
+  `{{STAGING_BRANCH}} → {{PROD_BRANCH}}` PR, show the promoted ticket list and get an explicit
+  go, then merge it with `gh pr merge --merge` (merge commit).
+
+## Hotfixes
+
+A prod-critical fix still goes **through `{{STAGING_BRANCH}}` first**: branch off it, PR to it,
+then promote. If a direct-to-`{{PROD_BRANCH}}` hotfix is genuinely unavoidable, label the PR to
+match whatever escape-hatch label your CI guard workflow checks for (e.g. `emergency-hotfix`) and
+**back-merge `{{PROD_BRANCH}} → {{STAGING_BRANCH}}` immediately**, or you have drifted by
+definition. If your repo needs hard enforcement of "nothing originates on the release branch",
+wire up a CI guard workflow that checks the PR head branch and blocks merges that don't come from
+the staging trunk (minus the labeled escape hatch).

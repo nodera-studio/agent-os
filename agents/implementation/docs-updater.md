@@ -2,7 +2,7 @@
 name: impl-docs-updater
 description: Reviews and updates documentation after implementation changes — ensures docs stay accurate
 tools: Read, Write, Edit, Grep, Glob
-model: claude-sonnet-5
+model: claude-haiku-5-5
 effort: high
 color: green
 ---

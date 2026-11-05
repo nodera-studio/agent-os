@@ -1,6 +1,6 @@
 {
   "name": "agent-os-workflow",
   "version": "1.0.0",
-  "description": "Reusable Claude Code workflow suite — plan/implement/review/debug/audit orchestrators, project skills, slash commands, and enforcement hooks, packaged as one versioned unit.",
+  "description": "Reusable Claude Code workflow suite — plan/implement/review/debug/audit orchestrators, project skills, slash commands, and enforcement hooks, packaged as one versioned unit. The component directories are symlinks to the repo roots; optional packs ship through install.sh --pack, not through this plugin.",
   "author": { "name": "{{AUTHOR_NAME}}" }
 }

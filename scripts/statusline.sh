@@ -91,10 +91,11 @@ fi
 # Lines — branch-level stats via git diff against merge base
 branch_dir=$(echo "$input" | jq -r '.workspace.project_dir // .cwd // empty')
 if [ -n "$branch_dir" ]; then
-  git_stat=$(git -C "$branch_dir" diff --numstat $(git -C "$branch_dir" merge-base HEAD main 2>/dev/null || echo HEAD~1) 2>/dev/null | grep -v -E '(package-lock\.json|\.lock$|dist/|\.next/)' | awk '{a+=$1; d+=$2} END {print a" "d}')
+  diff_base=$(git -C "$branch_dir" merge-base HEAD main 2>/dev/null || echo HEAD~1)
+  git_stat=$(git -C "$branch_dir" diff --numstat "$diff_base" 2>/dev/null | grep -v -E '(package-lock\.json|\.lock$|dist/|\.next/)' | awk '{a+=$1; d+=$2} END {print a" "d}')
   la=$(echo "$git_stat" | cut -d' ' -f1)
   lr=$(echo "$git_stat" | cut -d' ' -f2)
-  if [ -n "$la" ] && [ -n "$lr" ] && [ "$la" != "0" -o "$lr" != "0" ]; then
+  if [ -n "$la" ] && [ -n "$lr" ] && { [ "$la" != "0" ] || [ "$lr" != "0" ]; }; then
     parts+=("${GREEN}+${la}${RESET} ${DIM}added${RESET} ${RED}-${lr}${RESET} ${DIM}deleted${RESET}")
   fi
 fi

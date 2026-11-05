@@ -12,8 +12,8 @@
 # Denied: `codex … exec` (any path to codex) and `omp …`. Allowed: `omp --version|--help` alone,
 # `command -v omp`, everything else that merely mentions the words, and any command that goes
 # through scripts/omp-engine.sh (its command word is the script, not omp).
-# Block-and-instruct on exit 0, like steer-bash.sh. Fails open without jq. block-old-codex.sh keeps
-# its own entries until the Codex pack move removes it.
+# Block-and-instruct on exit 0, like steer-bash.sh. Fails open without jq. It is the only engine guard in
+# core; the codex pack adds a plugin-transport guard of its own.
 set -uo pipefail
 command -v jq >/dev/null 2>&1 || exit 0
 INPUT=$(cat 2>/dev/null) || exit 0

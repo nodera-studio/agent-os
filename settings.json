@@ -74,15 +74,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/session-start.sh"
-          }
-        ]
-      },
-      {
-        "matcher": "resume|compact",
-        "hooks": [
-          {
-            "type": "command",
             "command": ".claude/hooks/reinject-invariants.sh"
           }
         ]
@@ -92,10 +83,6 @@
       {
         "matcher": "Bash",
         "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/block-old-codex.sh"
-          },
           {
             "type": "command",
             "command": ".claude/hooks/block-legacy-engines.sh"
@@ -113,10 +100,6 @@
       {
         "matcher": "Skill",
         "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/block-old-codex.sh"
-          },
           {
             "type": "command",
             "command": ".claude/hooks/block-legacy-engines.sh"
@@ -139,21 +122,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/prettier-on-edit.sh"
-          },
-          {
-            "type": "command",
-            "command": ".claude/hooks/shellcheck-on-edit.sh"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/mnemosyne-capture.sh"
+            "command": ".claude/hooks/post-edit-lint.sh"
           }
         ]
       }

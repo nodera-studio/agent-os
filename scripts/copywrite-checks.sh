@@ -22,7 +22,7 @@
 #   glossary    --terms F --text F
 #               Brand terms keep their canonical spelling: --terms is the glossary (a markdown table
 #               whose first three columns are the term and its locale spellings, as in
-#               brand-terms.md.template; else one term per line, # comments ignored); any
+#               the copywrite pack's brand-terms template; else one term per line, # comments ignored); any
 #               case-insensitive whole-word match in the text that is not one of the row's spellings
 #               is a violation.
 # An option value written @path is read from that file (for long or multi-line strings).

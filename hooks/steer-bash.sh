@@ -17,9 +17,9 @@
 #   - `omp` with a profile not in omp/profiles.sh (`--profile`, OMP_PROFILE, PI_PROFILE), and
 #     `mkdir`/`cp`/`mv`/`rsync`/`ln` into another ~/.omp/profiles/<name> -> HOME="$(mktemp -d)"
 # Does NOT touch grep/rg (agentic search is good in-loop — routed via CLAUDE.md)
-# or codex (block-old-codex.sh). Fails open on any error. Project-specific
+# or codex (block-legacy-engines.sh). Fails open on any error. Project-specific
 # steering (e.g. a dev-tool wrapper hook) can be layered in separately — see
-# hooks/README-optional-hooks.md.
+# hooks/README.md ("Custom hooks for your project").
 set -uo pipefail
 command -v jq >/dev/null 2>&1 || exit 0
 INPUT=$(cat 2>/dev/null) || exit 0
@@ -50,7 +50,7 @@ fi
 # omp_profile_ok NAME: NAME is an approved profile (exact match, never a prefix or glob).
 omp_profile_ok() {
   if [ "$OMP_PROFILES_OK" = 1 ]; then profile_known "$1"; return; fi
-  case "$1" in glen-harness-codex | glen-harness-opencode | glen-harness) return 0 ;; esac
+  case "$1" in glen-harness-codex | glen-harness-opencode) return 0 ;; esac
   return 1
 }
 # shellcheck disable=SC2016 # the $(mktemp -d) and $HOME are literal advice text
@@ -138,13 +138,13 @@ while IFS= read -r seg || [ -n "$seg" ]; do
       # Service-specific redirects fire FIRST (more useful reason than the generic deny below).
       # These name the ONE replacement tool — no routing index duplicated in the hook.
       if printf '%s' "$seg" | grep -qiE 'https?://([a-z0-9.-]+\.)?cloudflare\.com([:/ ]|$|"|'"'"')'; then
-        deny "Don't curl Cloudflare's API — use the wrangler CLI (deploy / R2 / D1 writes, headless) or the Cloudflare MCP (read-only account queries). See the /wrangler skill."
+        deny "Don't curl Cloudflare's API — use the wrangler CLI (deploy / R2 / D1 writes, headless) or the Cloudflare MCP (read-only account queries). See the cloudflare:wrangler skill and rules/object-lock.md."
       fi
       if printf '%s' "$seg" | grep -qiE 'https?://([a-z0-9.-]+\.)?sentry\.io([:/ ]|$|"|'"'"')'; then
-        deny "Don't curl Sentry's API — use sentry-cli (releases / sourcemaps) or the Sentry MCP (issue lookup / Seer). See the /sentry-cli skill."
+        deny "Don't curl Sentry's API — use sentry-cli (releases / sourcemaps) or the Sentry MCP (issue lookup / Seer)."
       fi
       if printf '%s' "$seg" | grep -qiE 'https?://([a-z0-9.-]+\.)?linear\.app([:/ ]|$|"|'"'"')'; then
-        deny "Don't curl Linear's API — use the Linear connector (mcp__*Linear* tools). See the /linear skill."
+        deny "Don't curl Linear's API — use the Linear connector (mcp__*Linear* tools)."
       fi
       # Loopback stays allowed. External http(s) fetches are denied: route web
       # CONTENT to the Exa MCP, and known APIs to their SDK/CLI — WebFetch is

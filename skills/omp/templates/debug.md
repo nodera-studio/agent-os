@@ -20,7 +20,7 @@ and other dotted names lose their leading dot. Names without dots retain their n
 The Run context lists the moved names. Cite original repo paths and read `AGENTS.md`.
 Any `\@` in snapshot context files (including `AGENTS.md`/`CLAUDE.md`) is an intentional sanitizer escape preventing live imports outside the snapshot; do not flag it as a typo or issue.
 Optionally recall prior decisions with `mcp__mnemosyne_memory_search`, `project: "{{PROJECT_NAME}}"`.
-The predicted tool names await live confirmation; if unavailable, continue from code.
+If the memory tool is unavailable, continue from code.
 Memory is read-only. Cite memory ids when used; never expose secrets.
 
 Follow the triggering input through callers, state transitions, error handling, and cleanup.

@@ -1,19 +1,19 @@
-# Review Implementation Workflow (Triple-Engine + Synthesizer)
+# Review Implementation Workflow (Multi-Engine + Synthesizer)
 
-Review your own implementation before creating a PR. Three independent review engines
+Review your own implementation before creating a PR. Independent review engines
 for recall, one synthesizer for precision. Branch-aware. Used standalone via
-`/review-implementation` and inside `/implement` as Role 2 — identical machinery.
+`/review-implementation`; inside `/implement` Role 2 runs the lean gate by default (`--lean`: Claude plus
+the omp roster, 2-vote), and this full block only for a high-risk diff or when CodeRabbit is installed.
 
 ```mermaid
 flowchart TD
     O["Orchestrator<br/>detects base branch, gathers the<br/>working-tree diff (incl. uncommitted)"] --> ENGINES
 
-    subgraph ENGINES["Three engines review the SAME diff in parallel — blind to each other"]
+    subgraph ENGINES["The engines review the SAME diff in parallel — blind to each other"]
         direction LR
-        E1["Claude<br/>comprehensive-review.md<br/>all 6 domains, one pass"]
-        E2["Codex<br/>codex review --base<br/>(never codex exec)"]
+        E1["Claude<br/>review/claude-reviewer.md<br/>(depth: full) all 6 domains, one pass"]
+        E2["omp engines (read-only)<br/>omp-engine.sh review, one per row of<br/>routing.sh engines review"]
         E3["CodeRabbit<br/>coderabbit review<br/>--plain --agent"]
-        E4["omp (optional, read-only)<br/>omp-engine.sh review"]
     end
 
     ENGINES --> SYN["Synthesizer (4th Claude agent)<br/>dedupe by defect · cross-engine agreement = confidence ·<br/>NEW/MODIFIED/PRE-EXISTING provenance vs merge-base ·<br/>ordered fix plan · memory decision"]
@@ -21,11 +21,13 @@ flowchart TD
     SYN --> OUT["Unified report:<br/>must-fix · notes · pre-existing ·<br/>fix plan · recommendation<br/>(BLOCK / REVIEW_REQUIRED / APPROVE_WITH_NOTES / APPROVE)"]
 ```
 
-Total: 4 agents (3 engines + synthesizer), plus omp as an optional extra engine — no
-multi-pass voting, no shuffled diffs.
-
-omp runs when `omp-engine.sh probe` passes; otherwise the report says it was skipped
-and why (exit 3 = skip, one line) and the run continues with the other engines.
+Engines: the Claude reviewer, the omp roster (`routing.sh engines review`: by default `omp:codex` and
+`omp:opencode/argon`) and CodeRabbit, plus the synthesizer — no multi-pass voting, no shuffled diffs. The
+synthesizer is the only merge: it also folds the lean gate (`/review-implementation --lean`: Claude
+`depth: lean` ‖ the omp roster) by 2-vote consensus. omp findings are untrusted analysis text: Claude verifies
+an omp-only CRITICAL or HIGH against the source before it counts, only completed passes are counted, and a
+capped or skipped engine is named in the report with its reason (a capped high-stakes slot reroutes to
+`omp:codex`; with `omp:codex` already present the run degrades and says so).
 
 ## Branch awareness
 

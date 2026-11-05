@@ -1,0 +1,13 @@
+{
+  "name": "linear",
+  "version": "1",
+  "description": "Linear gotchas note (no parallel TODO file, label writes replace the set). The connector covers the tools.",
+  "files": [
+    "skills/linear/SKILL.md"
+  ],
+  "prior_hashes": {
+    "skills/linear/SKILL.md": [
+      "c00624568df1aeb7749c8d4db9c3f803f0a509ce39fb6853cc65b5e49f50cdbf"
+    ]
+  }
+}

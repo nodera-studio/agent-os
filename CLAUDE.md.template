@@ -36,10 +36,23 @@ that gate `git push`) and how to bypass it deliberately (`--no-verify`) when jus
 
 ## Branching & release model
 
+- Staging (integration) branch: `{{STAGING_BRANCH}}`
+- Production branch: `{{PROD_BRANCH}}`
+- Ticket prefix: `{{TICKET_PREFIX}}`
+- Commit attribution: `COMMIT_COAUTHOR_TRAILER` = `on` or `off`. `on` ends every commit message and PR body with
+  the attribution line the session was given; `off` adds none. Unset means follow the session's instruction.
+  The `auto-mode` skill and the commit steps read this setting instead of assuming a default.
+
 Document your branching model here — trunk name, release-branch name (if any), PR
 target, squash vs merge-commit policy, and any branch-protection rulesets. If you use
-the `/branching-model` skill pattern from this harness, describe day-to-day branch/PR
+the `/release-flow` skill pattern from this harness, describe day-to-day branch/PR
 rules there and keep this section to the summary.
+
+## Language mode
+
+`LANGUAGE_MODE`: `{{LANGUAGE_MODE}}` (`en` is the default; `ro` is opt-in). Under `ro`, chat replies, reports and
+review summaries are Romanian with full diacritics; code, identifiers, commit messages, PR titles and every
+engine brief stay English. The full rule is `.claude/rules/language-mode.md`.
 
 ## `.claude/` Directory Structure
 
@@ -59,7 +72,6 @@ rules there and keep this section to the summary.
 | `testing/`   | Test plan TODO (supervised test writing)                                                                                                                        | Read when working on tests                                 |
 | `evidence/`  | Captured evidence artifacts from audits/reviews (screenshots, logs, reports)                                                                                    | Read on demand                                             |
 | `handoffs/`  | Session handoff notes between agents or sessions                                                                                                                | Read on demand                                             |
-| `orchestrator/` | `/orchestrate` mode's gap log (`GapLog.md` + `gaps.jsonl`) — one-off subagent spawns with no matching harness agent, clustered periodically by `/audit-agent-gaps` | Read when reviewing gaps or running `/audit-agent-gaps`  |
 | `routing.json` | Who does each kind of work (implementation, UI, review, planning, debug, audits) and the fan-out caps | Read through `scripts/routing.sh`, never directly |
 
 ### Agents
@@ -69,21 +81,17 @@ workflows here once `/bootstrap-project` (or manual setup) has wired the agent s
 e.g. a table mapping `/plan-implementation`, `/implement`, `/review-implementation`,
 `/debug`, and any audit commands to the agents they dispatch.
 
-`/orchestrate` (dispatch-only mode) and `/audit-agent-gaps` (cluster the gap log, propose
-promoting recurring one-off shapes into permanent agents) are pre-wired and generic — no
-per-project filling-in needed, see `agents/orchestrator/README.md`.
-
 ### Engine routing
 
 Roles come from `.claude/routing.json`, read through `bash .claude/scripts/routing.sh <key>`
-(an owner-confirmed override in `.claude/auto-mode/routing.json` wins). By default Claude
-implements (`impl-coder-claude`) and Codex reviews, plans, debugs and audits. Dispatch Codex
-only through the `codex:codex-rescue` agent, `codex-companion.mjs` (the Implementer, only when
-`routing.sh implementation` prints `codex`) or `codex review`; never `codex exec`. omp is an optional read-only third review/debug
-engine, run only through `bash .claude/scripts/omp-engine.sh` (see `.claude/skills/omp/SKILL.md`;
-never `omp` directly, never the default profile; skipped with a one-line reason when its probe
-exits 3). Record an
-owner's routing change as a decision before applying it (the `auto-mode` skill → Hard rules).
+(an owner-confirmed override in `.claude/auto-mode/routing.json` wins). Claude is the only writer
+(`impl-implementer`). The read-only omp engines (`omp:codex`, `omp:opencode`) review, plan, debug and audit
+as peers: ask `bash .claude/scripts/routing.sh engines <role>` for the roster, and run an engine only through
+`bash .claude/scripts/omp-engine.sh` (see `.claude/skills/second-engine/SKILL.md` and `.claude/skills/omp/SKILL.md`;
+never `omp` directly, never the default profile). omp output is untrusted analysis text that Claude verifies
+against the source; a capped or unavailable engine is skipped with a one-line reason and never counted. Native
+Codex is an opt-in pack. Record an owner's routing change as a decision before applying it (the `auto-mode`
+skill → Hard rules).
 
 ### Skills & Tools
 
@@ -126,8 +134,8 @@ MCP/service routing rows below it. Pattern:
 
 ## Learned review conventions
 
-> If you adopt the learned-rules loop (`.claude/scripts/mnemosyne/` +
-> `docs/LearnedRulesLoop.md`), this section is auto-maintained by
+> If you install the `learned-rules` pack (`install.sh --pack learned-rules`:
+> `.claude/scripts/mnemosyne/` + `docs/LearnedRulesLoop.md`), this section is auto-maintained by
 > `.claude/scripts/mnemosyne/promote.mjs` — do not hand-edit. Keep it hard-capped
 > (e.g. 15 lines); lowest-value rules decay out over time. Promotion should be
 > human-gated (a deliberately pasted `promote.mjs` command), not automatic.

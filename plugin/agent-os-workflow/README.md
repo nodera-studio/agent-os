@@ -5,6 +5,17 @@ as one versioned, toggleable plugin. **Inert by default** — the component dirs
 are symlinks into the loose `.claude/{agents,skills,commands,hooks}` layout,
 which remains the live configuration. Nothing loads twice.
 
+## Layout, and what the plugin does not carry
+
+`agents/`, `commands/`, `hooks/` and `skills/` here are **symlinks** (`../../agents` and so on) to the
+directories at the repo root — in an installed project, to `.claude/agents` and the rest. They are never copied or
+merged: `install.sh` copies the `plugin/` directory as it is and fails if a link does not resolve in the target.
+Nothing else lives in the plugin: no `scripts/`, `rules/`, `omp/`, `routing.json` or `settings.json`.
+
+Optional packs are not part of the plugin. They ship through the installer
+(`./install.sh <target> --pack NAME`, see `packs/README.md`) into the loose `.claude/` layout, and the plugin
+sees a pack's agents, commands, hooks and skills only because it points at those same directories.
+
 ## Load it (opt-in)
 
 ```bash

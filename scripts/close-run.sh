@@ -19,7 +19,7 @@
 #              and left alone. `stopped` is filled with the time.
 #   worktrees  Each --worktree, plus every .claude/worktrees/<name> the state file names, that is a
 #              registered worktree: remove-worktree.sh (which refuses a live Codex job and preserves
-#              evidence), then sweep-codex-orphans.sh. A refusal is reported as blocked, never forced.
+#              evidence), then sweep-codex-orphans.sh when the codex pack installed it. A refusal is reported as blocked, never forced.
 #   scratch    clean-scratch.sh --dry-run '<prefix>*' always, to list what remains for the owner;
 #              with --apply it really cleans only the --scratch-pattern entries the run created.
 #   branches   The PR numbers of --prs, else those in the state file's wave ledger and harness
@@ -148,9 +148,14 @@ if ! skipped worktrees; then
       if [ "$rc" = 0 ]; then rec worktrees removed "$w" "$(printf '%s' "$out" | tail -n 3)"; else rec worktrees blocked "$w" "$(printf '%s' "$out" | tail -n 6)"; fi
     fi
   done <"$TMP/wts"
-  if [ "$APPLY" = 0 ]; then out="$(bash "$HERE/sweep-codex-orphans.sh" --dry-run 2>&1)"; rc=$?; else out="$(bash "$HERE/sweep-codex-orphans.sh" 2>&1)"; rc=$?; fi
-  SWEEP="$(jq -nc --argjson rc "$rc" --arg o "$(printf '%s' "$out" | tail -n 40)" --argjson dry "$((1 - APPLY))" '{dry_run: ($dry == 1), exit: $rc, output: $o}')"
-  [ "$rc" = 0 ] || BLOCKED=$((BLOCKED + 1))
+  if [ -f "$HERE/sweep-codex-orphans.sh" ]; then
+    if [ "$APPLY" = 0 ]; then out="$(bash "$HERE/sweep-codex-orphans.sh" --dry-run 2>&1)"; rc=$?; else out="$(bash "$HERE/sweep-codex-orphans.sh" 2>&1)"; rc=$?; fi
+    SWEEP="$(jq -nc --argjson rc "$rc" --arg o "$(printf '%s' "$out" | tail -n 40)" --argjson dry "$((1 - APPLY))" '{dry_run: ($dry == 1), exit: $rc, output: $o}')"
+    [ "$rc" = 0 ] || BLOCKED=$((BLOCKED + 1))
+  else
+    # The orphan sweep ships with the codex pack; without it there are no companion brokers to stop.
+    SWEEP='{"skipped": true, "reason": "codex pack not installed"}'
+  fi
 fi
 
 # --- scratch ---

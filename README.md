@@ -10,11 +10,11 @@ It is not a framework you code against. It's a `.claude/` tree: drop it in, run
 `/bootstrap-project`, and you have a working multi-agent workflow suite tuned for
 disciplined, verifiable, surgical changes.
 
-- **Agents** — 53 orchestration prompts across 8 workflows (plan · implement · review · debug · audit · copywrite · bootstrap · orchestrator)
-- **Commands** — 29 slash commands, the entry points into those workflows
-- **Skills** — 12 trigger-activated capabilities (Playwright testing, GitHub/PR workflows, Exa web search, branching-model conventions, and more)
-- **Hooks** — 10 enforcement scripts wired into `PreToolUse`/`PostToolUse`/session-lifecycle events
-- **Engine model** — who implements comes from `routing.json` (Claude by default, Codex when routed); Claude + Codex dual-engine for review/debug/audits, where cross-model disagreement catches what one model misses. omp is an optional, probe-gated third engine
+- **Agents** — 32 orchestration prompts across the core workflows (plan · implement · review · debug · audit · bootstrap), plus opt-in packs (copywrite, orchestrator, queue agents)
+- **Commands** — 19 slash commands, the entry points into those workflows
+- **Skills** — 6 trigger-activated capabilities (engine dispatch, auto-mode, GitHub/PR workflows, Exa web search, release-flow conventions), plus opt-in packs
+- **Hooks** — 7 enforcement scripts wired into `PreToolUse`/`PostToolUse`/session-lifecycle events
+- **Engine model** — Claude is the only writer (`routing.json` → `implementation`). The read-only omp engines (`omp:codex`, `omp:opencode`) join review, planning, debug and audits as peers, where cross-model disagreement catches what one model misses; `routing.sh engines <role>` names the roster, an engine that is capped or not set up is skipped with a one-line reason, and native Codex is an opt-in pack
 
 ## Why this exists
 
@@ -27,22 +27,23 @@ between them — closer to how a real engineering team catches its own errors th
 "ask the AI and hope."
 
 Concretely: `/plan-implementation` runs an explorer and a researcher before two
-independent architects propose approaches and a judge picks (and grafts the best of
-both). `/implement` writes code, then reviews it with Claude AND Codex in parallel,
+independent architects (Claude plus an omp engine) propose approaches and a judge picks (and grafts the best of
+both). `/implement` writes code, then reviews it with Claude AND the omp engines in parallel,
 plus an author-blind conformance test writer who never saw the plan being graded
-against. `/review-implementation` runs three independent engines (Claude, Codex,
-and a third reviewer) that don't see each other's output until a fourth agent
-synthesizes them — so a finding that survives independent scrutiny from three
-different vantage points is a much stronger signal than one model's opinion.
+against. `/review-implementation` runs several independent engines (Claude, the omp
+roster, and CodeRabbit if installed) that don't see each other's output until a
+synthesizer agent merges them — so a finding that survives independent scrutiny from different
+vantage points is a much stronger signal than one model's opinion, and Claude still verifies each
+omp finding against the source.
 
 The same principle runs through the rest of the suite, not just the plan → implement →
-review triangle: `/deep-debug` pairs a dual-engine investigation with a dedicated
+review triangle: `/deep-debug` pairs a multi-engine investigation with a dedicated
 adversary agent whose only job is to try to disprove the leading hypothesis before you
 act on it. The five `/codebase-audit` deep audits (security, API contract, error paths,
 docs accuracy, tech debt) apply the same cross-model-consensus idea at whole-repo
 scale, with an evidence-demanding synthesizer standing between a candidate finding and
-the final report. `/copywrite` runs five specialists — voice, brevity, microcopy,
-localization, consistency — in a parallel-then-sequential pipeline, so user-facing copy
+the final report. The optional `copywrite` pack runs four specialists — voice (with sentence-level
+brevity), microcopy, localization, consistency — in a parallel-then-sequential pipeline, so user-facing copy
 gets checked through several distinct lenses instead of one pass trying to catch
 everything. See the "Complete workflow" diagram below, and each workflow's own
 `README.md`, for the full shape of each.
@@ -66,14 +67,11 @@ not spending a model's non-deterministic reasoning on problems a deterministic t
 already solves.
 
 **A third angle: every workflow above is a pre-decided pipeline — a human picked the
-agent shape in advance.** `/orchestrate` mode covers the rest: it turns the main session
-into a pure dispatcher for whatever task doesn't already have a home, matching an
-existing agent first and falling back to a scoped one-off only when nothing fits — and
-logging that fallback instead of throwing the signal away. `/audit-agent-gaps`
-periodically clusters that log and proposes promoting a shape that keeps recurring into a
-permanent agent, evidence-and-approval-gated, the same way the rest of this harness
-gates everything else on verification before it counts as done. See
-`agents/orchestrator/README.md`.
+agent shape in advance.** The optional `orchestrator` pack (`install.sh --pack orchestrator`)
+covers the rest: `/orchestrate` turns the main session into a pure dispatcher for whatever
+task doesn't already have a home, logging each one-off it has to spawn, and
+`/audit-agent-gaps` proposes promoting a shape that keeps recurring into a permanent
+agent, evidence-and-approval-gated. See `packs/orchestrator/README.md`.
 
 ## Quick example — what `/implement` actually does
 
@@ -83,7 +81,7 @@ you: /implement Add rate limiting to the /api/upload endpoint
 1. Planner reads the codebase, drafts a step-by-step plan with a
    backward-verification pass (does this actually close the gap?).
 2. The Implementer writes the code, wires it in, and writes its own tests.
-3. Two independent reviewers — Claude and Codex — review the diff in parallel,
+3. Independent reviewers — Claude and the omp roster — review the diff in parallel,
    blind to each other's findings, then a 2-vote consensus gate decides what's
    actually a must-fix vs. a nitpick.
 4. A conformance-test writer, who only ever saw the PLAN (never the diff or the
@@ -103,7 +101,7 @@ or auto-push. You stay the one who decides what ships.
 flowchart TD
     U["You, in Claude Code"] -->|"/plan-implementation"| P["Plan workflow<br/>explore → research → 2× architect + judge → plan"]
     U -->|"/implement"| I["Implement workflow<br/>plan → code → review → conformance test → docs"]
-    U -->|"/review-implementation"| R["Review workflow<br/>Claude ‖ Codex ‖ 3rd engine → synthesizer"]
+    U -->|"/review-implementation"| R["Review workflow<br/>Claude ‖ omp roster ‖ CodeRabbit → synthesizer"]
     U -->|"/deep-debug"| D["Debug workflow<br/>investigator ⇄ adversary (disprove loop)"]
     U -->|"/codebase-audit"| A["Audit workflows<br/>security · API · docs · tech-debt"]
     U -->|"/bootstrap-project"| B["Bootstrap workflow<br/>explore target stack → fill {{TOKENS}} → report"]
@@ -127,11 +125,11 @@ The commands above compose. Here's the full lifecycle, manual and autonomous:
 flowchart TD
     IDEA["A vague idea"] -->|"/brainstorm"| REQ["Requirements doc<br/>(+ optional browser mockups)"]
     REQ -->|"/plan-implementation"| PLAN["Approved plan<br/>saved to .claude/plans/"]
-    PLAN -->|"/implement"| CODE["Code, wired + tested +<br/>reviewed (Claude ‖ Codex ‖ 3rd engine) +<br/>conformance-gated + docs updated"]
+    PLAN -->|"/implement"| CODE["Code, wired + tested +<br/>reviewed (Claude ‖ omp roster) +<br/>conformance-gated + docs updated"]
     CODE -->|"gh pr create"| PR["Pull request"]
     PR -->|"CI + review bots green"| SHIP["Merged — shipped"]
 
-    IDEA -.->|"or: declare the whole thing as one goal"| GOAL["/goal + /auto-mode"]
+    IDEA -.->|"or: declare the whole thing as one goal"| GOAL["/auto-mode &lt;goal&gt;"]
     GOAL -.->|"wave loop: plan → implement → PR →<br/>poll → fix → merge, no gate between waves"| SHIP
 ```
 
@@ -150,10 +148,10 @@ produce the same quality bar; the difference is how much you want to watch.
   investigation), and audits (security, API contract, docs accuracy, tech debt).
 - **Commands** (`commands/`) — the slash-command entry points that kick off those
   agent workflows: `/plan-implementation`, `/implement`, `/review-implementation`,
-  `/code-review`, `/deep-debug`, `/research`, `/security-audit`, `/api-audit`,
-  `/docs-audit`, `/tech-debt-audit`, `/codebase-audit`, `/copywrite`, and more.
+  `/deep-debug`, `/research`, `/security-audit`, `/api-audit`,
+  `/docs-audit`, `/tech-debt-audit`, `/codebase-audit`, and more (`/copywrite` ships in a pack).
 - **Skills** (`skills/`) — reusable, trigger-activated capabilities (e.g.
-  `/playwright-cli`, `/branching-model`, `/exa`, `/gh`) invoked automatically when
+  `/release-flow`, `/exa`, `/gh`; browser, Linear and Sentry skills ship as packs) invoked automatically when
   a task matches their description, or explicitly via `/skill-name`.
 - **Hooks** (`hooks/`) — enforcement scripts wired into `settings.json` for
   `PreToolUse`/`PostToolUse`/session-lifecycle events (steering risky bash,
@@ -166,9 +164,8 @@ produce the same quality bar; the difference is how much you want to watch.
 - **Docs** (`docs/`) — harness-setup reference material: the Claude Code config
   layer split and env-var decision matrix (`Claude-Code-Setup.md`), the status
   line setup guide (`docs/customizations/statusline-setup.md`), a custom Linear-styled
-  color theme setup guide (`docs/customizations/theme-setup.md`), a config-security
-  scanner writeup for widened-autonomy postures (`config-security.md`), and the
-  learned-rules-loop schema/workflow doc (`LearnedRulesLoop.md`).
+  color theme setup guide (`docs/customizations/theme-setup.md`). The
+  learned-rules-loop schema/workflow doc ships with the `learned-rules` pack.
 - **Scripts** (`scripts/`) — standalone tooling: `bootstrap-tools.sh` (installs
   the CLI productivity layer — shellcheck, gitleaks, delta, difft, ast-grep, sd,
   yq, scc, gron, and more — across macOS/Linux), `statusline.sh` (the Claude Code
@@ -178,8 +175,7 @@ produce the same quality bar; the difference is how much you want to watch.
   (the learned-rules-loop scripts), `cron/` (reference cron wiring for the
   codebase-reindex job), and the run-hygiene helpers: `routing.sh` (engine routing),
   `suite-lock.sh`, `clean-scratch.sh`, `checkpoint-due.sh`, `remove-worktree.sh`,
-  `codex-procs.sh` / `sweep-codex-orphans.sh` (Codex broker cleanup), and the optional omp
-  engine scripts (`omp-engine.sh`, `omp-profile-setup.sh`); smokes live in `scripts/tests/`.
+  and the omp engine scripts (`omp-engine.sh`, `omp-profile-setup.sh`, `omp-caps.sh`) plus the deterministic helpers (`run-ci.sh`, `dep-audit.sh`, `merge-trunk.sh`, `poll-pr.sh`, `close-run.sh`, …); smokes live in `scripts/tests/`.
 - **Prompts** (`prompts/`) — general-purpose prompt-engineering reference guides
   for Claude and OpenAI models.
 - **Plugin packaging** (`plugin/agent-os-workflow/`) — the whole suite packaged
@@ -201,11 +197,32 @@ produce the same quality bar; the difference is how much you want to watch.
 ```
 
 This copies `agents/ commands/ skills/ hooks/ rules/ docs/ scripts/ prompts/
-plugin/` plus the scaffold directories, `settings.json`, and
-`CLAUDE.md.template` into `<target>/.claude/`. It will **not** overwrite an
-existing `<target>/.claude/settings.json` or `<target>/.claude/CLAUDE.md` — if
-either already exists, `install.sh` prints a warning and skips it rather than
-clobbering project-specific customization.
+plugin/ omp/ templates/` plus the scaffold directories, `settings.json`,
+`routing.json` and `CLAUDE.md.template` into `<target>/.claude/`. It will **not**
+overwrite an existing `<target>/.claude/settings.json`, `routing.json` or
+`<target>/.claude/CLAUDE.md` — if one already exists, `install.sh` prints a notice and
+skips it rather than clobbering project-specific customization. Nothing is ever deleted.
+
+**Optional packs** (native Codex, copywrite, orchestrator, learned-rules, and more) are not part of
+the plain install:
+
+```bash
+./install.sh --list-packs [/path/to/target/project]          # name, install state, description
+./install.sh /path/to/target/project --pack codex --pack copywrite
+./install.sh /path/to/target/project --remove-pack codex     # removes only files unchanged since install
+```
+
+A pack records the hash of every file it installs in `<target>/.claude/packs.lock.json`, merges its hook
+entries into `settings.json` and its routing keys into `routing.json` (unset keys only), and reports a
+modified or unmanaged file as a `CONFLICT` instead of overwriting or deleting it (exit 3). Details:
+[`packs/README.md`](packs/README.md).
+
+**Adopting new routing defaults.** `routing.json` is seeded once, so a project installed earlier keeps its
+old review/planning/debug/audit values (and a pack's routing fragment only fills unset keys).
+`install.sh` prints a note when your file differs from the release default. To adopt the omp-engine
+defaults, copy `review`, `planning`, `debug`, `audits`, `omp_engines`, `omp_roles` and `omp_fallback` from this
+repo's `routing.json` into the project's, then run the owner setup in `docs/Claude-Code-Setup.md`. What moved
+where since the earlier layout: [`docs/CHANGELOG.md`](docs/CHANGELOG.md).
 
 ### Option B — load it as a plugin (no files copied)
 
@@ -245,8 +262,7 @@ See [`agents/README.md`](agents/README.md) for the full agent-suite index (with 
 [`implementation`](agents/implementation/README.md),
 [`review-implementation`](agents/review-implementation/README.md),
 [`debug`](agents/debug/README.md), [`codebase`](agents/codebase/README.md),
-[`copywrite`](agents/copywrite/README.md), [`bootstrap`](agents/bootstrap/README.md),
-[`orchestrator`](agents/orchestrator/README.md)),
+[`bootstrap`](agents/bootstrap/README.md)),
 [`commands/README.md`](commands/README.md) for every slash command grouped by workflow
 (plus diagrams for `/auto-mode`'s wave loop and `/research`'s fan-out),
 [`hooks/README.md`](hooks/README.md) for the enforcement-hook mechanism and what's
@@ -271,7 +287,7 @@ for the plugin-packaging details.
 | `scripts/`   | Standalone tooling used by hooks/commands/cron                                            |
 | `prompts/`   | Prompt-engineering reference guides                                                       |
 | `routing.json` | Who does each kind of work (implementation, review, …); read via `scripts/routing.sh` |
-| `omp/`       | Optional omp third-engine profile overlay, sandbox launchers and skills                    |
+| `omp/`       | omp engine profile registry and overlay, sandbox launchers and skills                      |
 | `plugin/`    | The whole suite packaged as a toggleable Claude Code plugin                                |
 | `plans/`     | Implementation plans — accumulate as project history, not deleted after use               |
 | `research/`  | Research reports (topic deep-dives, library comparisons)                                  |
@@ -279,7 +295,6 @@ for the plugin-packaging details.
 | `testing/`   | Test plan TODO for supervised test writing                                                |
 | `evidence/`  | Captured evidence artifacts (screenshots, logs, reports) from audits/reviews               |
 | `handoffs/`  | Session handoff notes between agents or sessions                                          |
-| `orchestrator/` | `/orchestrate` mode's gap log (`GapLog.md` + `gaps.jsonl`), clustered by `/audit-agent-gaps` |
 | `themes/`    | Custom Claude Code color themes (Linear Dark) — installed via `scripts/apply-theme.sh`     |
 
 ## Mnemosyne MCP integration (optional)

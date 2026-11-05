@@ -1,23 +1,23 @@
 ---
 name: mnemosyne-glen
-description: Recall Glen decisions and supporting memory through Mnemosyne's read-only tools.
+description: Recall {{PROJECT_NAME}} decisions and supporting memory through Mnemosyne's read-only tools.
 ---
 
 <!-- Managed by omp-profile-setup.sh: mnemosyne-glen -->
 
-# Mnemosyne memory for Glen
+# Mnemosyne memory for {{PROJECT_NAME}}
 
-Mnemosyne is the owner's decision store. Always pass `project: "glen"` on every call.
+Mnemosyne is the owner's decision store. Always pass `project: "{{PROJECT_NAME}}"` on every call.
 Before reviewing or debugging, recall relevant decisions and follow their constraints.
 Use these six read tools (exposed with the `mcp__mnemosyne_` prefix):
 
-- `memory_search {project: "glen", query, limit}` recalls by topic or meaning.
-- `memory_get {project: "glen", id, full: true}` reads the complete known memory.
-- `memory_list {project: "glen", sourceKind: "decision", limit}` enumerates decisions;
+- `memory_search {project: "{{PROJECT_NAME}}", query, limit}` recalls by topic or meaning.
+- `memory_get {project: "{{PROJECT_NAME}}", id, full: true}` reads the complete known memory.
+- `memory_list {project: "{{PROJECT_NAME}}", sourceKind: "decision", limit}` enumerates decisions;
   use `sourceKind: "tech-debt"` for known debt.
-- `memory_get_recent {project: "glen", limit}` reads recently created memories.
-- `memory_get_entity {project: "glen", nameOrId}` reads an entity and its links.
-- `memory_decision_chain {project: "glen", id}` follows a decision's supersession history.
+- `memory_get_recent {project: "{{PROJECT_NAME}}", limit}` reads recently created memories.
+- `memory_get_entity {project: "{{PROJECT_NAME}}", nameOrId}` reads an entity and its links.
+- `memory_decision_chain {project: "{{PROJECT_NAME}}", id}` follows a decision's supersession history.
 
 Search first, then retrieve relevant ids with `full: true` before relying on a snippet.
 Cite memory ids in findings and distinguish remembered decisions from current code evidence.

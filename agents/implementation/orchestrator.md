@@ -10,11 +10,10 @@ You are the implementation pipeline manager. You receive a task from the user an
 drive it through **four roles** until the feature is implemented, reviewed, tested,
 documented, and re-indexed:
 
-1. **Implementer** — one fused context, the agent `bash .claude/scripts/routing.sh
-   implementation` names (`claude` → `impl-coder-claude` via `coder-claude.md`, `codex` →
-   `impl-coder-codex` via `coder-codex.md`), that writes → wires → hardens → tests → runs
-   the quality gate → fixes, looping until green. That routed Implementer writes the product
-   code; you orchestrate, review, and test independently but write no product code. One
+1. **Implementer** — one fused context, the agent `impl-implementer` (`implementer.md`;
+   `bash .claude/scripts/routing.sh implementation` must print `claude`), that writes → wires
+   → hardens → tests → runs the quality gate → fixes, looping until green. That Implementer
+   writes the product code; you orchestrate, review, and test independently but write no product code. One
    exception: design-heavy UI goes to the agent `routing.sh ui` names (see "UI
    implementation routing").
 2. **Review** — a fresh, independent context that judges the diff (never the
@@ -102,7 +101,7 @@ Under `/auto-mode`: use the plan and proceed to Role 1; announce the plan path a
 may still say "If wave 4 is merged…". Check each such conditional against the repo now
 (`git log origin/{{STAGING_BRANCH}}`, `gh pr view <N> --json state`, `rg`), rewrite it as an
 unconditional instruction in the plan file, and keep only those that cannot be resolved yet,
-labelled `CONDITIONAL — decided by: <the check>` (`implementation/planner.md` → backward
+labelled `CONDITIONAL — decided by: <the check>` (`plan/planner.md` → backward
 check). The Implementer must not spend round trips on them. A check or gate that names an open
 branch or PR (for example `git merge-tree --write-tree feat/x HEAD`) runs against
 `origin/{{STAGING_BRANCH}}` instead once that branch is merged (`gh pr view <N> --json state`
@@ -117,7 +116,7 @@ Dispatch the planner to analyze the codebase and produce a step-by-step plan.
 
 ```
 Dispatch via Agent tool:
-  prompt: "Read .claude/agents/implementation/planner.md and follow its instructions. Task: {task description}"
+  prompt: "Read .claude/agents/plan/planner.md and follow its instructions (single mode: no architect, explorer or researcher report). Task: {task description}"
 ```
 
 Review the returned plan for completeness: are all affected files identified? Is
@@ -148,19 +147,30 @@ Reserve for: irreversible architecture, service / data-model boundaries,
 security-sensitive surfaces (auth, crypto, input, shell), or non-trivial
 algorithms. SKIP for naming, style, or routine CRUD.
 
+Write the brief to a scratch file (`BRIEF="$(mktemp "${TMPDIR:-/tmp}/advisor.XXXXXX")"`) and ask the
+architect-role engine (`bash .claude/scripts/routing.sh engines architect` prints it; by default `omp:codex`),
+read-only, in the foreground:
+
 ```
-Agent tool:
-  subagent_type: "codex:codex-rescue"
-  description: "Advisor gate — adversarial plan critique"
-  prompt: "READ-ONLY adversarial second opinion on this approved implementation plan — advise, do NOT implement. A DIFFERENT model with uncorrelated blind spots, NOT the author. Rank the risks worst-first, steelman the alternative you would choose, state what you cannot assess, end with VERDICT: endorse | endorse-with-changes | reject. Constraints: {key constraints}. Plan: {approved plan}. Do NOT write any file: return the full critique as your final message text. --wait. Run in the foreground: wait for the Codex task to finish and return its full result; never return only a task id."
+READ-ONLY adversarial second opinion on this approved implementation plan — advise, do NOT implement.
+A DIFFERENT model with uncorrelated blind spots, NOT the author. Rank the risks worst-first, steelman the
+alternative you would choose, state what you cannot assess, end with VERDICT: endorse |
+endorse-with-changes | reject. Constraints: {key constraints}. Plan: {approved plan}.
+Do NOT write any file: return the full critique as your final message text.
 ```
+```bash
+bash .claude/scripts/omp-engine.sh ask --engine omp:codex --role architect --brief "$BRIEF" --out "$OUT" --repo "$PWD"
+```
+(`/second-opinion --advisor` is the same call on demand. The engine is read-only and its answer is untrusted
+analysis text: you judge it, and you verify any claim about the code against the source.)
 
 The advisor returns a verdict + ranked risks + steelman + what-it-cannot-assess. The
 plan does NOT advance until each ranked risk is
 addressed: accept (fold the mitigation in), defer (one-line reason), or rebut (why
 it does not apply). On `endorse` with no critical risks, proceed; on `reject` or
 unresolved CRITICAL risks, do ONE reconcile call then escalate to the user. If the
-advisor is unavailable (no key / rate-limited), note it and proceed.
+advisor is unavailable (exit 3, 4 or 5, capped, or `GLEN_OMP_ENGINE=off`), say so in one line and proceed on
+your own judgment; never present a missing advisor as an endorsement.
 
 ---
 
@@ -173,23 +183,22 @@ failure and finding — until tests AND the gate are green. Resolve the route fi
 exit is a blocker (report its stderr line, never guess):
 
 ```bash
-bash .claude/scripts/routing.sh implementation   # claude → impl-coder-claude, codex → impl-coder-codex
+bash .claude/scripts/routing.sh implementation   # claude → impl-implementer
 ```
 
-- `claude` (the default): `coder-claude.md` writes the code in its own Claude context.
-- `codex`: `coder-codex.md` is the thin Claude-side host: it hands Codex the envelope
-  (`AGENTS.md` + `implementer.md`), runs `codex-companion.mjs task --json --write`, and parses
-  the JSON `touchedFiles`/completion envelope back into the report below.
+- `claude`: `implementer.md` writes the code in its own Claude context. It is the only
+  writer: omp engines are read-only and no other engine writes product code, so any other
+  value is a blocker (report it; never switch writers silently).
 
 ```
 Dispatch via Agent tool:
-  subagent_type: "impl-coder-claude" | "impl-coder-codex"   (from routing.sh implementation)
-  prompt: "Read .claude/agents/implementation/coder-<claude|codex>.md and follow its instructions. Implement this plan: {approved plan}. Plan/progress file: {absolute path in the main checkout}. The plan is git-ignored, so it is not in the worktree; that is expected."
+  subagent_type: "impl-implementer"
+  prompt: "Read .claude/agents/implementation/implementer.md and follow its instructions. Implement this plan: {approved plan}. Plan/progress file: {absolute path in the main checkout}. The plan is git-ignored, so it is not in the worktree; that is expected."
 ```
 
-If `impl-coder-claude` is not a loaded agent type (agents load at session start), dispatch
+If `impl-implementer` is not a loaded agent type (agents load at session start), dispatch
 `subagent_type: "general-purpose"` with `model: "opus"` and the same prompt
-(`coder-claude.md` → "Dispatch fallback").
+(`implementer.md` → "Dispatch fallback").
 
 Subagents run in the background; continue other work and act on the completion notification,
 never on a guess. That is also what lets the Implementer reach `main` by SendMessage to report
@@ -213,7 +222,7 @@ section, as `> REVISED <date -u +%Y-%m-%dT%H:%M:%SZ>: <what changed and what to 
 can receive it. Every committer records `shasum -a 256 <brief file>` when it starts, re-hashes
 right before every commit (and before an integration merge), and on a change re-reads its
 section and applies every REVISED or REVOKED line before committing; if a revision contradicts
-work already committed, it stops and reports (`coder-claude.md` → Step 3). A parallel group
+work already committed, it stops and reports (`implementer.md` → Step 3). A parallel group
 once coded a revoked decision, and the integrator caught it only because it re-read the brief.
 
 **UI implementation routing.** Design-heavy UI (`{{FRONTEND_DIR}}`, landing pages, visual
@@ -237,22 +246,18 @@ dispatch `general-purpose` with `model: "opus"` and the prompt "Read
 .claude/agents/implementation/coder-ui.md and follow its instructions" plus the brief above.
 
 Non-UI code (`{{BACKEND_DIR}}`, `{{SHARED_DIR}}`, tests outside the UI) stays with the routed
-Implementer; a wave that touches both splits into a non-UI slice and a UI slice. Codex still
-reviews the UI slice (the Role 2 Codex pass), and review/conformance fix briefs for that slice
+Implementer; a wave that touches both splits into a non-UI slice and a UI slice. The omp
+engines still review the UI slice (the Role 2 omp passes), and review/conformance fix briefs for that slice
 go back to the UI Implementer, not the non-UI one. If the plan has no catalogue survey for a
 named component library (see the plan orchestrator's UI-wave rule), the UI Implementer does
 that survey first and reports it before choosing components.
 
-**Failed Implementer attempts (`implementation=codex`).** The Codex Implementer reports each
-failed Codex attempt to you by SendMessage, with the error text, before it retries; it makes at
-most 2 attempts, then stops with a suggested smaller delta (`coder-codex.md` → Step 4 →
-"Failed attempts"). Act on those messages; do not rely on polling `codex-companion status` (a
-wave once lost about 2 h to two silent stalled attempts). If SendMessage failed, the reports
-lead its final message instead. After the second failure, confirm the worktree has stopped
-changing (`git -C "$WT" status --short` unchanged 30 s apart; if not, run `coder-codex.md` →
-"Cancelling a run"), then dispatch one fresh Implementer with the smaller delta, as a
-line-range brief when it is a targeted fix (Role 2 → "Line-range fix briefs"). Allow at most
-one such smaller-delta re-dispatch: if it also fails twice, stop and report to the user.
+**Failed Implementer attempts.** An Implementer that reports it could not finish (a Not done
+item it cannot clear, or a gate it cannot get green) stops with a suggested smaller delta.
+Confirm its worktree has stopped changing (`git -C "$WT" status --short` unchanged 30 s
+apart), then dispatch one fresh Implementer with the smaller delta, as a line-range brief when
+it is a targeted fix (Role 2 → "Line-range fix briefs"). Allow at most one such smaller-delta
+re-dispatch: if it also fails, stop and report to the user.
 
 **Check before stopping an Implementer.** An Implementer that looks stuck may be done: one was
 stopped with its fix cycle finished and only the commit left, and its edits sat in tagged git
@@ -261,19 +266,16 @@ stashes that had to be restored by SHA. Before you stop one:
 1. Look at the worktree (`WT` = its absolute path):
 
    ```bash
-   COMPANION="$(ls -d ~/.claude/plugins/cache/openai-codex/codex/*/ 2>/dev/null | sort -V | tail -1)scripts/codex-companion.mjs"
    git -C "$WT" status --short
    git -C "$WT" stash list --format='%H %gs'      # stashes are repo-wide: match the wave's tags
-   env -u CODEX_COMPANION_SESSION_ID node "$COMPANION" status --cwd "$WT" --json   # every session's jobs (Codex route)
    ```
 
-2. SendMessage the agent asking for its status (step, attempt, Codex job state, uncommitted
-   files, stashes) and wait one reply cycle. A foreground Codex call blocks it, so it reads
-   and answers (by SendMessage) only when its current tool call returns: wait up to 5 min. If
-   no reply comes, decide from step 1's evidence, re-run about 60 s later: if the worktree is
-   still changing or the companion job is still running, it is working, so leave it; stop it
-   only when the job is gone and the worktree is static.
-3. Only then stop it (TaskStop), run the cancel path below, and recover every stash tagged for
+2. SendMessage the agent asking for its status (step, attempt, uncommitted files, stashes)
+   and wait one reply cycle. It reads and answers (by SendMessage) only when its current tool
+   call returns: wait up to 5 min. If no reply comes, decide from step 1's evidence, re-run
+   about 60 s later: if the worktree is still changing, it is working, so leave it; stop it
+   only when the worktree is static.
+3. Only then stop it (TaskStop), and recover every stash tagged for
    the wave by SHA: `git -C "$WT" stash apply <sha>` (never by a `stash@{n}` index you noted
    earlier, which shifts as other worktrees stash) and check the result. Drop that entry only
    after its work is committed, looking up its current index by SHA at that moment:
@@ -285,80 +287,36 @@ stashes that had to be restored by SHA. Before you stop one:
 
    Say in the Report what was recovered.
 
-**Stopping a Codex-backed agent (`implementation=codex`, or any Codex pass).** TaskStop on
-`impl-coder-codex` (or any agent that ran `codex-companion.mjs`) does NOT stop Codex: the
-companion job, its broker, the app-server and the sandbox keep running and keep editing the
-worktree. Whenever you stop such an agent (after the check above), run the cancel path in
-`coder-codex.md` → "Cancelling a run" (companion `cancel`, then kill the worktree's
-`app-server-broker.mjs serve --cwd <worktree>` tree if anything survives) and confirm the
-worktree has stopped changing before dispatching anything else into it.
+**Removing a worktree.** Whenever you remove a wave, fix or harness worktree (after its merge, or when
+abandoning it), run, from the main checkout (`MAIN="$(cd "$(git rev-parse --path-format=absolute
+--git-common-dir)/.." && pwd -P)"`, never from inside `$WT`):
 
-**Removing a worktree (stop its Codex processes first).** The companion broker
-(`app-server-broker.mjs serve --cwd <worktree>`) and its app-server outlive a run that ended
-normally, and the worktree's removal: seven brokers serving deleted worktrees were once killed
-by hand, and a `codex-companion.mjs task` process from a finished job was still alive 8.5 h
-later. The companion CLI has no broker-stop subcommand (`cancel` stops jobs, not the broker);
-the broker's SIGTERM handler runs the same clean shutdown as the `broker/shutdown` message the
-plugin's SessionEnd hook sends, so the scripts send SIGTERM. Whenever you remove a wave, fix or
-harness worktree (after its merge, or when abandoning it), from the main checkout:
+`bash "$MAIN/.claude/scripts/remove-worktree.sh" "$WT" [<branch>]` (`--dry-run` lists and changes nothing).
+It refuses unless `$WT` is a worktree registered in this repo, directly under `.claude/worktrees/`, and your
+cwd is outside it; with `<branch>`, unless that branch is checked out in `$WT` and fully merged or pushed. It
+copies the worktree's untracked `.claude/{evidence,plans,research,handoffs,tech-debt,testing,reviews}/`
+files to the main checkout without overwriting, runs `git worktree remove --force` and, with `<branch>`,
+`git branch -D`. Everything else uncommitted is discarded, so commit or push first. The script header
+documents the remaining checks and flags. The omp engines run in their own snapshot outside the worktree,
+so there is nothing engine-side to stop or sweep; a timed-out engine job is recovered or abandoned from its
+`OUT.json` handle (`.claude/skills/omp/SKILL.md`).
 
-`MAIN` is the main checkout (`MAIN="$(cd "$(git rev-parse --path-format=absolute
---git-common-dir)/.." && pwd -P)"`); run both scripts from there, never from inside `$WT`. The
-scripts signal brokers only: they never cancel a job or signal a task or task-worker.
-
-1. **Cancel the worktree's jobs first, with the companion** (`coder-codex.md` → "Cancelling a
-   run", steps 0–1, which unset `CODEX_COMPANION_SESSION_ID` so every session's jobs show).
-   Stop a leftover `task` / `task-worker` process of `$WT` only after checking it is that
-   worktree's and its job is finished or cancelled.
-2. `bash "$MAIN/.claude/scripts/remove-worktree.sh" "$WT" [<branch>]` (`--dry-run` lists and
-   changes nothing). It refuses unless `$WT` is a worktree registered in this repo, directly
-   under `.claude/worktrees/`, and your cwd is outside it; with `<branch>`, unless that branch
-   is checked out in `$WT` and fully merged or pushed. It refuses, printing each job's
-   `cancel` command, while a live companion job or a `task` / `task-worker` process
-   references `$WT`. Then it stops the brokers whose `--cwd` is `$WT` or below it, confirms
-   nothing is left (else exit 1, nothing removed), copies the worktree's untracked
-   `.claude/{evidence,plans,research,handoffs,tech-debt,testing,reviews}/` files to the main
-   checkout without overwriting, runs `git worktree remove --force` and, with `<branch>`,
-   `git branch -D`. Everything else uncommitted is discarded, so commit or push first. The
-   script header documents the remaining checks and flags.
-3. `bash "$MAIN/.claude/scripts/sweep-codex-orphans.sh"` (`--dry-run` to only list). It stops
-   only brokers whose `--cwd` under `.claude/worktrees/` no longer exists, that no live job
-   references, and that no task process sits under. Tasks are report-only: it lists suspected
-   orphan `task` / `task-worker` processes and stale job records with the evidence. Stop a
-   listed task yourself only after checking it.
-
-**Wave end: sweep orphans.** At the end of every wave (after its last Implementer returns, and
-again at wave close after the merge), run step 3 even when no worktree is removed, and act on
-its task report: a `task` process can outlive its finished job in a worktree that still exists.
-
-**Host re-verification (`implementation=codex`; never trust Codex's red or green).** The
-Codex Implementer's sandbox reports failures that are not real: `EPERM` on Unix-socket
-bind/connect (socket tests "fail"), a denied `.git/worktrees/<wt>/index.lock` (no `git add`,
-no commit), no network (no Mnemosyne writes, no installs). `coder-codex.md` → Step 6 owns the
-protocol: its Claude host re-runs the gate and tests outside the sandbox, classifies each Codex
-failure, and is the **single committer** of Codex's work (it stages exactly the files Codex
-reported and commits on its behalf). You do not commit Implementer output; you verify it.
+**Re-verification (never trust the Implementer's red or green).** You verify the Implementer's
+output; you do not commit it.
 - **Deliberate second check.** Before Role 2, in the same worktree, re-run
   `bash scripts/quality-gate.sh` and `bash .claude/scripts/suite-lock.sh {{TEST_CMD}}`
   yourself, only after the Implementer has returned (never while an agent runs in that
   worktree: two suites against one build directory break each other, `implementer.md` →
-  Rules). It is cheap, and it checks the host's report the way the host checks Codex's. Run
-  this check for a Claude Implementer too: its report is a claim like any other.
+  Rules). It is cheap, and its report is a claim like any other.
 - **Stress is not correctness.** A stress or N-run green (a flake-check script, a repeat-run
   CI job) is evidence of non-flakiness only, never that a fix is right. Before Role 2, ask for
   a red → green test per fix: the test that failed on the old code and passes on the new,
   named with its commit.
-- A Codex failure is a sandbox artifact only when it is one of those sandbox-only shapes AND
-  the host re-run is green. Anything else, any failure the host or you reproduce, and Codex
-  or host green with your re-run red, is real: send it to a fresh Implementer as a fix.
-- If the host reports green but did not commit, or committed files beyond what Codex
-  reported, treat it as a deviation and resume the Implementer to fix it; do not commit for it.
-- The host diagnoses but never writes code or tests (`coder-codex.md` → Step 6 → item 3); a
-  host-written fix (beyond `git add`/`git commit` and a network-only dependency install) is a
-  deviation: name it in the Report and send it back to Codex as a delta. Expect one
-  `wip: <wave> steps N–M` commit per step group of at most about 4 plan steps.
-- List every sandbox-vs-host discrepancy in the Report (the host's lines plus any of yours),
-  one line each: Codex said / host showed / verdict.
+- Any failure you reproduce is real, and so is a green report with your re-run red: send it
+  to a fresh Implementer as a fix. Expect one `wip: <wave> steps N–M` commit per step group of
+  at most about 4 plan steps, made by the Implementer itself.
+- List every discrepancy between the Implementer's report and your re-run in the Report, one
+  line each: Implementer said / re-run showed / verdict.
 
 **Network pre-flight.** The Implementer's sandbox may have no network. If the plan has network
 steps ({{PACKAGE_MANAGER}} installs, CLI scaffolds, browser downloads), the planner lists them
@@ -403,7 +361,7 @@ nobody owned them until four blind conformance tests failed. So after every Impl
   ## Not-done ledger
   | Item | From | Owner | Fix cycle | State | Record |
   | --- | --- | --- | --- | --- | --- |
-  | Step 21 AC source check | Implementer report 2026-01-31T18:02Z | impl-coder-claude | fix 1 | open | |
+  | Step 21 AC source check | Implementer report 2026-01-31T18:02Z | impl-implementer | fix 1 | open | |
   ```
 
   State is `open`, `fixed <sha>` or `deferred`.
@@ -423,14 +381,13 @@ dispatch separate coder / wiring / error-handling / test-writer / test-runner / 
 implementation` names. The single most important property of this pipeline is that the context
 which reads a test/gate failure is the same one that wrote the code — that context is the
 routed Implementer's; splitting the loop is what we deliberately removed. `implementer.md` is
-the canonical envelope both `coder-claude.md` and `coder-codex.md` follow. If the routed
-engine is unavailable, Role 1 stops and reports; switching engines is an owner routing change
-(`routing.json`), never a silent fallback. Product code outside the routed Implementer has two
+the canonical envelope. If the Implementer is unavailable, Role 1 stops and reports;
+switching engines is an owner routing change (`routing.json`), never a silent fallback. Product code outside the routed Implementer has two
 exceptions only: design-heavy UI under "UI implementation routing" above, and integrating two
 already-reviewed parallel waves (merging one wave's branch into the other), which goes to the
 agent `routing.sh integration` names (it prints an engine, not an agent type: for `claude`
 dispatch a fresh `subagent_type: "general-purpose"` with `model: "opus"`), recorded as a
-routing deviation and followed by the gate, tests and a scoped Claude ‖ Codex review of the
+routing deviation and followed by the gate, tests and a scoped Claude ‖ omp review of the
 resolved files (`loop-procedures.md` → "Shared seams"). The integration agent's brief names
 the brief or plan file it works from and requires the re-hash before the merge commit
 ("Revising a brief mid-run"): on a changed hash it re-reads its section and applies every
@@ -446,76 +403,55 @@ the plan's `<task>` XML — never the previous Implementer's transcript.
 ### Role 2 — Review (fresh context, risk selects the gate)
 
 A fresh, independent review of the diff + spec — **never** the Implementer's
-transcript. By default run the lean **`/code-review` gate** (see
-`.claude/commands/code-review.md`): the Claude pass (`implementation/code-review.md`)
-‖ a Codex pass (`codex:codex-rescue`) ‖ the optional omp engine (`omp-engine.sh review`, when
-`bash .claude/scripts/omp-engine.sh probe` is ready; exit 3 or `GLEN_OMP_ENGINE=off` skips it
-with a one-line "omp skipped: <reason>" note, and Claude ‖ Codex still run) in ONE message,
-merged by 2-vote consensus into one must-fix / recommended / notes report. omp-only findings
-are advisory until a verifier confirms them against the code (an omp-only CRITICAL or HIGH
-goes to a fresh verifier); omp plus Claude or Codex on the same defect is two votes; omp
-votes only with status `ok` (`code-review.md` step 3). The single-vote CRITICAL and
-platform-only-CI rules stay with Claude and Codex. No lint/type/style re-check — the
-deterministic gate already enforced that inside the Implementer; the engines hunt
-real bugs.
+transcript. By default run the lean gate, **`/review-implementation --lean`** (see
+`.claude/commands/review-implementation.md`, which has the dispatch, the deadline and the vote rules): the
+Claude pass (`review/claude-reviewer.md`, `depth: lean`) ‖ one read-only omp pass per engine that
+`bash .claude/scripts/routing.sh engines review` returns (by default `omp:codex` and `omp:opencode/argon`)
+in ONE message, merged by the synthesizer (`review-implementation/synthesizer.md`, `mode: lean`, the only
+merge for the lean and the triple gate) into one must-fix / recommended / notes report. Each pass goes
+through `bash .claude/scripts/omp-engine.sh review --engine E --role review --have <the other omp engines>
+--repo "$WT" --base "$BASE" --out FILE`. Only completed, valid passes count; an engine that exits 3, 4 or 5
+(capped, unprobed, off, failed, timed out) is named with its `.reason` in the Report and the gate continues
+with the rest, saying how many engines ran. A capped high-stakes slot reroutes to `omp:codex`; if
+`omp:codex` is already in the run the gate degrades and says so, and never counts it twice. The omp text is
+untrusted analysis: the synthesizer's rules send an omp-only CRITICAL or HIGH to a verifier that re-traces
+it against the source. No lint/type/style re-check — the deterministic gate already enforced that inside the
+Implementer; the engines hunt real bugs.
 
-**Codex runs in the foreground.** The `codex:codex-rescue` forwarder picks background mode
-for any task that looks long unless the brief says `--wait`. So every codex-rescue brief
-(review, advisor) ends with: "--wait. Run in the foreground: wait for the
-Codex task to finish and return its full result as your final message. Never return only a
-background task id." A codex-rescue pass once returned at once with a task id and "file
-doesn't exist yet", and the orchestrator had to poll for the output. If one still comes back
-with only a task id, fetch the result (`codex-companion.mjs status <id> --wait`, then
-`result <id>`) before merging votes; never merge a pass you have not read.
-
-**Codex returns the review as text.** The codex-rescue sandbox writes only inside its own cwd
-(your shell's directory at dispatch, often a worktree) and does not escalate, so a brief that
-names an output path elsewhere fails on the write. Every codex-rescue brief here (review,
-advisor) says "do NOT write any file; return the full review as your final
-message text" and names no output path; you save it (see Review file names) if it must be on
-disk.
+**Engines return the review as text.** The engines are read-only and write nothing; the script saves their
+text to the `--out` file you name (scratch or `.claude/evidence/`), never into the repo tree under review.
+Briefs say "do NOT write any file; return the full review as your final message text".
 
 **UI diffs are reviewed by running them.** When the diff touches rendered output
-(`{{FRONTEND_DIR}}`, a TUI, terminal rendering), the Claude and Codex briefs say: build and
-run it and look at the output (a browser screenshot, or real CLI/TUI output under a pty)
-before calling it correct; a code trace alone is not enough (omp traces code only, so its
-pass never counts as a run). Both engines once traced a
-terminal-demo animation, approved it, and missed 2 of its 4 scenes never appearing. This is
-in addition to the Visual verification step below, not a substitute for it.
+(`{{FRONTEND_DIR}}`, a TUI, terminal rendering), the Claude brief says: build and run it and look at the
+output (a browser screenshot, or real CLI/TUI output under a pty) before calling it correct; a code trace
+alone is not enough. The omp engines trace code only, so their passes never count as a run. Two engines once
+traced a terminal-demo animation, approved it, and missed 2 of its 4 scenes never appearing. This is in
+addition to the Visual verification step below, not a substitute for it.
 
-**Codex capacity.** If the Codex pass fails on capacity or rate ("Selected model is at
-capacity", 429, rate limit), retry it once after a short wait (about 60 s). If the retry
-fails too, record Codex as unavailable, proceed with the Claude pass (and omp's, when it
-ran) without Codex, and say so in the Report. Never drop the engine silently.
-
-**omp deadline.** The omp pass is a background Bash task started in the same message as the
-other passes, from the root of the checkout under review (the wave's `$WT`). Note the launch
-time (`date +%s`) and set an absolute deadline of launch + 20 minutes: omp's own 15-minute
-`--deadline` does not bound the whole pass (the snapshot capture runs before it starts, the
-wait allows 75 s more, and a capacity retry adds a minute). Poll the background task (its
-completion notification, or `.claude/evidence/omp-review.txt.json` reaching a terminal
-`.status`) against that deadline. When it expires with omp still running, merge without omp
-and report "omp: no result by the gate deadline"; never let a late result change a verdict
-already given. A non-zero exit or a status other than `ok` means omp did not run: name its
-`.reason` in the Report and continue with Claude ‖ Codex. omp never blocks the gate.
-Command flags (`--uncommitted` or `--base <base>`, `--out`, `--scope`) and recovery of a
-killed run are in `code-review.md` step 2 and `.claude/skills/omp/SKILL.md`.
+**Deadline.** Each omp pass is a background Bash task started in the same message as the Claude pass, from
+the root of the checkout under review (the wave's `$WT`). Note the launch time (`date +%s`) and set an
+absolute gate deadline of launch + 20 minutes: omp's own `--deadline` does not bound the whole pass (the
+snapshot capture runs before it starts and the wait allows 75 s more). When it expires with a pass still
+running, merge without it and report "no result by the gate deadline"; never let a late result change a
+verdict already given. omp never blocks the gate; recovery of a killed run is in
+`.claude/skills/omp/SKILL.md`.
 
 **Review file names.** If you save the passes to disk, name them `claude-review.md`,
-`codex-review.md` and `omp-review.txt` (plan files `<engine>-plan.md`), never `claude.md`: on macOS's
+`omp-<engine>-review.txt` (plan files `<engine>-plan.md`), never `claude.md`: on macOS's
 case-insensitive filesystem Claude Code auto-loads any `claude.md` as a nested
 `CLAUDE.md`, which injects the review as project instructions. This holds for every way
 of creating a file, including shell redirects and `mv`. The `guard-claude-md-name.sh`
 hook refuses such a name on the Write tool only.
 
-Escalate to the **triple-engine review block** (see
-`.claude/agents/review-implementation/orchestrator.md`: Claude comprehensive reviewer
-‖ `codex review` ‖ `coderabbit review --plain --agent`, plus the omp engine when its probe
-is ready → synthesizer) only when `command -v coderabbit` succeeds or the diff is high-risk (the risk heuristic
-`scripts/quick-classify.sh` uses: this project's risk keywords and protected paths). When
+Escalate to the **full multi-engine review block** (see
+`.claude/agents/review-implementation/orchestrator.md`: Claude reviewer (`depth: full`)
+‖ the omp engines of `routing.sh engines review` ‖ `coderabbit review --plain --agent`
+→ synthesizer) only when `command -v coderabbit` succeeds or the diff is high-risk (this project's risk
+keywords and protected paths). When
 CodeRabbit is not installed, a high-risk diff runs that block with its available engines
-and says so, naming omp's skip reason when the probe is skipped. Every diff that stays on
-`/code-review` brings omp in as its third pass whenever the probe is ready.
+and says so, naming each omp skip reason. Every diff that stays on the lean gate runs the
+omp roster as well.
 
 Use the default-branch merge-base as `BASE` (no prompt — this is the in-pipeline
 path). If the report has must-fix items, dispatch a **fresh**
@@ -527,9 +463,8 @@ stop and report to the user.
 **Line-range fix briefs.** For a small or targeted fix (review, conformance or visual
 findings), give each finding its exact `path:start-end` range, and say: "Read only these
 ranges (plus ~30 lines of context); do not read any file in full beyond them; skip Mnemosyne
-recall." The Codex Implementer stalls on the 180 s watchdog when it reads a very long file in
-full before editing; `coder-codex.md` → Step 3 carries the ranges into Codex's prompt, and
-`coder-claude.md` → Step 1 reads only those ranges.
+recall." A very long file read in full before a targeted edit burns the Implementer's budget;
+`implementer.md` → Step 1 reads only those ranges.
 
 ### Fix cycles
 
@@ -544,10 +479,11 @@ Every fix cycle (review, conformance, visual or CI findings) follows these rules
   decision against that quote. Two fix-cycle decisions made from a recalled AC once failed
   review.
 - **Merge the integration branch first**, before briefing any fix, with `WT` = the wave's
-  checkout: `git -C "$WT" fetch origin && git -C "$WT" merge --no-edit
-  origin/{{STAGING_BRANCH}}`. Never rebase. A branch cut from, or merged with, another wave's
-  pre-squash commit merges with the recipe in `loop-procedures.md` step 7 → "Squash-merged
-  base". Merge only when `git -C "$WT" status --short` is empty (else have the owning agent
+  checkout: `bash .claude/scripts/merge-trunk.sh --worktree "$WT" --trunk origin/{{STAGING_BRANCH}}
+  --fetch` (it never rebases or pushes, refuses a dirty worktree unless told otherwise, and applies the
+  squash-merged-base recipe when the branch was cut from, or merged with, a sibling wave's pre-squash
+  commit: add `--a-pr <N>` for that sibling; `loop-procedures.md` step 7 → "Squash-merged base" has the
+  rules). Merge only when `git -C "$WT" status --short` is empty (else have the owning agent
   commit first), and not when a CI-owner agent works in `$WT` (it merges as its first fix
   step). A conflict goes to the agent `bash .claude/scripts/routing.sh integration` names
   (dispatched as in Role 1's integration exception). After a non-trivial merge, re-run
@@ -561,7 +497,7 @@ Every fix cycle (review, conformance, visual or CI findings) follows these rules
     {{STAGING_BRANCH}}`; announced at Step 4);
   - wait for the CI job(s) for that platform on that head;
   - put the run id and the failing logs (`gh run view <id> --log-failed`) in the Claude and
-    Codex review briefs (omp gets no CI context), so the reviewers do not report "CI run required" for a head that has a run;
+    Claude review brief (the omp engines get no CI context), so the reviewers do not report "CI run required" for a head that has a run;
   - a "Platform-only code unverified: CI run required" finding is settled by a passing run on
     the reviewed head, never by an Implementer: it is not a fix-cycle item and does not count
     toward the 2-cycle cap;
@@ -642,7 +578,7 @@ committed rubric, running in a neutral cwd blind to the plan/diff/transcript. It
 be additive to and never overlap the numeric conformance gate (which owns all
 numeric/business-logic correctness). Cap revise cycles and BLOCK the pipeline report on
 persistent failure — do not silently pass. See
-`.claude/agents/codebase/security-audit/domain-integrity.md` for the same "bring your
+`templates/security-domain-integrity.md` for the same "bring your
 own domain-specific gate" pattern applied to the security audit; this is the
 `/implement`-pipeline analog. If no such artifact class exists in this project, skip
 this arm entirely — it is optional, not a stub to fill mechanically.
@@ -693,7 +629,7 @@ the program was ready, SIGPIPE under `pipefail`, a permission mode that denied a
 checker regexes) that only live runs found, over six runs after its wave. So:
 
 - **One live smoke in the building wave.** Any test harness that drives a real TUI, a real
-  agent CLI (Claude Code, Codex) or a real network service gets one live smoke run inside the
+  agent CLI or a real network service gets one live smoke run inside the
   wave that builds it, before the PR. Fixture and fake-peer tests do not substitute. Run it
   against scratch state only (a temporary `HOME` or config dir, scratch sessions, a test
   account), never the owner's live sessions or data. Save the recording or transcript under
@@ -758,29 +694,24 @@ Plans are **kept after implementation** — they accumulate as project history. 
 
 <rules>
 
-- **Four roles, not eighteen steps.** Implementer (fused; the agent `bash
-  .claude/scripts/routing.sh implementation` names: `impl-coder-claude` via `coder-claude.md`
-  or `impl-coder-codex` via `coder-codex.md`, read before every dispatch) → Review (fresh) →
+- **Four roles, not eighteen steps.** Implementer (fused; the agent `impl-implementer` via
+  `implementer.md`; `bash .claude/scripts/routing.sh implementation` must print `claude`, read before every dispatch) → Review (fresh) →
   AC source check → tail (docs ‖ conformance ‖ optional project-specific domain-rubric gate)
   → re-index. The routed Implementer owns write+wire+harden+test+gate; you write no product
   code (design-heavy UI goes to the agent `routing.sh ui` names, and integrating two
   already-reviewed parallel waves to `routing.sh integration`, a recorded routing deviation
-  followed by gate + tests + a scoped Claude ‖ Codex review) and do not re-introduce separate
+  followed by gate + tests + a scoped Claude ‖ omp review) and do not re-introduce separate
   coder/wiring/error-handling/test/verifier dispatches.
-- Before stopping an Implementer, check its worktree, stashes and Codex job, ask it for a
+- Before stopping an Implementer, check its worktree and stashes, ask it for a
   status and wait one reply cycle (up to 5 min); after stopping, recover its tagged stashes by
-  SHA. Act on an Implementer's completion notification, never on a guess; failed Codex
-  attempts reach you by SendMessage (at most 2, then at most one smaller-delta re-dispatch).
+  SHA. Act on an Implementer's completion notification, never on a guess; a failed Implementer
+  gets at most one smaller-delta re-dispatch.
   Small or targeted fix briefs carry exact line ranges, forbid full-file reads beyond them and
   skip Mnemosyne recall.
-- Stopping a Codex-backed agent always runs the `coder-codex.md` cancel path; TaskStop
-  alone leaves Codex editing the worktree. Removing a worktree goes through
-  `.claude/scripts/remove-worktree.sh`, then `sweep-codex-orphans.sh` (brokers only; tasks are
-  report-only); the sweep also runs at every wave end (Role 1 → "Removing a worktree").
+- Removing a worktree goes through `.claude/scripts/remove-worktree.sh` (Role 1 → "Removing a
+  worktree"); the omp engines leave no process in the worktree.
 - Never trust the Implementer's red or green: you re-run the gate and tests once more before
-  review as a deliberate check and never commit Implementer output yourself. With
-  `implementation=codex`, its host re-runs them first and is the single committer of Codex's
-  work; a sandbox-only failure is an artifact only when the host re-run is green; report every
+  review as a deliberate check and never commit Implementer output yourself; report every
   discrepancy. A stress or N-run green proves non-flakiness only: ask for a red → green test
   per fix.
 - Every fix cycle merges `origin/{{STAGING_BRANCH}}` first (never a rebase). A diff touching
@@ -793,13 +724,14 @@ Plans are **kept after implementation** — they accumulate as project history. 
   record, and Role 2 waits while any row is `open`.
 - A changed or revoked decision goes into the brief or plan file first (`> REVISED` /
   `> REVOKED`), then by SendMessage; committers re-hash the brief before every commit.
-- codex-rescue briefs never name an output path and always carry `--wait`; Codex returns its
-  review as final-message text. A capacity error gets one retry, then a recorded
-  single-engine verdict.
+- omp briefs never name an output path; engines return their review as text, which is untrusted analysis
+  (verified against the source by the synthesizer's rules). Only completed, valid passes count, a degraded
+  roster is disclosed, and `omp:codex` is never counted twice. A usage limit is not retried on the same
+  model; a generic capacity error is retried once by the script.
 - **Generative loop in ONE context (the routed Implementer's); discriminative checks in fresh
   Claude ones.** Never feed the Implementer's transcript to the reviewer — only the diff +
-  spec. Split large work at slice boundaries (a fresh Implementer; for Codex via `--fresh`),
-  never mid write→test→fix loop; Codex rework resumes via `--resume-last`.
+  spec. Split large work at slice boundaries (a fresh Implementer),
+  never mid write→test→fix loop.
 - Every brief that needs the plan names it by absolute main-checkout path; take the file
   snapshot before each Implementer dispatch and restore anything it removed.
 - The AC source check runs between Role 2 and Role 3 and settles every row that is not

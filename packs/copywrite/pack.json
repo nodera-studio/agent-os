@@ -1,0 +1,59 @@
+{
+  "name": "copywrite",
+  "version": "1",
+  "description": "Copywriting suite: /copywrite, voice, microcopy, localization and consistency agents, the Apple voice rubric and style guide (grep on demand), Romanian ICU and diacritic gates.",
+  "files": [
+    "agents/copywrite/README.md",
+    "agents/copywrite/apple-style-guide.md",
+    "agents/copywrite/brand-terms.md.template",
+    "agents/copywrite/consistency-checker.md",
+    "agents/copywrite/localization-editor.md",
+    "agents/copywrite/localization-register-memo.md.template",
+    "agents/copywrite/microcopy-specialist.md",
+    "agents/copywrite/orchestrator.md",
+    "agents/copywrite/voice-editor.md",
+    "agents/copywrite/voice-rubric.md",
+    "commands/copywrite.md"
+  ],
+  "prior_hashes": {
+    "agents/copywrite/README.md": [
+      "3b41cd94fd8c4e5741489a68188aada1ccf66e7d644da109e10b3f1101b26966",
+      "8fd698515c67bf246a45536558d1a1bb5a60f133068afbd4327b0f8f3c7c4424"
+    ],
+    "agents/copywrite/apple-style-guide.md": [
+      "69ae4c6fb170344733fa840732eec68825a24525b7caed2b80e56194d9ba1447"
+    ],
+    "agents/copywrite/brand-terms.md.template": [
+      "cb58d6b116c58fe3dac4db7be54fb08aeb6394ffeb3ca4a8f56b82e6c91332e9"
+    ],
+    "agents/copywrite/consistency-checker.md": [
+      "65a0671c8f1a076b3d4fb5d259844587754622bb8eebbe240d42903ea2871a90",
+      "9e9440e541478e629a1b5ce202287dac629862d40bb5052b4bf25cdc7f44f01e"
+    ],
+    "agents/copywrite/localization-editor.md": [
+      "377972b387f2655cce7fbdf2da0bcc1a7886f9f63b359f69ba96bc4f33b481d1",
+      "6a94b4bdf50453af5b202f4ef543f466e9e99135b14a014bef3b68d83f12ffe9"
+    ],
+    "agents/copywrite/localization-register-memo.md.template": [
+      "a97a1b5e7b1ce664801ce7f1a683e07be0b10c6084a337049aea7033ea205351"
+    ],
+    "agents/copywrite/microcopy-specialist.md": [
+      "3a005b4b66ef65d1dfb93fc57f99773b5d770241c6a91bba2988072d2dc1b72e",
+      "7a1112cda08b25e97ccd195de440c61aaa24e5cb75d76b165f88d9c1d1e9460e"
+    ],
+    "agents/copywrite/orchestrator.md": [
+      "4865e7bf257679ca3b591fa61c2d39ede3a8a97eb314066ecda419bb6e284359",
+      "bfbbdca2cb681422da9befcbfc02366145b74c660c2f69b0675103c28a64c79f"
+    ],
+    "agents/copywrite/voice-editor.md": [
+      "e089ac8b4b12a84a5a8a03c0da6f4daeef17a2dcf23d23394ba94c67cbc74e2f",
+      "f30e15e11a9f31a963ad4d4bef24e0f40b72a60a9551760b81f7091c14ca7b56"
+    ],
+    "agents/copywrite/voice-rubric.md": [
+      "6f8e7d7b3e8d024e0adfd78d6fba750ef97e3a4e6b21a72964a4f85a887f3e99"
+    ],
+    "commands/copywrite.md": [
+      "f03837c9a83a8216637184457c886f39a947b2e523149913ae70209c0f104eea"
+    ]
+  }
+}

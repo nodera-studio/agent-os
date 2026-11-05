@@ -1,0 +1,51 @@
+{
+  "name": "codex",
+  "version": "1",
+  "description": "Native Codex (openai-codex plugin) dispatch, job cancel and orphan sweep. Opt-in; never a fallback for omp engines.",
+  "files": [
+    "hooks/block-old-codex.sh",
+    "scripts/codex-procs.sh",
+    "scripts/sweep-codex-orphans.sh",
+    "scripts/tests/codex-jobs-smoke.sh",
+    "skills/codex/SKILL.md"
+  ],
+  "hooks": [
+    {
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "command": ".claude/hooks/block-old-codex.sh",
+      "timeout": 10
+    }
+  ],
+  "routing": {
+    "codex": {
+      "enabled": false,
+      "readonly_confinement": "required-before-enable"
+    },
+    "omp_fallback": []
+  },
+  "prior_hashes": {
+    "hooks/block-old-codex.sh": [
+      "35efcc82f31e9d4320853ee8921c28f7db964326e919bfa3e8721b0ec3d8d51c"
+    ],
+    "scripts/codex-procs.sh": [
+      "9f5ab0f34b4e53c67b3144ca59bd6fb5441bd5d295fd6395b269b4616050e564",
+      "ef484f98e1cb577d394a54d262f2b35afaea46de3f5dfc5464a77a9d8bfac02a"
+    ],
+    "scripts/sweep-codex-orphans.sh": [
+      "73fdfd2fc54eb7f3341ff480b5a5dcdb728eb8fea6aa3582ee87003e24e91830"
+    ],
+    "scripts/tests/codex-jobs-smoke.sh": [
+      "ee2ba680c349a6ac4178389692579dd3887c9c073aa969649a8e88cdf696a441"
+    ],
+    "skills/codex/SKILL.md": [
+      "2ce317c77be4f2e27a8929e855e0c0923e54f5fc3eb631f5ce04a3b9b3264c49",
+      "3f5c9c716a72a24a57d2cbc507d0456bc4a0bf0ea1f6b3a29e35a75d97fc5f7f",
+      "7b78d306a62d63456e7202c080232be41d0ec4d43617581259f544bf15993a2e",
+      "8edac3ec43d348db6343489913d9a1048c7c1ea0044f114b3bb8a33099e7dabb",
+      "c0ad163924c10696c8a214bbc32267bba72b7a08ae76d77c2ba30c1c721af947",
+      "f83eade523c82652271430d014db557544c8718586c3964e3a04962f7c4c0fed",
+      "f99baa8a2bd77d20a68585d64672a2b4bb2161dd6864dc0c3de4c39362c11164"
+    ]
+  }
+}

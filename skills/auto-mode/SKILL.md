@@ -8,7 +8,7 @@ description: >
   your staging trunk → poll CI + code-review bots → fix every finding → merge → next wave;
   promote staging → release with a merge commit only when the goal targets prod.
 
-  Use this skill whenever the user runs /auto-mode or /goal, or asks to "ship
+  Use this skill whenever the user runs /auto-mode, or asks to "ship
   {{TICKET_PREFIX}}-XXX autonomously", "run the loop until <goal> on the main/staging
   branch", "keep implementing waves until done", "auto-pilot this ticket", "work through
   all the sub-issues by yourself", or otherwise asks Claude to carry a multi-wave feature
@@ -32,28 +32,29 @@ If you run a durable-memory system (see the `mnemosyne` skill), consider formali
 canonical per-wave pipeline (comment polling, triage, merge criteria) as a named memory —
 e.g. `feedback-autonomous-multi-wave-loop` — and treat its per-wave details as
 authoritative once written; don't contradict it. The detailed recipes (state-file
-template, wave-derivation, per-step expansions, shipping-label mechanics, code-review-bot
-command hooks, the escalation ladder, blocker criteria, reporting cadence) live in
+template, wave-derivation, per-step expansions, the escalation ladder, blocker criteria,
+reporting cadence) live in
 [`references/loop-procedures.md`](./references/loop-procedures.md) — read it when you need
 the long form.
 
 ## The goal contract (shared state file)
 
-`/auto-mode` and `/goal` cooperate through one state file: `.claude/auto-mode/state.md`
-— the single source of truth so the loop survives context compaction. (Template in
-the references file.)
+`/auto-mode [goal]` keeps its run in one state file: `.claude/auto-mode/state.md` — the
+single source of truth so the loop survives context compaction. (Template in
+`templates/auto-mode-state.md`; the shapes the scripts read are in the references file.)
 
-- `/goal <objective>` writes/overwrites the **Goal** section, sets status `goal-set`,
-  confirms in one line, and stops. It declares intent only — never starts the loop.
-- `/auto-mode [args]`: read the state file; if args carry an inline goal persist it as
-  a `/goal` write first; if no goal is set, ask for one and stop (a loop with no finish
-  line is the one thing not to start); if a goal exists, resume or begin the loop.
+- `/auto-mode <goal>` parses the goal and writes the state file itself: the **Goal**
+  section, status `goal-set`, the base branch under **Resolved goal**. It keeps an
+  existing wave ledger only if the ledger still matches the goal.
+- `/auto-mode` with no args: read the state file; if no goal is set, ask for one and stop
+  (a loop with no finish line is the one thing not to start); if a goal exists, resume or
+  begin the loop.
 
 ## Branch scope — staging is the trunk
 
 The default base is your **staging trunk** (e.g. `staging`), and the loop PRs each wave
 **directly into it** — there is no per-goal integration branch (see the
-`branching-model` skill). The **release branch** (e.g. `main`) is release-only: it is
+`release-flow` skill). The **release branch** (e.g. `main`) is release-only: it is
 reached solely by a staging → release **promotion** (a merge commit, never a squash), so
 it never originates work and never drifts from staging.
 
@@ -98,20 +99,20 @@ Per wave, in order — this sequence is the spine of the mode:
 4. **Pre-push check** — run your local CI-check command (e.g. `make ci-check`); fix red
    before pushing.
 5. **Open the PR into the staging trunk** (`gh pr create --base <staging-trunk>`).
-6. **Poll continuously** — wake ~270s apart; each cycle `gh pr checks` + fetch new
-   comments/reviews since the poll cursor; update the cursor. Idling over ~10 min on
+6. **Poll continuously** — wake ~270s apart; each cycle `bash .claude/scripts/poll-pr.sh <pr>`
+   (new comments/reviews and checks since the poll cursor; silent when quiet). Idling over ~10 min on
    background agents or CI → a `ScheduleWakeup` heartbeat about every 20 min; a background
    agent that owns a PR's CI loop gets a `.claude/auto-mode/ci-owner/pr-<N>.json` marker, and
    you leave that PR's CI events to it (references → step 6). On every wake,
    `bash .claude/scripts/checkpoint-due.sh` first when the goal has checkpoints; overdue →
    write the checkpoint before anything else (references → Run checkpoints).
 7. **Triage + fix** — start every fix cycle (CI, review or conformance) by merging the
-   staging trunk into the wave checkout: `git -C "$WT" fetch origin && git -C "$WT" merge
-   --no-edit origin/<staging-trunk>`, never a rebase (a CI-owner agent merges in its own
+   staging trunk into the wave checkout: `bash .claude/scripts/merge-trunk.sh --worktree "$WT"
+   --trunk origin/<staging-trunk> --fetch`, never a rebase (a CI-owner agent merges in its own
    checkout; you merge only into a clean `$WT`); a conflict goes to `routing.sh integration`;
    after a non-trivial merge re-run the quality gate and tests, and name the merged SHA in the
    fix brief (references → step 7). A branch cut from another wave's pre-squash commit uses
-   the squash-merged base recipe (`git replace --graft`, references → step 7); fix-cycle
+   the squash-merged base option of the same script (`--a-pr`, references → step 7); fix-cycle
    decisions quote their governing AC (`Governing AC: AC-<id> — "<verbatim>"`). Then
    Critical/Major → fix+push+reschedule; Minor → fix or batch; keep tests + docs in sync.
 8. **Capture, then merge when the bar is met** — all checks green (Lint+Typecheck,
@@ -123,20 +124,18 @@ Per wave, in order — this sequence is the spine of the mode:
    Do NOT pass `--delete-branch` if you want deletion to stay a deliberate post-capture
    step; delete the branch yourself at wave close.
 9. **Close the wave** — flip the tracker ticket → `Done`, post the wave-end comment
-   (files / commit / PR / tests), update the ledger, apply a **`shipped:staging`**-style
-   label (the code is now on the staging trunk), then delete the wave branch. A wave run in
-   a worktree is removed with `.claude/scripts/remove-worktree.sh`, then
-   `.claude/scripts/sweep-codex-orphans.sh` (references → Removing a worktree). The harness
-   self-improvement batch and any independent wave run in their own worktrees alongside
-   (references → Parallel work).
+   (files / commit / PR / tests), update the ledger (with the `auto-mode-extras` pack, also
+   apply the `shipped:staging` label), then delete the wave branch. A wave run in
+   a worktree is removed with `.claude/scripts/remove-worktree.sh` (references → Removing a worktree). Any
+   independent wave runs in its own worktree alongside (references → Parallel work).
 10. **Advance** to the next wave without asking. 2–3 line status at boundaries only;
     silent during polling.
 11. **Promote to prod only if the goal targets the release branch** — when every wave is
     on the staging trunk: status `landing`, open ONE PR staging → release branch, poll
     the same way, merge with **`gh pr merge --merge`** (merge commit, never squash), then
-    flip every goal ticket's shipping label from staging to prod. A staging-only goal is
-    finished once its last wave is merged + shipped-to-staging. Either way, then "Closing the
-    run" (references), which sets status `done` at its end.
+    flip every goal ticket's shipping label from staging to prod (`auto-mode-extras` pack).
+    A staging-only goal is finished once its last wave is merged. Either way, then "Closing
+    the run" (references; `scripts/close-run.sh` does the mechanical steps), which sets status `done` at its end.
 
 ## Hard rules
 
@@ -155,13 +154,13 @@ Per wave, in order — this sequence is the spine of the mode:
   the escalation ladder (read codebase → probe the tools you have → dispatch a
   specialist → only then flag); flag only true human-required blockers (credentials,
   material scope trade-offs, external approvals, a wave red 3+ cycles with no path).
-- **Tracker flips**: `In Progress` at wave start (step 1), `Done` + `shipped:staging` at
-  wave close (step 9); `shipped:prod` ONLY after the staging → release-branch promotion
-  merges (step 11). Most trackers' label-set APIs REPLACE the whole set on write, so
-  always read current labels first and pass the full desired set. (Label mechanics +
-  promotion detail in the references file.)
+- **Tracker flips**: `In Progress` at wave start (step 1), `Done` at wave close (step 9).
+  With the `auto-mode-extras` pack the shipping labels follow: `shipped:staging` at wave
+  close, `shipped:prod` ONLY after the staging → release-branch promotion merges (step 11).
+  Most trackers' label-set APIs REPLACE the whole set on write, so always read current
+  labels first and pass the full desired set.
 - **Confirm a routing change before broadcasting it.** Restate an owner routing directive
-  in chat as one line ("Routing: implementation → claude (Codex keeps
+  in chat as one line ("Routing: implementation → claude (the omp engines keep
   review/plan/debug/audit). Apply and tell N running agents?") and apply it only after the
   owner confirms. Then store the decision memory, write `.claude/auto-mode/routing.json`
   with `decision` set to its id, and only then SendMessage the running agents, pointing
@@ -169,14 +168,16 @@ Per wave, in order — this sequence is the spine of the mode:
   directive broadcast before confirmation was reversed minutes later, then superseded.
 - **Revise briefs in the file.** A changed or revoked decision goes into the brief or plan
   file as `REVISED`/`REVOKED` before any message; committers re-read it before committing
-  (references → Harness self-improvement loop).
-- **No `Co-Authored-By` trailer on commits** if your project convention says not to add
-  one — confirm your project's commit-attribution convention first.
+  (`implementer.md` → Step 3, item 3).
+- **Commit trailers follow the project setting `COMMIT_COAUTHOR_TRAILER`** in `CLAUDE.md`
+  (`on`: end every commit message with the session's attribution line; `off`: add none). Unset means
+  follow the attribution instruction the session was given. Never invent a trailer, and never strip one the
+  setting or the session requires.
 
 ## Stop conditions
 
-- Staging-only goal: last wave merged + shipped-to-staging. Promotion goal: staging →
-  release-branch merged + tickets flipped shipped-to-prod. Either way, then "Closing the
+- Staging-only goal: last wave merged. Promotion goal: staging → release-branch merged
+  (and, with the `auto-mode-extras` pack, tickets flipped to shipped-to-prod). Either way, then "Closing the
   run" (references), which sets status `done`; final summary.
 - A wave PR red 3+ cycles with no path forward → stop that wave, flag the user.
 - User says stop/pause or changes the goal → stop, confirm current state.
@@ -188,10 +189,11 @@ Per wave, in order — this sequence is the spine of the mode:
   a commit-attribution convention memory — authoritative once written; this skill layers
   on top.
 - [`references/loop-procedures.md`](./references/loop-procedures.md) — state-file
-  template, wave-derivation, per-step expansions, shipping-label mechanics, code-review
-  bot command hooks, escalation ladder, blocker criteria, reporting cadence.
+  template, wave-derivation, per-step expansions, escalation ladder, blocker criteria,
+  reporting cadence. The optional `auto-mode-extras` pack adds shipping-label mechanics,
+  CodeRabbit command hooks and the harness self-improvement loop as sibling reference files.
 - `.claude/commands/implement.md`, `.claude/commands/plan-implementation.md` — the
   per-wave engines this loop drives.
-- Your project's branching-model doc — the staging-trunk / release-branch model, the
+- Your project's branching doc — the staging-trunk / release-branch model, the
   two no-drift rules, the merge-method contract, and the enforcement stack.
 - `.claude/rules/` — path-scoped conventions; consult before deciding "unclear".

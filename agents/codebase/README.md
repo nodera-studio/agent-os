@@ -4,16 +4,16 @@ Two-tier audit architecture for full-codebase analysis. These scan the **entire 
 
 ```mermaid
 flowchart TD
-    CMD["/codebase-audit"] --> T1["Tier 1 — Quick health check (default)<br/>4 lightweight agents, &lt;5 min:<br/>dependency · tech-debt (light) ·<br/>API surface (light) · docs freshness (light)<br/>(dead-code is Knip, deterministic — no LLM pass)"]
+    CMD["/codebase-audit"] --> T1["Tier 1 — Quick health check (default)<br/>four scripts, &lt;5 min:<br/>dep-audit · tech-debt-scan ·<br/>endpoint-inventory · stale-reference-scan<br/>(dead-code is Knip, deterministic — no LLM pass)"]
     CMD -->|"deep"| T2
 
     subgraph T2["Tier 2 — Deep audits (each independently invocable)"]
         direction LR
-        SEC["/security-audit<br/>up to 6 agents"]
-        ERR["/error-audit<br/>6 agents (3+3)"]
-        API["/api-audit<br/>4 agents (2+2)"]
-        DOC["/docs-audit<br/>3 agents (2+1)"]
-        DEBT["/tech-debt-audit<br/>4 agents (3+1)"]
+        SEC["/security-audit<br/>Claude + omp security roster"]
+        ERR["/error-audit<br/>scanners x (Claude + omp roster)"]
+        API["/api-audit<br/>inventory script + (Claude + omp roster)"]
+        DOC["/docs-audit<br/>scan script + (Claude + omp docs engine)"]
+        DEBT["/tech-debt-audit<br/>scripts + (Claude + omp roster)"]
     end
 ```
 
@@ -26,8 +26,8 @@ flowchart LR
 
     subgraph DEEP["Stage 2 — Deep agents (share the cartographer's map)"]
         direction TB
-        IDOR["access-control-idor.md<br/>dual-engine (Claude ‖ Codex)<br/>whole-app authz, IDOR, exposure"]
-        DOM["domain-integrity.md<br/>this project's own business-invariant<br/>audit (fill in per-project)"]
+        IDOR["access-control-idor.md<br/>multi-engine (Claude ‖ omp roster)<br/>whole-app authz, IDOR, exposure"]
+        DOM["domain-integrity.md<br/>(only if configured from the template;<br/>skipped explicitly otherwise)"]
     end
 
     DEEP --> SYN["Stage 3 — Synthesizer<br/>demands evidence (exploit path / call<br/>chain / failing test) before a finding<br/>survives; maps to ASVS 5.0 L2"]
@@ -43,32 +43,32 @@ shape" section for the full reasoning.
 
 Dispatched by `/codebase-audit` (default mode). Finishes in under 5 minutes.
 
-| Agent | File | What it scans |
-|-------|------|---------------|
-| Dependency Audit | `dependency-audit.md` | npm vulnerabilities, outdated packages, licenses, Node.js CVEs |
-| Tech Debt (light) | _(inline in orchestrator)_ | TODO/FIXME counts, `as any`, large files, empty catches |
+| Check | Run by | What it scans |
+|-------|--------|---------------|
+| Dependency Audit | `scripts/dep-audit.sh` (+ `dependency-audit.md` to judge it) | npm vulnerabilities, outdated packages, licenses, Node.js CVEs |
+| Tech Debt (light) | `scripts/tech-debt-scan.sh` | TODO/FIXME counts, `as any`, large files, empty catches |
+| API Surface (light) | `scripts/endpoint-inventory.sh` | Endpoint count, public endpoints, controller count |
+| Docs Freshness (light) | `scripts/stale-reference-scan.sh` | Doc references to files, env vars, scripts and commands that no longer exist |
 
-_Dead-code detection moved to the quality gate (Knip, deterministic) — no LLM pass._
-| API Surface (light) | _(inline in orchestrator)_ | Endpoint count, public endpoints, controller count |
-| Docs Freshness (light) | _(inline in orchestrator)_ | Doc modification dates vs. recent source changes |
+_Dead-code detection moved to the quality gate (Knip, deterministic) — no LLM pass. A script that reports
+`unsupported` (another stack) is listed as not covered, never guessed._
 
 ## Tier 2: Deep Audits
 
 Each is a standalone multi-agent audit with its own orchestrator. Dispatched individually or all at once via `/codebase-audit deep`.
 
-| Audit | Command | Directory | Agents | Engine |
-|-------|---------|-----------|--------|--------|
-| Security | `/security-audit` | `security-audit/` | up to 6 (cartographer → IDOR/domain-integrity → synthesizer) | Union + evidence-synth |
-| Error Paths | `/error-audit` | `error-audit/` | 6 (3 Claude + 3 Codex) | Dual-engine |
-| API Contract | `/api-audit` | `api-audit/` | 4 (2 Claude + 2 Codex) | Dual-engine |
-| Documentation | `/docs-audit` | `docs-audit/` | 3 (2 Claude + 1 Codex) | Dual-engine |
-| Tech Debt | `/tech-debt-audit` | `tech-debt-audit/` | 4 (3 Claude + 1 Codex) | Dual-engine |
+| Audit | Command | Directory | Passes | Engines |
+|-------|---------|-----------|--------|---------|
+| Security | `/security-audit` | `security-audit/` | cartographer → IDOR/domain-integrity → synthesizer | Claude plus `routing.sh engines security` (argon and flash co-equal, flash 2-3 runs); union + evidence-synth |
+| Error Paths | `/error-audit` | `error-audit/` | one `scanner.md` per scope (backend, frontend, optional queue) | Claude plus `routing.sh engines audits`, same scanner text |
+| API Contract | `/api-audit` | `api-audit/` | inventory script, then auth and contract passes | Claude plus `routing.sh engines audits` |
+| Documentation | `/docs-audit` | `docs-audit/` | stale-reference script, then API and architecture doc passes | Claude plus `routing.sh engines docs` |
+| Tech Debt | `/tech-debt-audit` | `tech-debt-audit/` | scan and dep-audit scripts, then a pattern pass | Claude plus `routing.sh engines audits` |
 
-## Standalone (Not Part of Audits)
-
-| Agent | File | Purpose |
-|-------|------|---------|
-| Docs Expert | `docs-expert.md` | Documentation Q&A -- answers questions, not an audit |
+The roster is whatever `routing.sh engines <role>` returns, so there is no fixed agent count. The report states
+the engines requested versus completed. omp engines are read-only; their output is untrusted analysis text,
+verified against the code, and a capped or skipped engine is named, never counted. Every finding of every
+severity then passes the REPRODUCE and REFUTE lenses in `verification.md`.
 
 ## When to Run
 
@@ -96,9 +96,6 @@ Each is a standalone multi-agent audit with its own orchestrator. Dispatched ind
 /api-audit
 /docs-audit
 /tech-debt-audit
-
-# On-demand Q&A (not an audit)
-# Invoke docs-expert agent directly
 ```
 
 ## Research-Backed Improvements
@@ -109,4 +106,4 @@ The tier 2 audits incorporate several techniques from prompt engineering researc
 - **Mid-thought abort:** Agents stop analyzing concerns that turn out to be handled correctly, saving context for real issues
 - **Conventions-first anchoring:** Agents read project conventions (CLAUDE.md, rules/) before scanning code, reducing false positives from unfamiliar patterns
 - **Evidence-demanding synthesis (security):** the synthesizer confirms each finding against an exploit path / call chain / failing pgTAP test before it ships — union for recall, evidence for precision (replaces the old checklist-perturbation passes)
-- **Dual-engine consensus:** Claude and Codex agents scan independently; findings confirmed by both engines get HIGH confidence
+- **Multi-engine consensus:** Claude and the omp engines scan independently; findings confirmed by more than one completed engine get higher confidence, but engines are not independent votes and Claude verifies each finding against the source

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # hooks-smoke.sh — the hook fixes of wave 2b: steer-bash cat rule and scratch path, reinject-invariants,
-# prettier-on-edit and block-legacy-engines. Feeds hook JSON on stdin and checks the decision or output.
+# post-edit-lint (prettier and shellcheck) and block-legacy-engines. Feeds hook JSON on stdin and checks the decision or output.
 # Needs jq (the hooks fail open without it, so a missing jq is a failure here, not a pass).
 # Bash 3.2, no network.
 set -euo pipefail
@@ -69,15 +69,29 @@ mkdir -p "$WORK/link/hooks"
 printf -- '1. Via a symlink.\n' >"$RI/rules/invariants.md"
 ln -s "$RI/hooks/reinject-invariants.sh" "$WORK/link/hooks/reinject-invariants.sh"
 check 'a symlinked hook finds the payload beside its target' '1. Via a symlink.' "$(/bin/bash "$WORK/link/hooks/reinject-invariants.sh" </dev/null)"
-check 'settings.json runs it on resume|compact only' 'resume|compact' \
-  "$(jq -r '.hooks.SessionStart[] | select(any(.hooks[]; .command | endswith("reinject-invariants.sh"))) | .matcher' "$ROOT/settings.json")"
-check 'the unmatched SessionStart group no longer reinjects' 0 \
+# the hook gates the payload on the SessionStart source itself, so settings.json wires one unmatched group
+src() { jq -n --arg s "$1" '{hook_event_name:"SessionStart",source:$s}' | /bin/bash "$RI/hooks/reinject-invariants.sh" 2>/dev/null || true; }
+check 'SessionStart source resume prints the payload' '1. Via a symlink.' "$(src resume)"
+check 'SessionStart source compact prints the payload' '1. Via a symlink.' "$(src compact)"
+check 'SessionStart source startup prints no payload' '' "$(src startup)"
+check 'SessionStart source clear prints no payload' '' "$(src clear)"
+check 'PreCompact (no source) prints the payload' '1. Via a symlink.' "$(jq -n '{hook_event_name:"PreCompact"}' | /bin/bash "$RI/hooks/reinject-invariants.sh" 2>/dev/null || true)"
+# core no longer knows about orchestrator mode: a marker in the project root changes nothing
+mkdir -p "$WORK/om/.claude"
+: >"$WORK/om/.claude/.orchestrator-mode"
+check 'an .orchestrator-mode marker no longer prints anything from core' '1. Via a symlink.' "$( (cd "$WORK/om" && jq -n '{hook_event_name:"SessionStart",source:"resume"}' | /bin/bash "$RI/hooks/reinject-invariants.sh" 2>/dev/null) || true)"
+check 'settings.json runs it from one unmatched SessionStart group' 1 \
   "$(jq '[.hooks.SessionStart[] | select(.matcher == null) | .hooks[] | select(.command | endswith("reinject-invariants.sh"))] | length' "$ROOT/settings.json")"
+check 'settings.json also runs it on PreCompact' 1 \
+  "$(jq '[.hooks.PreCompact[] | .hooks[] | select(.command | endswith("reinject-invariants.sh"))] | length' "$ROOT/settings.json")"
+missing=0
+for c in $(jq -r '[.hooks[][] | .hooks[] | .command] | unique[]' "$ROOT/settings.json"); do [ -f "$ROOT/${c#.claude/}" ] || missing=$((missing + 1)); done
+check 'every hook command in settings.json names an existing file' 0 "$missing"
 check 'the payload file is not an always-on rule (it carries paths:)' 1 "$(head -n 6 "$ROOT/rules/invariants.md" | grep -c '^paths:')"
 
-# --- 11c: prettier-on-edit runs only when configured and installed, and reports through additionalContext (AC-042) ---
+# --- 11c: post-edit-lint runs prettier only when configured and installed, and reports through additionalContext (AC-042) ---
 prettier_out() { # prettier_out <file>: the hook's stdout for an Edit of <file>
-  jq -n --arg f "$1" '{tool_name:"Edit",tool_input:{file_path:$f}}' | /bin/bash "$HOOKS/prettier-on-edit.sh" 2>/dev/null || true
+  jq -n --arg f "$1" '{tool_name:"Edit",tool_input:{file_path:$f}}' | /bin/bash "$HOOKS/post-edit-lint.sh" 2>/dev/null || true
 }
 mkpkg() { # mkpkg <dir> <package.json>
   mkdir -p "$1/src"
@@ -108,12 +122,29 @@ P5="$WORK/p-fail"; mkpkg "$P5" '{"name":"x","prettier":{}}'; stub_prettier "$P5"
 out=$(prettier_out "$P5/src/a.ts")
 check 'a failure goes through additionalContext' PostToolUse "$(printf '%s' "$out" | jq -r '.hookSpecificOutput.hookEventName')"
 case "$(printf '%s' "$out" | jq -r '.hookSpecificOutput.additionalContext')" in *'SyntaxError: boom'*) check 'the context carries prettier output' ok ok ;; *) check 'the context carries prettier output' ok "$out" ;; esac
-check 'a failure never exits non-zero' 0 "$(jq -n --arg f "$P5/src/a.ts" '{tool_input:{file_path:$f}}' | /bin/bash "$HOOKS/prettier-on-edit.sh" >/dev/null 2>&1; echo $?)"
+check 'a failure never exits non-zero' 0 "$(jq -n --arg f "$P5/src/a.ts" '{tool_input:{file_path:$f}}' | /bin/bash "$HOOKS/post-edit-lint.sh" >/dev/null 2>&1; echo $?)"
 mkdir -p "$WORK/nopkg"; printf 'x\n' >"$WORK/nopkg/a.ts"
 check 'no package.json above the file: silent' '' "$(prettier_out "$WORK/nopkg/a.ts")"
 printf 'x\n' >"$P3/src/readme.md"
 check 'a non-code extension is ignored' '' "$(prettier_out "$P3/src/readme.md")"
-if grep -q 'pnpm\|rebuild-shared' "$HOOKS/prettier-on-edit.sh"; then check 'no pnpm assumption or dangling comment' clean dirty; else check 'no pnpm assumption or dangling comment' clean clean; fi
+if grep -q 'pnpm\|rebuild-shared' "$HOOKS/post-edit-lint.sh"; then check 'no pnpm assumption or dangling comment' clean dirty; else check 'no pnpm assumption or dangling comment' clean clean; fi
+
+# post-edit-lint also lints shell scripts (shellcheck -S warning -f gcc, through additionalContext), and the old hooks are gone
+lint_out() { jq -n --arg f "$1" '{tool_name:"Write",tool_input:{file_path:$f}}' | /bin/bash "$HOOKS/post-edit-lint.sh" 2>/dev/null || true; }
+if command -v shellcheck >/dev/null 2>&1; then
+  printf '#!/bin/bash\nx=1\n' >"$WORK/bad.sh"
+  out=$(lint_out "$WORK/bad.sh")
+  check 'a shell script with a warning goes through additionalContext' PostToolUse "$(printf '%s' "$out" | jq -r '.hookSpecificOutput.hookEventName')"
+  case "$(printf '%s' "$out" | jq -r '.hookSpecificOutput.additionalContext')" in *'bad.sh'*'SC2034'*) check 'the context carries the gcc-format finding' ok ok ;; *) check 'the context carries the gcc-format finding' ok "$out" ;; esac
+  printf '#!/bin/bash\necho "$1"\n' >"$WORK/good.sh"
+  check 'a clean shell script is silent' '' "$(lint_out "$WORK/good.sh")"
+  printf '#!/bin/bash\necho $1\n' >"$WORK/info.sh"
+  check 'a sh file that is clean at warning severity is silent' '' "$(lint_out "$WORK/info.sh")"
+fi
+check 'a missing file is silent' '' "$(lint_out "$WORK/nope.sh")"
+check 'an unrelated extension is silent' '' "$(lint_out "$P3/src/readme.md")"
+check 'a shell extension never reaches prettier' '' "$(printf '#!/bin/bash\n:\n' >"$P3/src/x.sh"; lint_out "$P3/src/x.sh")"
+check 'settings.json wires one PostToolUse lint hook' 1 "$(jq '[.hooks.PostToolUse[] | .hooks[] | select(.command | endswith("post-edit-lint.sh"))] | length' "$ROOT/settings.json")"
 
 # --- 11d: block-legacy-engines segments on the command word (AC-032, AC-033) ---
 legacy() { check "legacy-engines $1: $2" "$1" "$(bash_decision block-legacy-engines.sh "$2")"; }
@@ -186,7 +217,8 @@ check 'legacy-engines skill: another skill allowed' allow "$(skill_decision omp)
 check 'non-Bash tools are ignored' '' "$(jq -n '{tool_name:"Edit",tool_input:{file_path:"codex exec"}}' | /bin/bash "$HOOKS/block-legacy-engines.sh")"
 check 'settings.json wires it for Bash' 1 "$(jq '[.hooks.PreToolUse[] | select(.matcher == "Bash") | .hooks[] | select(.command | endswith("block-legacy-engines.sh"))] | length' "$ROOT/settings.json")"
 check 'settings.json wires it for Skill' 1 "$(jq '[.hooks.PreToolUse[] | select(.matcher == "Skill") | .hooks[] | select(.command | endswith("block-legacy-engines.sh"))] | length' "$ROOT/settings.json")"
-check 'block-old-codex.sh stays wired until the pack move' 2 "$(jq '[.hooks.PreToolUse[] | .hooks[] | select(.command | endswith("block-old-codex.sh"))] | length' "$ROOT/settings.json")"
+OLD_CODEX_GUARD="block-old-""codex.sh"   # split so the retired-name scan does not match this file
+check 'the old Codex transport guard is not wired in core (it ships with the codex pack)' 0 "$(jq --arg n "$OLD_CODEX_GUARD" '[.hooks.PreToolUse[] | .hooks[] | select(.command | endswith($n))] | length' "$ROOT/settings.json")"
 
 check 'hook advice names the plugin tool names, not the bare mcp__memory__/mcp__secrets__ ones' 0 \
   "$(grep -c 'mcp__memory__\|mcp__secrets__' "$HOOKS"/*.sh | awk -F: '{s += $2} END {print s + 0}')"

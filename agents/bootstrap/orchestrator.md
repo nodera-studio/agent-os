@@ -31,7 +31,15 @@ list doesn't cover):
 `{{PROJECT_NAME}}`, `{{PACKAGE_MANAGER}}`, `{{DEV_CMD}}`, `{{BUILD_CMD}}`,
 `{{TEST_CMD}}`, `{{TYPECHECK_CMD}}`, `{{LINT_CMD}}`, `{{FORMAT_CMD}}`, `{{MONOREPO}}`,
 `{{PRIMARY_LANGUAGE}}`, `{{FRAMEWORK}}`, `{{VCS_DEFAULT_BRANCH}}`, `{{DOCKER}}`,
-`{{FRONTEND_DIR}}`, `{{BACKEND_DIR}}`, `{{SHARED_DIR}}`.
+`{{FRONTEND_DIR}}`, `{{BACKEND_DIR}}`, `{{SHARED_DIR}}`, `{{PROJECT_DESCRIPTION}}`,
+`{{FRONTEND_STACK}}`, `{{BACKEND_STACK}}`, `{{DATABASE_STACK}}`, `{{HOSTING_STACK}}`,
+`{{STAGING_BRANCH}}`, `{{PROD_BRANCH}}`, `{{TICKET_PREFIX}}`, `{{LANGUAGE_MODE}}`.
+
+STAGING_BRANCH and PROD_BRANCH are the integration and production branches of the branching model (equal
+when there is no staging branch); TICKET_PREFIX is the issue-key prefix, empty when the project has none.
+LANGUAGE_MODE is `en` (default) or `ro` (opt-in; today only nodex): ask for it once, write it into the
+project's `CLAUDE.md`, and see `rules/language-mode.md`. This list is the one place the tokens are declared;
+`commands/bootstrap-project.md` and `CLAUDE.md.template` follow it.
 
 ## Pipeline
 
@@ -99,13 +107,13 @@ guess and do not silently default):
   before CI). Ask, don't assume yes.
 - **Branching model** — does this project use a single trunk branch, a
   staging-then-main promotion model, or something else? This determines whether the
-  `/branching-model`-style skill and PR-target guidance in the ported agents makes sense
+  `/release-flow`-style skill and PR-target guidance in the ported agents makes sense
   as-is or needs adapting.
-- **Which optional agents/audits actually apply** — e.g. the `copywrite/` suite only
+- **Which optional agents/audits actually apply** — e.g. the `copywrite` pack (`install.sh --pack copywrite`) only
   matters if the project has meaningful user-facing copy to polish; the
-  `security-audit/domain-integrity.md` slot needs a real domain invariant to be worth
-  filling in (see that file's own "if this project has no single dominant business
-  invariant" escape hatch) — don't force it.
+  security-audit domain-integrity lens needs a real domain invariant to be worth
+  configuring (copy `templates/security-domain-integrity.md` into the audit folder when it is;
+  see its own "no single dominant business invariant" escape hatch) — don't force it.
 
 ### Step 4 — Fill in the tokens
 
@@ -170,7 +178,7 @@ Give the user:
   - GitHub/GitLab repo settings (branch protection rules, required status checks) if
     the branching model in Step 3 implies any.
   - Any optional agent/audit left un-configured because it didn't apply yet (e.g. the
-    `domain-integrity.md` slot, the copywrite brand-terms/register-memo templates) —
+    domain-integrity template, the copywrite pack's brand-terms/register-memo templates) —
     point at exactly which file needs filling in and when it'll matter.
   - Whether `claude-md-management` got installed/invoked in Step 4.5, and a reminder to
     run `/revise-claude-md` after future sessions to keep `CLAUDE.md` current.

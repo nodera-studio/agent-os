@@ -23,7 +23,7 @@ the caveat below intact.
 
 ## Process
 
-1. **Collect the union** of candidate findings from `access-control-idor` (Claude+Codex)
+1. **Collect the union** of candidate findings from `access-control-idor` (Claude plus the omp security engines)
    and `domain-integrity` (whatever engine(s) this project's filled-in version uses, if
    that Stage-2 slot was wired up and dispatched). Record which engine(s) raised each.
 2. **Demand evidence.** For each candidate, go to the code and establish ONE of: a concrete
@@ -32,7 +32,7 @@ the caveat below intact.
    one — e.g. a database isolation test). No evidence → FALSE POSITIVE, with
    the dismissal reasoning recorded. This is the whole job — be ruthless.
 3. **Dedupe** across agents/engines (same defect, overlapping location). **Cross-model
-   agreement (Claude + Codex both raised it) is a PRIORITY BOOSTER, not a survival gate** —
+   agreement (Claude and an omp engine both raised it; repeated runs of one engine count once) is a PRIORITY BOOSTER, not a survival gate** —
    a single-engine finding with a real exploit path still ships.
 4. **Rank** survivors by severity × exploitability (reachable-by-anonymous >
    reachable-by-authenticated-user > requires-admin).

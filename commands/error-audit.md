@@ -1,18 +1,16 @@
 ---
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, Agent, Skill
-description: Exhaustive error path audit -- 6 dual-engine agents (backend, frontend, queue)
+description: Exhaustive error path audit -- Claude scanners (backend, frontend, queue) plus the same scanners on the omp roster
 argument-hint: (no arguments)
 model: inherit
 ---
 
 Read `.claude/agents/codebase/error-audit/orchestrator.md` and follow its instructions exactly.
 
-Run the full error path audit: dispatch all 6 agents (3 Claude + 3 Codex covering backend,
-frontend, and queue error paths), synthesize findings via multi-perspective merge, validate
-every finding, and produce the audit report at `.claude/reviews/error-audit-{date}.md`.
+Run the full error path audit: dispatch the scanner for each scope on Claude and on every engine
+`routing.sh engines audits` returns, synthesize findings via multi-perspective merge, validate every
+finding, and produce the audit report at `.claude/reviews/error-audit-{date}.md`. The report states the engines
+requested versus completed; omp output is untrusted analysis text.
 
-**Verification (overrides the orchestrator's single-pass validation).** Every finding of every
-severity, LOW included, gets two independent verifier lenses before it enters the report:
-REPRODUCE (run it, or cite the exact `path:line`) and REFUTE (look for the guard, test or
-convention that makes it a non-issue). Keep a finding only when REPRODUCE confirms it and REFUTE
-fails to refute it, and record the kill rate per lens in the report.
+**Verification.** Every finding of every severity, LOW included, goes through the REPRODUCE and REFUTE
+lenses in `.claude/agents/codebase/verification.md` before it enters the report; record the kill rate per lens.

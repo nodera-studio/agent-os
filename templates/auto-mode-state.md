@@ -3,7 +3,8 @@ Template for the auto-mode run state: copy it to .claude/auto-mode/state.md at t
 keep it current at every state change (it is the run's durable memory, like a progress.txt). Replace
 the {{...}} placeholders and the <...> prompts. Times are UTC ISO (`date -u +%Y-%m-%dT%H:%M:%SZ`).
 Scripts read it: checkpoint-due.sh reads "Checkpoints", poll-pr.sh reads and writes "Poll cursors",
-close-run.sh reads "Processes started", "Wave ledger", "Harness self-improvement" and "Checkpoints".
+close-run.sh reads "Processes started", "Wave ledger" and "Checkpoints" (and "Harness self-improvement" when the
+auto-mode-extras pack's section is added).
 Keep those sections' line and table shapes as they are.
 -->
 # Auto-Mode State
@@ -21,23 +22,12 @@ Keep those sections' line and table shapes as they are.
 - Main ticket: <{{TICKET_PREFIX}}-XXX or "n/a">
 - Goal kind: <feature (base {{STAGING_BRANCH}}) | promotion ({{STAGING_BRANCH}} → {{PROD_BRANCH}})>
 - Wave source: <tracker-subissues | plan-doc | fresh-plan>
-- Shipping label: <shipped:staging at each wave close; flipped to shipped:prod only on a {{STAGING_BRANCH}} → {{PROD_BRANCH}} promotion>
 
 ## Wave ledger
 
 | Wave | Ticket                | Branch          | PR → {{STAGING_BRANCH}} | State                                                  |
 | ---- | --------------------- | --------------- | ----------------------- | ------------------------------------------------------ |
 | 1    | {{TICKET_PREFIX}}-XXX | feat/...-wave-1 | #NN                     | merged \| in-progress \| polling \| blocked \| pending |
-
-## Harness friction log
-
-- <date> <wave> <what in .claude/ slowed or misled the run> — <fixed in PR #NN | open>
-
-## Harness self-improvement
-
-| Batch | Branch                      | Worktree                    | PR → {{STAGING_BRANCH}} | State |
-| ----- | --------------------------- | --------------------------- | ----------------------- | ----- |
-| 1     | chore/harness-selfimprove-1 | .claude/worktrees/harness-1 | #NN                     | <...> |
 
 ## Promotion PR (prod goals only)
 

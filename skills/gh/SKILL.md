@@ -1,7 +1,7 @@
 ---
 name: gh
 description: >-
-  Use the `gh` CLI (2.94.0) for everything on the GitHub API surface — pull requests, issues,
+  Use the `gh` CLI for everything on the GitHub API surface — pull requests, issues,
   checks, and run logs. Reach for it whenever the user wants to open a PR, check PR status or CI
   checks, view or comment on a PR, list issues by label, view a workflow run's logs, or merge a
   PR. Trigger on indirect phrasing too — "send this up for review", "did CI pass", "what's

@@ -21,6 +21,12 @@ step-by-step implementation plan that can be handed to `/implement`.
 - **Explorer report** — codebase mapping.
 - **Researcher report** — best practices and pitfalls.
 
+**Single mode.** When `/implement` dispatches you without a plan pipeline (no architect
+pass, explorer report or researcher report), the task description is the whole input:
+explore the codebase yourself with Grep/Glob, choose the closest existing feature as the
+pattern, and state the approach you took in the plan's `Approach` line. You still produce
+the plan only; you write no product code.
+
 ## Goal
 
 Produce an ordered, dependency-correct plan where a coder agent can implement each step

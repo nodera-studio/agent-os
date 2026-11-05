@@ -16,15 +16,16 @@ CONFIG_ROOT="$REAL_HOME/${PI_CONFIG_DIR:-.omp}"
 double='//' single='/'
 while [[ "$CONFIG_ROOT" == *//* ]]; do CONFIG_ROOT="${CONFIG_ROOT//$double/$single}"; done
 CONFIG_ROOT="${CONFIG_ROOT%/}"
-# Repository callers pass the agent directory; legacy callers use glen-harness.
+# Callers pass the agent directory in OMP_PROFILE_AGENT_DIR; there is no default profile.
 # The profile name is checked here against an exact list, because this launcher runs from a cache
 # outside the checkout and cannot source omp/profiles.sh (omp-profiles-smoke.sh keeps the two in step).
 # A prefix glob would admit any such name, so there is none.
 profile_name_ok() {
-  case "$1" in glen-harness | glen-harness-codex | glen-harness-opencode) return 0 ;; esac
+  case "$1" in glen-harness-codex | glen-harness-opencode) return 0 ;; esac
   return 1
 }
-agent_arg="${OMP_PROFILE_AGENT_DIR:-$CONFIG_ROOT/profiles/glen-harness/agent}"
+[ -n "${OMP_PROFILE_AGENT_DIR:-}" ] || die 'OMP_PROFILE_AGENT_DIR is required'
+agent_arg="$OMP_PROFILE_AGENT_DIR"
 while [ "${agent_arg%/}" != "$agent_arg" ]; do agent_arg="${agent_arg%/}"; done
 profile_name="${agent_arg%/agent}"
 profile_name="${profile_name##*/}"
@@ -286,7 +287,7 @@ cat > "$profile" <<EOF
   ;; Dylib dependencies and system frameworks.
   (subpath "/usr")
   (subpath "/System")
-  ;; TLS root certificates for the Cursor API.
+  ;; TLS root certificates for the provider API.
   (subpath "/private/etc/ssl")
   ;; Runtime device nodes and timezone database.
   (subpath "/dev")
@@ -391,10 +392,10 @@ $scope_rules
 (deny file-write-create (vnode-type SYMLINK))
 ;; Fix cycle 4, item 6 (accepted exfiltration residual, documented in
 ;; SKILL.md under Risks): outbound is restricted to TCP 443 (any host, not
-;; just Cursor's) plus the mDNSResponder DNS socket below. omp still needs
-;; name resolution and Cursor's API is plain HTTPS/443, so this is the
+;; just the provider's) plus the mDNSResponder DNS socket below. omp still needs
+;; name resolution and the provider APIs are plain HTTPS/443, so this is the
 ;; narrowest grant that keeps a real dispatch working; it does not confine
-;; traffic to Cursor specifically.
+;; traffic to one provider.
 (allow network-outbound (remote tcp "*:443"))
 ;; Fix cycle 5, decision 2: the Mnemosyne MCP's own loopback port, derived
 ;; above from the profile's mcp.json at launch. Empty when mcp.json has no
@@ -403,7 +404,7 @@ $scope_rules
 $mnemosyne_rule
 ;; Apple com.apple.security.XPCTimeStampingService.sb:79: DNS Unix socket.
 (allow network-outbound (literal "/private/var/run/mDNSResponder"))
-;; S5 fix-cycle-4 (host-verified via a real send and models cursor --json,
+;; S5 fix-cycle-4 (host-verified via a real send and a models listing,
 ;; 2026-10-31): no mach-lookup allow at all. A real dispatch with this removed
 ;; still completed; the denied lookups seen in the log (opendirectoryd,
 ;; diagnosticd, FSEvents, PowerManagement, securityd.xpc, SecurityServer) are

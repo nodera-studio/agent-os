@@ -3,14 +3,14 @@
 #
 # Usage: bash .claude/scripts/promote-preflight.sh --prod <branch> --staging <branch> --workflow <name>
 #                  [--ticket-prefix <PFX>] [--remote origin] [--no-fetch]
-#   --workflow       the CI workflow whose run must be green (promote-to-prod step 1: without it
+#   --workflow       the CI workflow whose run must be green (promote runbook step 1: without it
 #                    the newest run on the branch may be another workflow, a nightly or a deploy)
 #   --ticket-prefix  the tracker prefix to enumerate (PFX-123); default $HARNESS_TICKET_PREFIX;
 #                    without one the ticket list is skipped and said so
 #   --no-fetch       use the remote-tracking refs as they are (default: git fetch <remote> <prod>
 #                    <staging>)
 #
-# Checks, from promote-to-prod step 1:
+# Checks, from the promote runbook step 1:
 #   - the latest <workflow> run on <staging> is completed, its conclusion is success, and its
 #     headSha equals the staging head being promoted (a green run of an older commit proves nothing);
 #   - commits to promote: rev-list --count <prod>..<staging> (blocked at 0: nothing to ship);
