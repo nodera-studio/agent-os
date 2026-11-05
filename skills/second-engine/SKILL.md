@@ -63,7 +63,7 @@ Write the brief to a file and run `omp-engine.sh` with an engine and a role:
 bash .claude/scripts/routing.sh engines architect
 bash .claude/scripts/omp-engine.sh ask    --engine omp:codex --role architect --brief BRIEF --out OUT
 bash .claude/scripts/omp-engine.sh review --engine omp:codex --role review --repo DIR --base REF --out OUT
-bash .claude/scripts/omp-engine.sh debug  --engine omp:opencode --role debug --repo DIR --brief BRIEF --out OUT
+bash .claude/scripts/omp-engine.sh debug  --engine omp:opencode --slot glm --role debug --repo DIR --brief BRIEF --out OUT
 ```
 
 `ask` is a text-only second opinion (add `--no-tools` to withhold repo reads), `review` and `debug`

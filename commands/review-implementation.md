@@ -57,7 +57,7 @@ Steps:
    - If there are no changes, say so and stop.
    - Ask the roster: `bash .claude/scripts/routing.sh engines review` (one row per omp engine; its stderr
      carries `degraded=` when the router had to drop an engine). Probe each with
-     `bash .claude/scripts/omp-engine.sh probe --engine <engine>` (exit 0 = ready; exit 3 = skipped,
+     `bash .claude/scripts/omp-engine.sh probe --engine <engine> [--slot <slot>] --role review` (exit 0 = ready; exit 3 = skipped,
      including `GLEN_OMP_ENGINE=off`, `capped` and `unprobed`). On a skip, keep its JSON `.reason` for the
      report's one-line note ("<engine> skipped: <reason>") and run the engines that are ready.
 

@@ -57,6 +57,7 @@ layout). This focuses the Claude reviewer; it no longer selects specialist agent
 command -v coderabbit >/dev/null && echo "coderabbit ok"
 bash .claude/scripts/routing.sh engines review      # the omp roster: one row per engine/slot
 bash .claude/scripts/omp-engine.sh probe --engine omp:codex --role review   # optional; exit 0 = ready, 3 = skipped
+bash .claude/scripts/omp-engine.sh probe --engine omp:opencode --slot argon --role review --have omp:codex
 ```
 A probe that skips (exit 3, including `GLEN_OMP_ENGINE=off`, `capped`, `unprobed`) removes that engine; put
 the probe's `.reason` from its JSON line in the report, in one line. Any engine that is unavailable is
@@ -124,6 +125,11 @@ CLI/TUI output under a pty) before calling it correct; a code trace alone is not
 The omp engines trace code only — they cannot run or observe UI/runtime output.
 
 ## Step 5 — Synthesize
+
+Run the synthesizer, then verify: for each finding it lists under `Needs verification` (omp-only
+CRITICAL/HIGH), dispatch a fresh read-only Agent that re-traces the cited `file:line` against the source
+and returns verified / not verified with the evidence. Feed the verdicts back into the fix plan (verified
+CRITICAL → must fix, verified HIGH → recommended). Never send an omp finding to the Implementer unverified.
 
 Dispatch the synthesizer (Agent tool) with the outputs + provenance inputs:
 ```

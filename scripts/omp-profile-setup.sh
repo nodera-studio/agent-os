@@ -175,7 +175,7 @@ finish() {
 trap finish EXIT
 
 # Each call gets a new project-free cwd. Never inherit the caller's overlay or
-# active profile; every omp invocation must explicitly select glen-harness.
+# active profile; every omp invocation must explicitly select its exact profile (profiles.sh registry).
 omp_run() {
   local layer="$1" cwd launcher real_omp
   shift

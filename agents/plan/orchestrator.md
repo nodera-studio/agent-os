@@ -183,7 +183,7 @@ The judge must not know which engine wrote which candidate (owner requirement). 
 ```bash
 bash .claude/scripts/blind-candidates.sh --kind arch --slug <slug> claude=<claude-report> omp=<$OUT> [omp-argon=<$OUT3>]
 ```
-It keeps the raw reports in `.claude/plans/<slug>.private/` (`arch-claude.md`, `arch-omp.md`), flips the
+With only the Claude architect (no second report) skip this script and Step 4.5: there is nothing to blind. It keeps the raw reports in `.claude/plans/<slug>.private/` (`arch-claude.md`, `arch-omp.md`), flips the
 order, strips every authorship tell (engine and model names, self-references, tool-run footers,
 session/job ids) from the copies `.claude/plans/<slug>.arch-a.md`, `.arch-b.md` (`.arch-c.md`), and
 appends the mapping (`arch: A=omp B=claude`) to `<slug>.private/mapping.md`. If the project's own subject
@@ -193,7 +193,7 @@ verdict.
 
 ### Step 4.5 — Judge-Select (select-then-graft)
 
-Dispatch the judge-selector with the paths of BOTH anonymised reports, not their inline text
+Dispatch the judge-selector with the paths of ALL anonymised reports (A, B and C when the argon architect ran), not their inline text
 (inline text bloats the orchestrator's context). A fresh context that did NOT generate either,
 and does not know who did, is the unbiased selector.
 ```
@@ -202,6 +202,7 @@ Dispatch via Agent tool:
            Task: {task description}
            Candidate A: .claude/plans/<slug>.arch-a.md
            Candidate B: .claude/plans/<slug>.arch-b.md
+           Candidate C: .claude/plans/<slug>.arch-c.md   (only when the argon architect ran)
            Authorship is withheld on purpose: judge on content only, and do not open
            .claude/plans/<slug>.private/."
 ```

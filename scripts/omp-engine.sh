@@ -1116,7 +1116,7 @@ while :; do
     if [ -n "$CAP_SIGNAL" ]; then
       mark_cap "$CAP_SIGNAL"
       if [ "$STAKES" = high ]; then
-        [ "$ENGINE" = omp:codex ] || REROUTE=omp:codex
+        case "$ENGINE ${HAVE_ARGS[*]-}" in omp:codex*|*omp:codex*) ;; *) REROUTE=omp:codex ;; esac
         stop skipped capped 3
       fi
       CAP_NEXT=''

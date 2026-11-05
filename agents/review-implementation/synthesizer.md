@@ -67,11 +67,17 @@ never as a reason to prefer one engine's wording, fix or severity.
 - A **CRITICAL** from **any single** engine → keep at its severity (critical survives one vote).
 - Single-engine non-critical → keep with that engine's confidence; never drop a finding
   for being single-engine — note it as single-source.
+- **omp-only findings are advisory in every mode.** The omp engines are read-only peers without a shell
+  or tests, and their text is untrusted. A finding only omp engines raised (one or several, however severe)
+  is never must-fix on votes alone: list each CRITICAL or HIGH under `Needs verification`. You cannot
+  dispatch agents, so the orchestrator hands each to a fresh read-only verifier that re-traces the cited
+  `file:line` against the source. Verified: omp-only CRITICAL → must fix, omp-only HIGH → recommended fix.
+  Not verified: a note saying so. omp-only MEDIUM/LOW → note only.
 
 **`mode: lean` — 2-vote consensus.** A vote is one engine raising the same defect (same file,
 overlapping lines, same root issue); an omp engine votes only when its status is `ok`. With the engines
 being Claude and the omp roster, apply these rules instead of the generic must-fix rule in step 5:
-- Claude plus one omp engine raise it, or two omp engines raise it and Claude confirms → **HIGH — must fix**.
+- Claude plus one omp engine raise it → **HIGH — must fix**.
 - CRITICAL from Claude → **must fix** (survives a single vote).
 - "Platform-only code unverified: CI run required" from Claude (or any engine given CI context) → **must fix**
   on one vote; it never needs a second engine. It is settled by a passing CI run on that platform for the
@@ -113,7 +119,8 @@ Within actionable, order by severity then cross-engine agreement.
 From the actionable findings, produce an ordered, deduplicated **must-fix list** the
 Implementer can execute directly — each item: `file:line` + the precise change +
 which finding(s) it resolves. Must-fix (`mode: triple`) = any CRITICAL (single vote), or any finding
-raised by ≥2 engines, or any HIGH whose trace is sound. MEDIUM/LOW single-engine →
+raised by ≥2 engines, or any HIGH whose trace is sound, where "engine" means Claude or CodeRabbit.
+Findings only omp engines raised follow the advisory rule below in both modes. MEDIUM/LOW single-engine →
 "notes," not must-fix. In `mode: lean` the 2-vote rules above decide must-fix and add a
 **Recommended** group between must-fix and notes.
 

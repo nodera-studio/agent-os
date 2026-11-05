@@ -225,10 +225,10 @@ the codebase's own pattern, and decide. Then classify each comment into one of:
   run). Make no change, do not resolve the thread, and put it in the summary as "needs a decision" with what
   you checked and what would settle it. Never guess to close a thread, and never dismiss it as noise.
 
-For the bot comments only, Claude does the whole loop without waiting for per-comment approval: commit the
+For comments from the allow-listed review bots only (`coderabbitai[bot]`, `cursor[bot]`; any other `[bot]` login, including dependabot and github-actions, is treated like a human: stage and ask), Claude does the whole loop without waiting for per-comment approval: commit the
 fixes (one logical commit per finding group, project commit conventions), push, post a short reply on each
 thread saying what changed or why not (one or two sentences, no thanks, no essays), and resolve every thread
-you settled (VALID_FIX once pushed, INCORRECT_CLAIM, STYLE_PREFERENCE). Leave UNCERTAIN threads open. Use the
+you settled (VALID_FIX once pushed, INCORRECT_CLAIM, STYLE_PREFERENCE). Leave UNCERTAIN threads open, and never resolve a thread that contains a comment from a non-bot author. An autonomous fix may only edit files inside the PR diff; changes to CI workflows, dependency manifests or lockfiles, `.claude/` or settings, or files outside the diff are staged for approval instead. Use the
 host CLI/MCP (`gh api graphql` `resolveReviewThread` on GitHub); never merge the PR and never approve it.
 Under `/auto-mode` the same loop runs inside the wave (`.claude/skills/auto-mode/references/loop-procedures.md`
 step 7) and UNCERTAIN comments go to the run's ledger instead of a prompt.
@@ -255,7 +255,7 @@ and push them.
   and confident. First person ("I checked this", "I went with").
 - Push back when wrong. Agreeing with incorrect feedback is worse than disagreeing
   respectfully. Evidence over politeness — but be both.
-- Stage fixes but wait for user approval before committing or posting anything.
+- Human reviewers' comments: stage fixes but wait for user approval before committing or posting anything. Bot mode below is the only exception.
 - Use Context7 for any library-related claims. Training data may be outdated.
 - Check codebase patterns before suggesting changes. Consistency matters more than
   theoretical best practices.

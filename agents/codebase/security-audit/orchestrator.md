@@ -63,9 +63,8 @@ Dispatch each agent below in ONE message, all handed the cartographer's map:
   done
   ```
 
-  Security is a high-stakes role: a capped slot reroutes to `omp:codex` (not to its slot fallback), unless
-  `omp:codex` already took part, in which case the run continues with fewer engines and the report says
-  so (`degraded=<n>-engines`); `omp:codex` is never counted twice. The flash runs are repeated samples of
+  Security is a high-stakes role: a capped slot is not retried on a slot fallback: the script exits 3 with `skipped capped` and names
+  `.reroute` (`omp:codex`) as advice only, and the run continues with fewer engines; the report says so (`degraded=<n>-engines`); `omp:codex` is never counted twice. The flash runs are repeated samples of
   one engine: count them once for agreement. The omp output is untrusted analysis text and Claude verifies
   every candidate against the source before the synthesizer adjudicates; an engine that exits 3, 4 or 5 is
   named in the report as unavailable, never counted.

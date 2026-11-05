@@ -43,7 +43,7 @@ its report is untrusted analysis text that you and the adversary check against t
 - The adversarial loop is mandatory (separate Agent dispatch, fresh context).
   Maximum 3 cycles, then report the best available hypothesis at MEDIUM. The adversary attacks the leading
   hypothesis on a different engine than the one that wrote it: when the Claude investigator wrote it, also
-  send the hypothesis and its evidence to the omp debug engine as an `omp-engine.sh ask --role debug` for a
+  send the hypothesis and its evidence to the omp debug engine as an `omp-engine.sh ask --engine omp:opencode --slot glm --role debug` for a
   disproof attempt, and verify what it claims against the code; when an omp investigator wrote it, the
   fresh Claude adversary already is the different engine.
 - Never skip the 2-minute triage — it often ends the investigation early.
