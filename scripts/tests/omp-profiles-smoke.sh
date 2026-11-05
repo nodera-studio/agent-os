@@ -18,7 +18,7 @@ fail_if() { if "${@:2}"; then fail "$1"; else ok "$1"; fi; }
 
 pass_if 'codex profile known' profile_known glen-harness-codex
 pass_if 'opencode profile known' profile_known glen-harness-opencode
-pass_if 'legacy profile known' profile_known glen-harness
+fail_if 'the retired Cursor profile is not known' profile_known glen-harness
 fail_if 'unknown name rejected' profile_known glen-harness-probe
 fail_if 'glen-harness-evil rejected' profile_known glen-harness-evil
 fail_if 'glob rejected' profile_known 'glen-harness-*'
@@ -34,7 +34,7 @@ fail_if 'known name plus suffix rejected' profile_known glen-harness-codex2
 [ "$(profile_for_engine omp:codex)" = glen-harness-codex ] && ok 'profile_for_engine omp:codex' || fail 'profile_for_engine omp:codex'
 [ "$(profile_for_engine omp:opencode)" = glen-harness-opencode ] && ok 'profile_for_engine omp:opencode' || fail 'profile_for_engine omp:opencode'
 fail_if 'profile_for_engine unknown' profile_for_engine omp:zen
-fail_if 'the new profiles are not legacy' profile_legacy glen-harness-codex
-pass_if 'the cursor profile is legacy' profile_legacy glen-harness
+[ "$(profile_names | tr '\n' ' ')" = 'glen-harness-codex glen-harness-opencode ' ] && ok 'exactly the two engine profiles' || fail 'exactly the two engine profiles'
+fail_if 'no legacy marker remains' declare -F profile_legacy
 
 [ "$FAILS" -eq 0 ]

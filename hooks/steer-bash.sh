@@ -50,7 +50,7 @@ fi
 # omp_profile_ok NAME: NAME is an approved profile (exact match, never a prefix or glob).
 omp_profile_ok() {
   if [ "$OMP_PROFILES_OK" = 1 ]; then profile_known "$1"; return; fi
-  case "$1" in glen-harness-codex | glen-harness-opencode | glen-harness) return 0 ;; esac
+  case "$1" in glen-harness-codex | glen-harness-opencode) return 0 ;; esac
   return 1
 }
 # shellcheck disable=SC2016 # the $(mktemp -d) and $HOME are literal advice text

@@ -262,11 +262,11 @@ CASE_PROBE=''
 
 # E3: provider and model gates (AC-020, AC-022).
 engine_case wrong-provider openai-codex gpt-6.1-sol
-transcript j0000001 cursor gpt-6.1-sol
+transcript j0000001 anthropic gpt-6.1-sol
 step send 0 "$(envelope completed j0000001)"
 edispatch --engine omp:codex --role review
 assert_exit 'a run on another provider exits 4' 4
-assert_contains 'the provider refusal names both providers' 'ran on cursor, not openai-codex' "$STDOUT"
+assert_contains 'the provider refusal names both providers' 'ran on anthropic, not openai-codex' "$STDOUT"
 engine_case wrong-model openai-codex other-model
 step send 0 "$(envelope completed j0000001)"
 edispatch --engine omp:codex --role review
@@ -284,7 +284,7 @@ edispatch --engine omp:codex
 assert_exit 'an engine without --role is a usage error' 2
 edispatch --role review
 assert_exit '--role without an engine is a usage error' 2
-edispatch --engine omp:cursor --role review
+edispatch --engine omp:unknown --role review
 assert_exit 'an unknown engine is a usage error' 2
 edispatch --engine omp:codex --role review --slot
 assert_exit 'a flag without a value is a usage error' 2

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Isolated read-only review/debug/ask engine. Policy/envcheck are internal smoke helpers.
-# Without --engine it is the legacy glen-harness (Cursor) engine. With --engine omp:codex|omp:opencode
-# --slot S --role R it runs that profile, picks the model with select_model, and records provenance.
+# review, debug, ask and probe need --engine omp:codex|omp:opencode: with --slot S --role R it runs that
+# engine's profile, picks the model with select_model, and records provenance. snapshot, policy, launcher
+# and envcheck are helpers that name no engine.
 set -euo pipefail
 umask 077
 # A signal trap can run while dispatch_env's stdout is redirected to response.raw.
@@ -10,7 +11,9 @@ exec 3>&1
 
 MODE="${1:-}"
 [ "$#" -eq 0 ] || shift
-PROFILE=glen-harness EXPECT_PROVIDER=cursor LOGIN_CMD='login cursor' LOGIN_LABEL=Cursor
+# Filled by engine_resolve from the profile registry. The helper modes that name no engine (launcher, envcheck)
+# use the registry's first profile, set below once the registry is loaded.
+PROFILE='' EXPECT_PROVIDER='' LOGIN_CMD='' LOGIN_LABEL=''
 # Engine mode (--engine): filled by engine_resolve from routing.sh engines and the profile registry.
 ENGINE='' SLOT='' ROLE='' HAVE_ARGS=() CONFIG_FILES='' STARTUP_MODEL='' NO_TOOLS=0 GLEN_MODEL_SPEC=''
 REQ_PROVIDER='' REQ_MODEL='' REQ_EFFORT='' FALLBACKS='' STAKES='' SUBST_FROM='' ROUTE_SOURCE='' ROUTE_DECISION=''
@@ -26,6 +29,7 @@ USAGE='{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"totalTokens":0,"cost_
 log() { printf 'omp-engine: %s\n' "$*" >&2; }
 # shellcheck source=../omp/profiles.sh
 . "$(cd "$(dirname "$0")/../omp" && pwd -P)/profiles.sh" 2>/dev/null || { log 'profile registry omp/profiles.sh missing'; exit 4; }
+PROFILE="$(profile_names)" PROFILE="${PROFILE%%$'\n'*}"
 stop() { STATUS="$1"; REASON="$2"; EXIT_CODE="$3"; exit "$EXIT_CODE"; }
 # shellcheck disable=SC2329 # Registered below for INT/TERM.
 interrupted() {
@@ -36,8 +40,8 @@ usage() {
   log 'usage: omp-engine.sh probe | review [--repo DIR] (--base REF | --uncommitted) --out FILE [--scope TEXT] [--deadline 15m] [--keep]'
   log '       omp-engine.sh debug [--repo DIR] --brief FILE --out FILE [--base REF] [--deadline 20m] [--keep]'
   log '       omp-engine.sh ask --brief FILE --out FILE [--no-tools] [--repo DIR] [--deadline 10m] [--keep]   (text-only second opinion)'
-  log '       review|debug|ask|probe also take --engine omp:codex|omp:opencode [--slot S] --role R [--have ENGINE]'
-  log '       omp-engine.sh snapshot SRC DEST | policy SRC | envcheck -- CMD...'
+  log '       review|debug|ask need --engine omp:codex|omp:opencode [--slot S] --role R [--have ENGINE]; probe takes --engine too'
+  log '       omp-engine.sh snapshot SRC DEST | policy SRC | envcheck [--engine ENGINE] -- CMD...'
   stop failed 'usage error' 2
 }
 
@@ -66,7 +70,7 @@ dispatch_env() {
   local engine_root agent_dir real_omp
   local -a scrub=() assign=()
   # Only the opencode engine may see the OpenCode key; model choice reaches the launcher by env.
-  [ -z "$ENGINE" ] || [ "$ENGINE" = omp:opencode ] || scrub+=(-u OPENCODE_API_KEY)
+  [ "$ENGINE" = omp:opencode ] || scrub+=(-u OPENCODE_API_KEY)
   [ -z "$STARTUP_MODEL" ] || assign+=("OMP_STARTUP_MODEL=$STARTUP_MODEL")
   [ "$NO_TOOLS" -eq 0 ] || assign+=(OMP_NO_TOOLS=1)
   engine_root="${ENGINE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)}"
@@ -99,10 +103,10 @@ check_no_group_other_write() {
   [ "$owner" = "$(id -u)" ] || return 1
   (( (8#$permissions & 0022) == 0 ))
 }
-# Fix cycle 7 (Codex P1): no component of the glen-harness profile path, from
-# the omp root down through profiles/glen-harness/agent and the runtime
+# Fix cycle 7 (Codex P1): no component of the engine profile path, from
+# the omp root down through profiles/<profile>/agent and the runtime
 # children the sandbox can write, may be a symlink. A relocated profile (for
-# example profiles/glen-harness -> /elsewhere) would let the containment
+# example profiles/<profile> -> /elsewhere) would let the containment
 # checks below compare against one spelling while the sandbox grants writes
 # to another, so it is refused with its path, never followed. With no
 # symlinks in the chain, the lexical and physical profile paths agree.
@@ -320,6 +324,11 @@ case "$MODE" in
     exit 0
     ;;
   envcheck)
+    # envcheck [--engine ENGINE] -- CMD...: the engine decides the profile and whether OPENCODE_API_KEY passes.
+    if [ "${1:-}" = --engine ] && [ "$#" -ge 2 ]; then
+      case "$2" in omp:codex | omp:opencode) ENGINE="$2"; PROFILE="$(profile_for_engine "$ENGINE")" ;; *) usage ;; esac
+      shift 2
+    fi
     if [ "${1:-}" != -- ] || [ "$#" -lt 2 ]; then
       printf '%s\n' '{"v":1,"engine":"omp","mode":"envcheck","status":"failed","reason":"usage error"}'
       exit 2
@@ -434,7 +443,7 @@ capture() {
     STATUS=failed REASON="ran on $PROVIDER, not $EXPECT_PROVIDER" EXIT_CODE=4
   elif [ "$STATUS" = ok ] && [ -z "$PROVIDER" ]; then
     STATUS=failed REASON="ran on unknown, not $EXPECT_PROVIDER" EXIT_CODE=4
-  elif [ "$STATUS" = ok ] && [ -n "$ENGINE" ] && [ -n "$OBSERVED_MODEL" ]; then
+  elif [ "$STATUS" = ok ] && [ -n "$OBSERVED_MODEL" ]; then
     # The requested model or one of the slot's own fallbacks; anything else is a silent engine change.
     case ",$SUBST_FROM,$REQ_MODEL,$FALLBACKS," in
       *",$OBSERVED_MODEL,"*) ;;
@@ -601,11 +610,11 @@ bounded_omp() {
   )
 }
 probe_checks() {
-  local models value rc
+  local models rc
   [ "${GLEN_OMP_ENGINE:-}" != off ] || stop skipped 'disabled by GLEN_OMP_ENGINE=off' 3
   # Orchestrator decision (fix cycle 4): the omp engine is unavailable on
   # Linux in v0.1.0. bwrap cannot isolate abstract Unix sockets while still
-  # letting the sandboxed process reach Cursor over the network, so there is
+  # letting the sandboxed process reach its provider over the network, so there is
   # no safe bwrap policy today. omp-sandboxed-linux.sh stays in the repo for
   # a later Landlock-based version, but dispatch never calls it; this check
   # runs before resolve_launcher, regardless of whether bwrap happens to be
@@ -636,38 +645,14 @@ probe_checks() {
   if [ "$rc" -ne 0 ] || ! printf '%s' "$models" | jq -e '.models | type == "array" and length > 0' >/dev/null 2>&1; then
     stop skipped "omp --profile $PROFILE not logged into $LOGIN_LABEL (run: omp --profile $PROFILE $LOGIN_CMD)" 3
   fi
-  if [ -n "$ENGINE" ]; then
-    # The model comes from routing data, not the profile's saved default: it must be in the catalog.
-    if [ -n "$REQ_MODEL" ]; then
-      printf '%s' "$models" | jq -e --arg s "$REQ_PROVIDER/$REQ_MODEL" \
-        'any(.models[]; (.selector // (.provider + "/" + .id)) == $s)' >/dev/null 2>&1 || \
-        stop skipped "model $REQ_PROVIDER/$REQ_MODEL is not listed by omp --profile $PROFILE" 3
-      MODEL="$REQ_PROVIDER/$REQ_MODEL"
-    fi
-    THINKING_LEVEL="$REQ_EFFORT"
-    STATUS=ready REASON='' EXIT_CODE=0
-    return 0
+  # The model comes from routing data, not the profile's saved default: it must be in the catalog.
+  if [ -n "$REQ_MODEL" ]; then
+    printf '%s' "$models" | jq -e --arg s "$REQ_PROVIDER/$REQ_MODEL" \
+      'any(.models[]; (.selector // (.provider + "/" + .id)) == $s)' >/dev/null 2>&1 || \
+      stop skipped "model $REQ_PROVIDER/$REQ_MODEL is not listed by omp --profile $PROFILE" 3
+    MODEL="$REQ_PROVIDER/$REQ_MODEL"
   fi
-  if value="$(bounded_omp 4 config get modelRoles --json)"; then rc=0; else rc="$?"; fi
-  case "$rc" in
-    124 | 137 | 142) stop skipped 'modelRoles.default config check timed out' 3 ;;
-  esac
-  [ "$rc" -eq 0 ] || stop skipped 'modelRoles.default config check failed' 3
-  MODEL="$(printf '%s' "$value" | jq -er '.value.default | select(type == "string" and length > 0)')" || \
-    stop skipped 'modelRoles.default config check failed' 3
-  # Item 10 (fix cycle 4): setup persists "<id>:<level>" on the ladder path
-  # (omp honours this suffix itself) and a bare id for an explicit --model.
-  # The per-dispatch --thinking repeats exactly that persisted level, and is
-  # omitted when there is none (fix cycle 6, Claude MED-2 / Codex P2): ladder
-  # membership of the id says nothing about what setup saved. Only a trailing
-  # :<level> that is one of omp's own levels counts as a suffix.
-  THINKING_LEVEL=''
-  case "$MODEL" in
-    *:off | *:minimal | *:low | *:medium | *:high | *:xhigh | *:max | *:auto)
-      THINKING_LEVEL="${MODEL##*:}"
-      MODEL="${MODEL%:*}"
-      ;;
-  esac
+  THINKING_LEVEL="$REQ_EFFORT"
   STATUS=ready REASON='' EXIT_CODE=0
 }
 
@@ -916,7 +901,8 @@ case "$MODE" in
       [ "$#" -ge 2 ] && [ -n "$2" ] && engine_flag "$1" "$2" || usage
       shift 2
     done
-    [ -z "$ENGINE" ] || engine_resolve
+    [ -n "$ENGINE" ] || usage
+    engine_resolve
     probe_checks
     exit 0
     ;;
@@ -969,7 +955,8 @@ fi
 mkdir -p "$(dirname "$OUT")"
 OUT="$(cd "$(dirname "$OUT")" && pwd -P)/$(basename "$OUT")"
 OUTPUT_READY=1
-if [ -n "$ENGINE" ]; then engine_resolve; elif [ -n "$SLOT$ROLE" ] || [ "${#HAVE_ARGS[@]}" -gt 0 ]; then usage; fi
+[ -n "$ENGINE" ] || usage
+engine_resolve
 probe_checks
 STATUS=failed REASON='engine command failed' EXIT_CODE=4
 REPO="$(git -C "$REPO" rev-parse --show-toplevel)"
@@ -988,7 +975,7 @@ RUN_GLEN_HOME="$RUN_DIR/glen-home"
 POLICY_PATH="$RUN_DIR/policy.yml"
 TREE="$RUN_DIR/tree"
 policy "$ENGINE_ROOT" "$POLICY_PATH"
-[ -z "$ENGINE" ] || select_model
+select_model
 
 # Invoke the same snapshot subcommand used by smoke tests; its JSON stays private.
 if env -u GLEN_OMP_ENGINE_TEST_MUTATE "$SCRIPT" snapshot "$REPO" "$TREE" > "$RUN_DIR/snapshot.json"; then SNAP_RC=0; else SNAP_RC="$?"; fi
@@ -1080,8 +1067,7 @@ while :; do
   if [ -n "$GLEN_MODEL_SPEC" ]; then
     dispatch_env "$GLEN_BIN" --profile "$PROFILE" model @new "$GLEN_MODEL_SPEC" > /dev/null || stop failed 'glen model failed' 4
   fi
-  # Fix cycle 5, decision 7: omit --thinking entirely for an off-ladder
-  # (explicit --model) configuration, rather than guessing a ladder level.
+  # Omit --thinking entirely when the slot carries no effort, rather than guessing a level.
   # Bash 3.2 (macOS's default) treats "${arr[@]}" on a zero-element array as
   # unbound under set -u, so branch on THINKING_LEVEL instead of expanding an
   # possibly-empty THINKING_ARGS array.
@@ -1099,7 +1085,7 @@ while :; do
     remaining=$((DEADLINE_SECONDS + 75 - ($(date +%s) - FIRST_SEND)))
     if [ "$remaining" -le 0 ]; then
       # A hung cap signal: the outer deadline fires, and omp usage may say why.
-      if [ -n "$ENGINE" ] && rate_limited; then mark_cap usage; fi
+      if rate_limited; then mark_cap usage; fi
       stop timeout 'engine deadline exceeded' 5
     fi
     wait_seconds="$remaining"
@@ -1114,7 +1100,7 @@ while :; do
     stop timeout 'glen job deadline exceeded' 5
   fi
   remaining=$((DEADLINE_SECONDS - ($(date +%s) - FIRST_SEND)))
-  if [ "$RC" -eq 7 ] && [ -n "$ENGINE" ]; then
+  if [ "$RC" -eq 7 ]; then
     # A usage limit (GoUsageLimitError / 429, insufficient funds / 402, or omp usage "rate-limited") is a
     # cap, not a transient capacity error: record it, skip the 60 s sleep, and never fall to Zen or native Codex.
     CAP_SIGNAL=''

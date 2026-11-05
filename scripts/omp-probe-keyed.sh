@@ -104,7 +104,7 @@ fi
 ENV_PASS=false LOGIN_OK=false
 if [ -n "${OPENCODE_API_KEY:-}" ]; then
   envcheck_out="$WORK/envcheck.out"
-  if /bin/bash "$ROOT/scripts/omp-engine.sh" envcheck -- \
+  if /bin/bash "$ROOT/scripts/omp-engine.sh" envcheck --engine omp:opencode -- \
     /bin/sh -c 'test -n "${OPENCODE_API_KEY:-}"' > "$envcheck_out" 2>&1; then
     ENV_PASS=true
   elif grep -Fq 'launcher unavailable' "$envcheck_out"; then

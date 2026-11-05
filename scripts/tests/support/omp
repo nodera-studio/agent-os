@@ -3,7 +3,7 @@
 set -euo pipefail
 [ "$HOME" = "$FAKE_OMP_TEST_HOME" ] || exit 99
 jq -cn --arg home "$HOME" --args '{home:$home,argv:$ARGS.positional}' -- "$@" >> "$FAKE_OMP_LOG"
-case "${2:-}" in glen-harness | glen-harness-codex | glen-harness-opencode) profile="$2" ;; *) profile='' ;; esac
+case "${2:-}" in glen-harness-codex | glen-harness-opencode) profile="$2" ;; *) profile='' ;; esac
 if [ "${1:-}" != --profile ] || [ -z "$profile" ]; then
   printf 'unscoped omp invocation refused\n' >&2
   exit 42
@@ -56,7 +56,7 @@ case "${1:-}" in
     esac
     ;;
   models)
-    case "$*" in 'models cursor --json' | 'models openai-codex --json' | 'models opencode-go --json') ;; *) exit 44 ;; esac
+    case "$*" in 'models openai-codex --json' | 'models opencode-go --json') ;; *) exit 44 ;; esac
     # Deliberate default-profile mutation for the component diagnostics tests.
     root="$HOME/${PI_CONFIG_DIR:-.omp}"
     case "${FAKE_OMP_MUTATE:-}" in

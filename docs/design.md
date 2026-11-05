@@ -2,9 +2,10 @@
 
 Internals of the read-only omp engines (`scripts/omp-engine.sh`), moved out of `skills/omp/SKILL.md` so the
 skill stays a short dispatch guide. Read this when changing the sandbox, the policy or the launchers.
-The profiles are listed in `omp/profiles.sh` (`glen-harness-codex`, `glen-harness-opencode`); where the
-text below says `glen-harness` it means the engine's profile, and where it says the provider it means
-`openai-codex` or `opencode-go`.
+The profiles are listed in `omp/profiles.sh`: exactly `glen-harness-codex` and `glen-harness-opencode`. There is
+no default profile and no wildcard; the old Cursor profile and its model ladder are gone. Where the text below
+says `glen-harness-<engine>` or the profile it means the dispatched engine's profile, and where it says the
+provider it means `openai-codex` or `opencode-go`.
 
 ## What is enforced
 
@@ -27,11 +28,11 @@ and the merge-base are both taken from that commit, so a clean checkout or reset
 capture is caught like an edit: once during the copy it recaptures, and between the copy and
 the diff capture the run skips with `source changed during capture`.
 
-The glen-harness profile must not be relocated. If any component from the omp root
-(`~/.omp`, or `$HOME/$PI_CONFIG_DIR`) down through `profiles/glen-harness/agent`, or one of
+An engine profile must not be relocated. If any component from the omp root
+(`~/.omp`, or `$HOME/$PI_CONFIG_DIR`) down through `profiles/<profile>/agent`, or one of
 its writable children (`agent/sessions`, `logs`, `cache`, `run`, `run/daemons`, the shared
 `run` and `run/session-owners`), is a symlink, launcher resolution, probe and dispatch refuse
-with `refusing symlinked glen-harness profile path: <path>`; the sandbox launcher refuses
+with `refusing symlinked <profile> profile path: <path>`; the sandbox launcher refuses
 the same for the four profile components. Setup replaces the profile's
 `mcp.json` only when its bytes are exactly a template version setup shipped; any other
 difference (an added server or key, an edited URL, default, header or token) is a conflict
@@ -45,7 +46,7 @@ shell parser: do not rely on them to catch `bash -c "omp login"`, heredocs, vari
 indirection, or other alternate invocation forms. They do not govern calls inside scripts.
 [Claude Code also checks separated subcommands and unwraps some wrappers](https://code.claude.com/docs/en/permissions#compound-commands);
 prefix matching is not limited to position zero of the entire Bash call.
-The real default-profile protections are explicit `--profile glen-harness` on every
+The real default-profile protections are explicit `--profile <engine profile>` on every
 harness invocation, setup's default-profile fingerprint, and the OS sandbox.
 
 ## Risks
@@ -74,7 +75,7 @@ it creates there cannot be removed by it; the profile's own `run/` (`tiny`, `mne
 `provider-inflight`) stays writable outside `run/daemons`, so a forged lease there could stall
 later harness-profile provider calls; and the source fingerprint hashes each untracked,
 non-ignored file separately, about 14 ms per file per pass (three passes per dispatch). Setup's `--dry-run` makes no config changes, but
-querying config still initializes databases and caches on disk under `glen-harness`.
+querying config still initializes databases and caches on disk under the engine profile.
 
 **The engine is unavailable on Linux in v0.1.0.** bwrap cannot isolate abstract Unix sockets
 while still letting the sandboxed process reach the provider over the network, so there is no safe

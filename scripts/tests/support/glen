@@ -6,7 +6,7 @@ state="${FAKE_GLEN_STATE:?scratch fixture directory required}"
 argv=("$@")
 profile=''
 if [ "${1:-}" = --profile ]; then
-  case "${2:-}" in glen-harness | glen-harness-codex | glen-harness-opencode) ;; *) exit 99 ;; esac
+  case "${2:-}" in glen-harness-codex | glen-harness-opencode) ;; *) exit 99 ;; esac
   profile="$2"
   shift 2
 fi

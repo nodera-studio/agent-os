@@ -15,7 +15,7 @@ mkdir -p "$ENGINE_FIXTURE/.claude/scripts" "$ENGINE_FIXTURE/.claude/omp/skills/m
 cp "$REPO_ROOT/.claude/scripts/omp-profile-setup.sh" "$REPO_ROOT/.claude/scripts/omp-engine.sh" "$ENGINE_FIXTURE/.claude/scripts/"
 cp "$REPO_ROOT/.claude/omp/omp-sandboxed.sh" "$REPO_ROOT/.claude/omp/omp-sandboxed-linux.sh" \
   "$REPO_ROOT/.claude/omp/glen-harness.yml" "$REPO_ROOT/.claude/omp/mcp.json" \
-  "$REPO_ROOT/.claude/omp/model-ladder.sh" "$REPO_ROOT/.claude/omp/profiles.sh" "$ENGINE_FIXTURE/.claude/omp/"
+  "$REPO_ROOT/.claude/omp/profiles.sh" "$ENGINE_FIXTURE/.claude/omp/"
 cp "$REPO_ROOT/.claude/routing.json" "$ENGINE_FIXTURE/.claude/"
 cp "$REPO_ROOT/.claude/omp/skills/mnemosyne-glen/SKILL.md" "$ENGINE_FIXTURE/.claude/omp/skills/mnemosyne-glen/"
 git -C "$ENGINE_FIXTURE" init -q --initial-branch=main
@@ -36,7 +36,7 @@ if [ "${BUN_BE_BUN:-}" = 1 ]; then printf '0123456789abcdef'; exit 0; fi
 # Fix cycle 6: no omp call may inherit a native-cache override.
 [ -z "${PI_NATIVES_DIR:-}" ] || exit 95
 case "$*" in
-  '--profile glen-harness toks glen-native-warmup --json' | '--profile glen-harness-codex toks glen-native-warmup --json' | \
+  '--profile glen-harness-codex toks glen-native-warmup --json' | \
     '--profile glen-harness-opencode toks glen-native-warmup --json')
     [ "$HOME" = "$FAKE_OMP_TEST_HOME" ] || exit 99
     [ "${FAKE_OMP_SANDBOX_ACTIVE:-0}" = 0 ] || exit 98
@@ -47,7 +47,7 @@ case "$*" in
     printf '{}\n'
     exit 0
     ;;
-  '--profile glen-harness models cursor --json' | '--profile glen-harness-codex models openai-codex --json' | \
+  '--profile glen-harness-codex models openai-codex --json' | \
     '--profile glen-harness-opencode models opencode-go --json')
     [ -f "$HOME/.omp/natives/prewarmed" ] || exit 96
     ;;
@@ -70,13 +70,13 @@ assert() {
   fi
 }
 assert_eq() { assert "$1" test "$2" = "$3"; }
-assert_exit() { assert_eq "$1" "$CODE" "$2"; }
+assert_exit() { assert_eq "$1" "$CODE" "$2"; [ "$CODE" = "$2" ] || echo "code=$CODE: $(head -c 600 "$STDERR")" >&2; }
 assert_contains() { assert "$1" grep -Fq -- "$2" "$3"; }
 run() {
   if "$@" > "$STDOUT" 2> "$STDERR"; then CODE=0; else CODE="$?"; fi
 }
 all_scoped() {
-  jq -es 'length > 0 and all(.[]; .argv[0:2] == ["--profile","glen-harness"])' "$FAKE_OMP_LOG"
+  jq -es 'length > 0 and all(.[]; .argv[0:2] == ["--profile","glen-harness-codex"])' "$FAKE_OMP_LOG"
 }
 tree_contents() {
   (cd "$1"; find . -print | LC_ALL=C sort; find . -type f -exec shasum -a 256 {} + | LC_ALL=C sort)
@@ -95,9 +95,9 @@ set -eu
 printf 'glen %s\n' "$*" >> "$FAKE_TOOL_CALLS"
 case "$*" in
   --version) printf 'glen/fixture\n' ;;
-  '--profile glen-harness install-extension --json' | '--profile glen-harness-codex install-extension --json' | \
+  '--profile glen-harness-codex install-extension --json' | \
     '--profile glen-harness-opencode install-extension --json') printf '{}\n' ;;
-  '--profile glen-harness doctor --json' | '--profile glen-harness-codex doctor --json' | '--profile glen-harness-opencode doctor --json')
+  '--profile glen-harness-codex doctor --json' | '--profile glen-harness-opencode doctor --json')
     jq -cn --argjson current "${FAKE_GLEN_CURRENT:-true}" '{data:{extension:{state:"fixture",current:$current}}}'
     ;;
   *) exit 99 ;;
@@ -135,7 +135,7 @@ new_fixture() {
   CASE_DIR="$(mktemp -d "$WORK/case.XXXXXX")"
   TEST_HOME="$CASE_DIR/home" TEST_CONFIG_DIR="${1:-.omp}"
   TEST_ROOT="$TEST_HOME/${TEST_CONFIG_DIR#/}"
-  TEST_AGENT="$TEST_ROOT/profiles/glen-harness/agent"
+  TEST_AGENT="$TEST_ROOT/profiles/glen-harness-codex/agent"
   mkdir -p "$TEST_HOME" "$CASE_DIR/tmp" "$CASE_DIR/state" "$TEST_ROOT/agent/extensions" \
     "$TEST_ROOT/agent/sessions" "$TEST_ROOT/natives"
   printf 'owner config\n' > "$TEST_ROOT/agent/config.yml"
@@ -156,10 +156,10 @@ new_fixture() {
   : > "$FAKE_TOOL_CALLS"
   # Canned config responses keyed by the exact registered setting ID.
   cat > "$FAKE_OMP_STATE/overlay.json" <<'EOF'
-{"modelRoles":{"default":"cursor/grok-4.7:high","task":"cursor/task-model","custom":"cursor/custom-model"},"tools.approvalMode":"always-ask","tools.approval":{"write":"deny","glen_reply":"allow"},"tools.xdev":false,"tools.restrictedFolders":["~"],"fetch.enabled":false,"web_search.enabled":false,"bash.enabled":false,"eval.py":false,"eval.js":false,"browser.enabled":false,"lsp.enabled":false,"mcp.enableProjectConfig":false,"mcp.startupTimeoutMs":15000}
+{"modelRoles":{"default":"openai-codex/gpt-6.1-sol:high","task":"openai-codex/task-model","custom":"openai-codex/custom-model"},"disabledProviders":["agents"],"tools.approvalMode":"always-ask","tools.approval":{"write":"deny","glen_reply":"allow"},"tools.xdev":false,"tools.restrictedFolders":["~"],"fetch.enabled":false,"web_search.enabled":false,"bash.enabled":false,"eval.py":false,"eval.js":false,"browser.enabled":false,"lsp.enabled":false,"mcp.enableProjectConfig":false,"mcp.startupTimeoutMs":15000}
 EOF
   cp "$FAKE_OMP_STATE/overlay.json" "$FAKE_OMP_STATE/settings.json"
-  printf '%s\n' '{"models":[{"selector":"cursor/grok-4.7"}]}' > "$FAKE_OMP_STATE/models.json"
+  printf '%s\n' '{"models":[{"selector":"openai-codex/gpt-6.1-sol"}]}' > "$FAKE_OMP_STATE/models.json"
 }
 ready_assets() {
   mkdir -p "$TEST_AGENT/skills/mnemosyne-glen"
@@ -174,34 +174,32 @@ setup_run() {
 }
 
 new_fixture
-setup_run "$WORK/bin/omp" --profile glen-harness --version
+setup_run "$WORK/bin/omp" --profile glen-harness-codex --version
 assert_exit 'native prewarm control version command succeeds' 0
 assert 'version control leaves native cache cold' test ! -e "$TEST_HOME/.omp/natives/prewarmed"
 
 new_fixture
-# Reverse the live list's order and exercise both selector and provider/id forms:
-# preference order, rather than API order, must choose Grok when both exist.
-printf '%s\n' '{"models":[{"selector":"cursor/other-model"},{"selector":"cursor/other"},{"provider":"cursor","id":"grok-4.7"}]}' > "$FAKE_OMP_STATE/models.json"
-jq '.modelRoles.default = "cursor/old" | .["tools.xdev"] = true' "$FAKE_OMP_STATE/settings.json" > "$CASE_DIR/drift.json"
+# The catalog lists the routing model in provider/id form among others; setup finds it there.
+printf '%s\n' '{"models":[{"selector":"openai-codex/other-model"},{"provider":"openai-codex","id":"gpt-6.1-sol"}]}' > "$FAKE_OMP_STATE/models.json"
+jq '.modelRoles.default = "openai-codex/old" | .["tools.xdev"] = true' "$FAKE_OMP_STATE/settings.json" > "$CASE_DIR/drift.json"
 cp "$CASE_DIR/drift.json" "$FAKE_OMP_STATE/settings.json"
-setup_run "$SETUP"
+setup_run "$SETUP" --engine omp:codex
 assert_exit 'full setup succeeds with record-only modelRoles CLI' 0
-assert 'full setup preserves other model roles' jq -e '.modelRoles == {default:"cursor/grok-4.7:high",task:"cursor/task-model",custom:"cursor/custom-model"}' "$FAKE_OMP_STATE/settings.json"
+assert 'full setup preserves other model roles' jq -e '.modelRoles == {default:"openai-codex/gpt-6.1-sol:high",task:"openai-codex/task-model",custom:"openai-codex/custom-model"}' "$FAKE_OMP_STATE/settings.json"
 assert 'full setup applies other overlay settings' jq -e '.["tools.xdev"] == false' "$FAKE_OMP_STATE/settings.json"
-assert 'full setup queries bare modelRoles key' jq -es 'any(.[]; .argv == ["--profile","glen-harness","config","get","modelRoles","--json"])' "$FAKE_OMP_LOG"
-assert 'full setup sets bare modelRoles key with whole record' jq -es 'any(.[]; .argv[2:5] == ["config","set","modelRoles"] and (.argv[5] | fromjson | .task == "cursor/task-model"))' "$FAKE_OMP_LOG"
+assert 'full setup queries bare modelRoles key' jq -es 'any(.[]; .argv == ["--profile","glen-harness-codex","config","get","modelRoles","--json"])' "$FAKE_OMP_LOG"
+assert 'full setup sets bare modelRoles key with whole record' jq -es 'any(.[]; .argv[2:5] == ["config","set","modelRoles"] and (.argv[5] | fromjson | .task == "openai-codex/task-model"))' "$FAKE_OMP_LOG"
 assert 'full setup makes only harness-scoped omp calls' all_scoped
 assert 'full setup installs MCP asset' cmp -s "$REPO_ROOT/.claude/omp/mcp.json" "$TEST_AGENT/mcp.json"
 assert 'full setup installs skill asset' cmp -s "$REPO_ROOT/.claude/omp/skills/mnemosyne-glen/SKILL.md" "$TEST_AGENT/skills/mnemosyne-glen/SKILL.md"
-assert_contains 'both preferred models present chooses Grok visibly' 'chose cursor/grok-4.7 from preference list' "$STDOUT"
-assert_contains 'Grok selection reports its high thinking level' 'chose cursor/grok-4.7 from preference list, thinking high' "$STDOUT"
+assert_contains 'setup names the routing model visibly' 'model: openai-codex/gpt-6.1-sol (routing.json)' "$STDOUT"
 # shellcheck disable=SC2016 # jq binds its own $calls variable.
 assert 'full setup fetches models before setting config' jq -es '
   map(.argv[2:4] | join(" ")) as $calls |
-  ($calls | index("models cursor")) < ($calls | index("config set"))' "$FAKE_OMP_LOG"
+  ($calls | index("models openai-codex")) < ($calls | index("config set"))' "$FAKE_OMP_LOG"
 # shellcheck disable=SC2016 # jq receives $agent through --arg.
 assert 'setup launches only the model query with explicit profile and cwd' jq -es --arg agent "$TEST_AGENT" \
-  'length==1 and all(.[]; .argv==["--profile","glen-harness","models","cursor","--json"] and .agent==$agent and .root==.cwd)' "$FAKE_OMP_LAUNCH_LOG"
+  'length==1 and all(.[]; .argv==["--profile","glen-harness-codex","models","openai-codex","--json"] and .agent==$agent and .root==.cwd)' "$FAKE_OMP_LAUNCH_LOG"
 assert 'setup removes model query scratch root after the call' test ! -e "$(jq -r .root "$FAKE_OMP_LAUNCH_LOG")"
 assert 'setup prewarms native cache before sandboxed models' test -f "$TEST_HOME/.omp/natives/prewarmed"
 # shellcheck disable=SC2016 # jq binds its own $calls variable.
@@ -210,57 +208,39 @@ assert 'setup native prewarm precedes model catalog query' jq -es '
 # A modified worktree launcher cannot replace the captured main version.
 if [ "$(uname -s)" = Darwin ]; then launcher_name=omp-sandboxed.sh; else launcher_name=omp-sandboxed-linux.sh; fi
 printf '#!/bin/bash\nexit 99\n' > "$ENGINE_FIXTURE/.claude/omp/$launcher_name"
-setup_run "$SETUP" --check
+setup_run "$SETUP" --engine omp:codex --check
 assert_exit 'setup model fetch prefers main over modified worktree launcher' 0
 assert 'setup using main launcher has no fallback warning' test ! -s "$STDERR"
 
 new_fixture
 export FAKE_OMP_PREWARM_FAIL=1
-setup_run "$SETUP" --dry-run
+setup_run "$SETUP" --engine omp:codex --dry-run
 assert_exit 'setup stops if native cache prewarm fails' 97
 assert 'failed prewarm never queries models or sets config' jq -es \
   'all(.[]; .argv[2]!="models" and .argv[2:4]!=["config","set"])' "$FAKE_OMP_LOG"
 assert 'failed prewarm never invokes sandboxed payload' test ! -s "$FAKE_OMP_LAUNCH_LOG"
 
 new_fixture
-printf '%s\n' '{"models":[{"selector":"cursor/other"}]}' > "$FAKE_OMP_STATE/models.json"
-setup_run "$SETUP"
-assert_exit 'none of the preferred models available fails' 1
-assert_contains 'missing preferences reason explains none found' 'none of the preferred models' "$STDERR"
-assert_contains 'missing preferences reason names Grok' 'cursor/grok-4.7' "$STDERR"
-assert 'missing preferences never set config' jq -es \
+printf '%s\n' '{"models":[{"selector":"openai-codex/other"}]}' > "$FAKE_OMP_STATE/models.json"
+setup_run "$SETUP" --engine omp:codex
+assert_exit 'a routing model missing from the catalog fails' 1
+assert_contains 'the missing model is named with the catalog' 'model openai-codex/gpt-6.1-sol is not listed' "$STDERR"
+assert 'a missing model never sets config' jq -es \
   'all(.[]; .argv[2:4] != ["config","set"])' "$FAKE_OMP_LOG"
-assert 'missing preferences never install MCP' test ! -e "$TEST_AGENT/mcp.json"
-assert 'missing preferences never install skill' test ! -e "$TEST_AGENT/skills/mnemosyne-glen/SKILL.md"
-assert 'missing preferences never build or install extension' test ! -s "$FAKE_TOOL_CALLS"
-assert 'missing preferences still use only harness-scoped calls' all_scoped
-
-new_fixture
-printf '%s\n' '{"models":[{"selector":"cursor/grok-4.7"},{"selector":"cursor/other-model"},{"selector":"cursor/explicit"}]}' > "$FAKE_OMP_STATE/models.json"
-setup_run "$SETUP" --model cursor/explicit
-assert_exit 'explicit model bypasses preference order' 0
-assert 'explicit model is the configured default' jq -e '.modelRoles.default == "cursor/explicit"' "$FAKE_OMP_STATE/settings.json"
-assert_contains 'explicit model decision is visible' 'model: cursor/explicit (explicit --model)' "$STDOUT"
-
-new_fixture
-printf '%s\n' '{"models":[{"selector":"cursor/grok-4.7"},{"selector":"cursor/other-model"}]}' > "$FAKE_OMP_STATE/models.json"
-setup_run "$SETUP" --model cursor/missing
-assert_exit 'missing explicit model does not fall back' 1
-assert_contains 'missing explicit model keeps exact-id diagnostic' 'model cursor/missing is not listed' "$STDERR"
+assert 'a missing model still uses only harness-scoped calls' all_scoped
 
 new_fixture
 printf '%s\n' '{"models":[]}' > "$FAKE_OMP_STATE/models.json"
-setup_run "$SETUP" --dry-run
+setup_run "$SETUP" --engine omp:codex --dry-run
 assert_exit 'empty model list preserves missing-login exit' 2
-assert_contains 'empty model list leaves preference list unvalidated' 'no live Cursor login yet; preference list unvalidated' "$STDOUT"
-assert_contains 'empty model list retains owner login instruction' "Owner action: run 'omp --profile glen-harness login cursor'" "$STDOUT"
+assert_contains 'empty model list retains owner login instruction' "Owner action: run 'omp --profile glen-harness-codex login openai-codex'" "$STDOUT"
 assert 'empty model list produces no unavailable-model error' test ! -s "$STDERR"
 
 # Negative control: execute a copy in memory with only the queried key reverted.
 # $0 still identifies the real script, so repository resolution is unchanged.
 new_fixture
 reverted="$(sed 's/^KEYS=(modelRoles /KEYS=(modelRoles.default /' "$SETUP")"
-setup_run -c "$reverted" "$SETUP" --dry-run
+setup_run -c "$reverted" "$SETUP" --engine omp:codex --dry-run
 assert_exit 'reverted modelRoles.default query fails' 43
 assert_contains 'reverted key rejected by fake omp' 'Unknown setting: modelRoles.default' "$STDERR"
 assert 'reverted key actually reached fake omp' jq -es 'any(.[]; .argv[4] == "modelRoles.default")' "$FAKE_OMP_LOG"
@@ -268,7 +248,7 @@ assert 'reverted key failure performs no config sets' test "$(grep -c '^config s
 
 new_fixture
 export FAKE_OMP_ERROR_KEY=modelRoles
-setup_run "$SETUP" --dry-run
+setup_run "$SETUP" --engine omp:codex --dry-run
 assert 'modelRoles error response fails closed' test "$CODE" -ne 0
 assert_contains 'modelRoles error response names record problem' 'modelRoles must be a record' "$STDERR"
 
@@ -278,13 +258,13 @@ new_fixture
 reverted="$(sed '/^AGENT_DIR=.*profile_omp.*config path/a\
 legacy_default_agent_dir="$(omp_run profile config path)"
 ' "$SETUP")"
-setup_run -c "$reverted" "$SETUP" --dry-run
+setup_run -c "$reverted" "$SETUP" --engine omp:codex --dry-run
 assert_exit 'reverted default-profile query fails' 42
 assert_contains 'fake rejects default-profile safety query' 'unscoped omp invocation refused' "$STDERR"
-assert 'unscoped invocation detector catches reverted query' jq -es 'any(.[]; .argv[0:2] != ["--profile","glen-harness"])' "$FAKE_OMP_LOG"
+assert 'unscoped invocation detector catches reverted query' jq -es 'any(.[]; .argv[0:2] != ["--profile","glen-harness-codex"])' "$FAKE_OMP_LOG"
 
 new_fixture /custom-omp
-setup_run "$SETUP" --dry-run
+setup_run "$SETUP" --engine omp:codex --dry-run
 assert_exit 'leading-slash PI_CONFIG_DIR stays under scratch HOME' 0
 assert 'custom config directory still scopes every call' all_scoped
 # shellcheck disable=SC2016 # jq receives $agent through --arg.
@@ -294,11 +274,11 @@ assert 'setup passes resolved custom profile directory into launcher' jq -es --a
 # Setup may configure local files directly, but it cannot query models without
 # an OS sandbox. The allowlisted PATH contains no sandbox-exec or bwrap.
 mkdir "$WORK/no-sandbox-bin"
-for tool in date dirname git jq shasum uname mktemp rm find stat awk sort env omp mkdir cmp grep basename; do
+for tool in date dirname git jq shasum uname mktemp rm find stat awk sort env omp mkdir cmp grep basename cut; do
   ln -s "$(command -v "$tool")" "$WORK/no-sandbox-bin/$tool"
 done
 new_fixture
-PATH="$WORK/no-sandbox-bin" setup_run "$SETUP" --dry-run
+PATH="$WORK/no-sandbox-bin" setup_run "$SETUP" --engine omp:codex --dry-run
 assert_exit 'setup model fetch without sandbox fails closed' 1
 if [ "$(uname -s)" = Darwin ]; then missing_tool=sandbox-exec; else missing_tool=bwrap; fi
 assert_contains 'setup missing sandbox reason names tool' "$missing_tool not on PATH" "$STDERR"
@@ -314,7 +294,7 @@ for existing in no yes; do
   physical_home="$TEST_HOME"
   ln -s "$physical_home" "$CASE_DIR/home-alias"
   TEST_HOME="$CASE_DIR/home-alias"
-  setup_run "$SETUP" --dry-run
+  setup_run "$SETUP" --engine omp:codex --dry-run
   assert_exit "symlinked HOME existing=$existing dry-run succeeds" 0
   assert "symlinked HOME existing=$existing keeps harness scope" all_scoped
   # shellcheck disable=SC2016 # jq expands its own --arg variable.
@@ -331,7 +311,7 @@ ln -s "$CASE_DIR/outside-agent" "$TEST_AGENT"
 ln -s "$physical_home" "$CASE_DIR/home-alias"
 TEST_HOME="$CASE_DIR/home-alias"
 before="$(tree_contents "$CASE_DIR")"
-setup_run "$SETUP" --dry-run
+setup_run "$SETUP" --engine omp:codex --dry-run
 assert_exit 'symlinked HOME still refuses symlink at agent component' 1
 assert_contains 'symlinked HOME component refusal names physical agent path' "$TEST_AGENT" "$STDERR"
 assert 'symlinked HOME component refusal precedes omp initialization' test ! -s "$FAKE_OMP_LOG"
@@ -341,7 +321,7 @@ for version in omp/18.14.0 18.14.0 omp/18.15.0; do
   new_fixture
   ready_assets
   export FAKE_OMP_VERSION="$version"
-  setup_run "$SETUP" --check
+  setup_run "$SETUP" --engine omp:codex --check
   assert_exit "check version $version is informational" 0
   assert "check version $version scopes every call including version" all_scoped
   assert_contains "check version $version fingerprint stable" 'fingerprint-unchanged' "$STDOUT"
@@ -354,14 +334,14 @@ done
 new_fixture
 ready_assets
 export FAKE_OMP_VERSION=omp/18.15.0 FAKE_GLEN_CURRENT=false
-setup_run "$SETUP" --check
+setup_run "$SETUP" --engine omp:codex --check
 assert_exit 'version warning does not hide another check failure' 1
 assert_contains 'failed check retains version warning' 'WARN: expected omp 18.14.0' "$STDERR"
 
-for component in .omp .omp/profiles .omp/profiles/glen-harness .omp/profiles/glen-harness/agent \
-  .omp/profiles/glen-harness/agent/config.yml .omp/profiles/glen-harness/agent/mcp.json \
-  .omp/profiles/glen-harness/agent/skills .omp/profiles/glen-harness/agent/skills/mnemosyne-glen \
-  .omp/profiles/glen-harness/agent/skills/mnemosyne-glen/SKILL.md; do
+for component in .omp .omp/profiles .omp/profiles/glen-harness-codex .omp/profiles/glen-harness-codex/agent \
+  .omp/profiles/glen-harness-codex/agent/config.yml .omp/profiles/glen-harness-codex/agent/mcp.json \
+  .omp/profiles/glen-harness-codex/agent/skills .omp/profiles/glen-harness-codex/agent/skills/mnemosyne-glen \
+  .omp/profiles/glen-harness-codex/agent/skills/mnemosyne-glen/SKILL.md; do
   new_fixture
   ready_assets
   printf 'fixture config\n' > "$TEST_AGENT/config.yml"
@@ -370,7 +350,7 @@ for component in .omp .omp/profiles .omp/profiles/glen-harness .omp/profiles/gle
   rm -rf "$target"
   ln -s "$CASE_DIR/outside" "$target"
   before="$(tree_contents "$CASE_DIR")"
-  setup_run "$SETUP"
+  setup_run "$SETUP" --engine omp:codex
   assert_exit "setup refuses symlink at $component" 1
   assert_contains "symlink diagnostic names $component" "$target" "$STDERR"
   assert_eq "symlink $component refuses before even Settings.init" "$(cat "$FAKE_OMP_LOG")" ''
@@ -385,7 +365,7 @@ new_fixture
 mkdir -p "$CASE_DIR/physical-parent"
 ln -s "$CASE_DIR/physical-parent" "$TEST_HOME/alias"
 TEST_CONFIG_DIR=alias/.omp
-setup_run "$SETUP"
+setup_run "$SETUP" --engine omp:codex
 assert_exit 'setup refuses differing physical profile path' 1
 assert_contains 'physical path mismatch diagnostic' 'real path differs' "$STDERR"
 assert 'physical path mismatch precedes omp initialization' test ! -s "$FAKE_OMP_LOG"
@@ -393,7 +373,7 @@ assert_eq 'physical path mismatch leaves symlink target empty' "$(find "$CASE_DI
 
 new_fixture
 export FAKE_OMP_REPORTED_DIR="$TEST_ROOT/agent"
-setup_run "$SETUP"
+setup_run "$SETUP" --engine omp:codex
 assert_exit 'setup refuses reported default agent directory' 1
 assert_contains 'default directory collision diagnostic' 'resolves to the default profile' "$STDERR"
 assert 'directory collision never queries default profile' all_scoped
@@ -403,7 +383,7 @@ for component in config.yml mcp.json extensions sessions; do
   new_fixture
   ready_assets
   export FAKE_OMP_MUTATE="$component"
-  setup_run "$SETUP" --check
+  setup_run "$SETUP" --engine omp:codex --check
   assert_exit "default fingerprint $component mutation fails" 1
   assert_contains "default fingerprint names changed $component" "default-profile fingerprint changed: $component" "$STDERR"
   assert 'fingerprint mismatch reports no unchanged claim' test "$(grep -c 'fingerprint-unchanged.*yes' "$STDOUT" || true)" -eq 0
@@ -412,7 +392,7 @@ for component in run natives; do
   new_fixture
   ready_assets
   export FAKE_OMP_MUTATE="$component"
-  setup_run "$SETUP" --check
+  setup_run "$SETUP" --engine omp:codex --check
   assert_exit "documented shared $component directory remains outside fingerprint" 0
   assert_contains "shared $component mutation leaves default fingerprint unchanged" 'fingerprint-unchanged' "$STDOUT"
   assert "shared $component mutation reports no fingerprint error" test ! -s "$STDERR"
@@ -428,7 +408,7 @@ cat > "$WORK/db-bin/omp" <<'EOF'
 #!/bin/bash
 set -euo pipefail
 if [ "${BUN_BE_BUN:-}" = 1 ]; then printf '0123456789abcdef'; exit 0; fi
-if [ "$*" = '--profile glen-harness models cursor --json' ]; then
+if [ "$*" = '--profile glen-harness-codex models openai-codex --json' ]; then
   database="$FAKE_OMP_TEST_HOME/${PI_CONFIG_DIR:-.omp}/agent/${FAKE_OMP_DB_FILE:-agent.db}"
   case "$FAKE_OMP_DB_CHANGE" in
     size | appear) printf 'database grew\n' >> "$database" ;;
@@ -450,7 +430,7 @@ for change in size appear disappear mtime content; do
     touch -t 200001010000 "$database"
   fi
   export FAKE_OMP_DB_CHANGE="$change"
-  PATH="$WORK/db-bin:$PATH" setup_run "$SETUP" --check
+  PATH="$WORK/db-bin:$PATH" setup_run "$SETUP" --engine omp:codex --check
   case "$change" in
     size | appear | disappear)
       assert_exit "default fingerprint agent.db $change change fails" 1
@@ -492,7 +472,7 @@ for sidecar in agent.db-wal agent.db-shm; do
       printf 'database fixture\n' > "$TEST_ROOT/agent/$sidecar"
     fi
     export FAKE_OMP_DB_FILE="$sidecar" FAKE_OMP_DB_CHANGE="$change"
-    PATH="$WORK/db-bin:$PATH" setup_run "$SETUP" --check
+    PATH="$WORK/db-bin:$PATH" setup_run "$SETUP" --engine omp:codex --check
     assert_exit "default fingerprint $sidecar $change change fails" 1
     assert_contains "default fingerprint detects $sidecar $change" 'default-profile fingerprint changed: agent.db' "$STDERR"
     assert "$sidecar $change leaves main database unchanged" cmp -s "$database" "$CASE_DIR/database-before"
@@ -530,7 +510,7 @@ for mcp_case in extra-server extra-key literal-token edited-default edited-heade
       jq '.mcpServers.mnemosyne.headers.Authorization = "Token ${MNEMOSYNE_TOKEN}"' "$REPO_ROOT/.claude/omp/mcp.json" > "$TEST_AGENT/mcp.json" ;;
   esac
   cp "$TEST_AGENT/mcp.json" "$CASE_DIR/mcp-before"
-  setup_run "$SETUP"
+  setup_run "$SETUP" --engine omp:codex
   assert_exit "owner mcp.json with $mcp_case is a conflict" 1
   assert_contains "owner mcp.json $mcp_case conflict names the file" "Conflict at $TEST_AGENT/mcp.json" "$STDERR"
   assert_contains "owner mcp.json $mcp_case conflict gives the reason" 'not a managed template version' "$STDERR"
@@ -545,7 +525,7 @@ new_fixture
 ready_assets
 run env HOME="$TEST_HOME" TMPDIR="$CASE_DIR/tmp" PI_CONFIG_DIR="$TEST_CONFIG_DIR" \
   XDG_DATA_HOME="$CASE_DIR/xdg-data" XDG_STATE_HOME="$CASE_DIR/xdg-state" XDG_CACHE_HOME="$CASE_DIR/xdg-cache" \
-  PI_NATIVES_DIR="$CASE_DIR/custom-natives" GLEN_BIN="$WORK/bin/glen" /bin/bash "$SETUP" --dry-run
+  PI_NATIVES_DIR="$CASE_DIR/custom-natives" GLEN_BIN="$WORK/bin/glen" /bin/bash "$SETUP" --engine omp:codex --dry-run
 assert_exit 'setup with a caller PI_NATIVES_DIR override succeeds' 0
 assert 'setup warms the default native cache despite the override' test -f "$TEST_HOME/.omp/natives/prewarmed"
 assert 'setup never fills the override native cache' test ! -e "$CASE_DIR/custom-natives"
@@ -575,7 +555,7 @@ engine_fixture glen-harness-codex openai-codex
 setup_run "$SETUP" --engine omp:codex
 assert_exit 'codex engine setup succeeds' 0
 assert 'codex default model comes from routing.json with its effort' jq -e '.modelRoles.default == "openai-codex/gpt-6.1-sol:high"' "$FAKE_OMP_STATE/settings.json"
-assert 'codex setup keeps the other model roles' jq -e '.modelRoles.task == "cursor/task-model"' "$FAKE_OMP_STATE/settings.json"
+assert 'codex setup keeps the other model roles' jq -e '.modelRoles.task == "openai-codex/task-model"' "$FAKE_OMP_STATE/settings.json"
 assert 'codex setup makes only codex-profile omp calls' scoped_to glen-harness-codex
 assert 'codex setup queried the codex catalog' jq -es 'any(.[]; .argv == ["--profile","glen-harness-codex","models","openai-codex","--json"])' "$FAKE_OMP_LAUNCH_LOG"
 assert 'codex setup pins no retry settings' jq -e '.["retry.maxRetries"] == 10 and .["retry.maxDelayMs"] == 300000' "$FAKE_OMP_STATE/settings.json"
@@ -618,11 +598,15 @@ assert_exit 'a model missing from the catalog fails' 1
 assert_contains 'the failure names the model' 'model opencode-go/gemini-4-argon is not listed' "$STDERR"
 
 engine_fixture glen-harness-codex openai-codex
-setup_run "$SETUP" --engine omp:cursor
+setup_run "$SETUP" --engine omp:unknown
 assert_exit 'an unknown engine is refused' 1
 setup_run "$SETUP" --engine omp:codex --model openai-codex/gpt-6.1-terra
-assert_exit '--model with --engine is refused' 1
-assert_contains 'the refusal says why' 'engine models come from routing.json' "$STDERR"
+assert_exit '--model is no longer an option' 1
+assert_contains 'the refusal names the flag' 'Unknown arg: --model' "$STDERR"
+setup_run "$SETUP" --dry-run
+assert_exit 'setup without --engine is refused' 1
+assert_contains 'the refusal says an engine is required' '--engine omp:codex, omp:opencode or all is required' "$STDERR"
+assert 'a refused setup makes no omp call' test ! -s "$FAKE_OMP_LOG"
 setup_run "$SETUP" --engine
 assert_exit '--engine without a value is refused' 1
 

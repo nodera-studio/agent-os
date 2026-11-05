@@ -33,8 +33,9 @@ expect() {
   expect deny  'omp --profile glen-harness-probe models'
   expect deny  'PI_PROFILE=x omp models'
   expect deny  'mkdir -p ~/.omp/profiles/foo'
-  expect allow 'omp --profile glen-harness models'
-  expect allow 'omp --profile=glen-harness models'
+  expect deny  'omp --profile glen-harness models'
+  expect deny  'omp --profile=glen-harness models'
+  expect allow 'omp --profile glen-harness-codex models'
   expect allow 'HOME="$T" omp --version'
   expect allow 'ls ~/.omp/profiles'
   # beyond the plan's list
@@ -43,8 +44,8 @@ expect() {
   expect deny  'HOME=/tmp/x OMP_PROFILE=other omp models'
   expect deny  'export OMP_PROFILE=other && omp models'
   expect deny  'cp -R ~/.omp/profiles/glen-harness ~/.omp/profiles/glen-harness-2'
-  expect allow 'OMP_PROFILE=glen-harness omp models'
-  expect allow 'mkdir -p ~/.omp/profiles/glen-harness/agent'
+  expect deny  'OMP_PROFILE=glen-harness omp models'
+  expect deny  'mkdir -p ~/.omp/profiles/glen-harness/agent'
   expect allow 'omp --version'
   # wrappers, subshells and sh -c (review LOW-001)
   expect deny  'timeout 30 omp --profile other models'
@@ -53,8 +54,8 @@ expect() {
   expect deny  '(omp --profile other models)'
   expect deny  "sh -c 'omp --profile other models'"
   expect deny  'nice -n 5 /usr/local/bin/omp --profile=other models'
-  expect allow 'timeout 30 omp --profile glen-harness models'
-  expect allow '(omp --profile glen-harness models)'
+  expect allow 'timeout 30 omp --profile glen-harness-codex models'
+  expect allow '(omp --profile glen-harness-opencode models)'
   expect allow 'HOME="$T" timeout 30 omp models'
   # only the real home's profiles (review LOW-002)
   expect allow 'mkdir -p "$T/.omp/profiles/fixture"'
@@ -84,7 +85,7 @@ cp "$HOOK" "$FALLBACK_DIR/hooks/steer-bash.sh"
 HOOK_UNDER_TEST="$FALLBACK_DIR/hooks/steer-bash.sh"
 expect allow 'omp --profile glen-harness-codex models'
 expect allow 'omp --profile glen-harness-opencode models'
-expect allow 'omp --profile glen-harness models'
+expect deny  'omp --profile glen-harness models'
 expect deny  'omp --profile glen-harness-evil models'
 expect deny  'omp --profile glen-harness-probe models'
 expect deny  'mkdir -p ~/.omp/profiles/glen-harness-evil'

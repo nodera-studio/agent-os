@@ -12,11 +12,12 @@ export HOME="$REAL_HOME"
 [ -n "${OMP_SANDBOX_RUN_ROOT:-}" ] || die 'OMP_SANDBOX_RUN_ROOT is required'
 RUN_ROOT_REAL="$(cd "$OMP_SANDBOX_RUN_ROOT" && pwd -P)" || die 'could not resolve run root'
 RUN_CWD="$(pwd -P)" || die 'could not resolve working directory'
-PROFILE_AGENT_DIR="$(cd "${OMP_PROFILE_AGENT_DIR:-$REAL_HOME/.omp/profiles/glen-harness/agent}" && pwd -P)" || die 'could not resolve profile agent directory'
+[ -n "${OMP_PROFILE_AGENT_DIR:-}" ] || die 'OMP_PROFILE_AGENT_DIR is required'
+PROFILE_AGENT_DIR="$(cd "$OMP_PROFILE_AGENT_DIR" && pwd -P)" || die 'could not resolve profile agent directory'
 PROFILE_ROOT="$(cd "$PROFILE_AGENT_DIR/.." && pwd -P)" || die 'could not resolve profile root'
 # Exact names, as in omp-sandboxed.sh and omp/profiles.sh.
 case "${PROFILE_ROOT##*/}" in
-  glen-harness | glen-harness-codex | glen-harness-opencode) ;;
+  glen-harness-codex | glen-harness-opencode) ;;
   *) die "profile name is not on the allowlist: ${PROFILE_ROOT##*/}" ;;
 esac
 
@@ -40,7 +41,7 @@ done
 
 # bwrap starts with an empty root, not a bind of the host root or HOME. A private
 # PID namespace keeps /proc from exposing host processes' root/fd references.
-# Network stays in the host namespace by default for Cursor's API and DNS.
+# Network stays in the host namespace by default for the provider API and DNS.
 # Flags: https://github.com/containers/bubblewrap/blob/main/bwrap.xml
 binds=(--unshare-user --unshare-pid --die-with-parent --new-session)
 # Dynamic linker, libraries, system binaries, and framework/data equivalents.
