@@ -141,10 +141,10 @@ while IFS= read -r seg || [ -n "$seg" ]; do
         deny "Don't curl Cloudflare's API — use the wrangler CLI (deploy / R2 / D1 writes, headless) or the Cloudflare MCP (read-only account queries). See the cloudflare:wrangler skill and rules/object-lock.md."
       fi
       if printf '%s' "$seg" | grep -qiE 'https?://([a-z0-9.-]+\.)?sentry\.io([:/ ]|$|"|'"'"')'; then
-        deny "Don't curl Sentry's API — use sentry-cli (releases / sourcemaps) or the Sentry MCP (issue lookup / Seer). See the /sentry-cli skill."
+        deny "Don't curl Sentry's API — use sentry-cli (releases / sourcemaps) or the Sentry MCP (issue lookup / Seer)."
       fi
       if printf '%s' "$seg" | grep -qiE 'https?://([a-z0-9.-]+\.)?linear\.app([:/ ]|$|"|'"'"')'; then
-        deny "Don't curl Linear's API — use the Linear connector (mcp__*Linear* tools). See the /linear skill."
+        deny "Don't curl Linear's API — use the Linear connector (mcp__*Linear* tools)."
       fi
       # Loopback stays allowed. External http(s) fetches are denied: route web
       # CONTENT to the Exa MCP, and known APIs to their SDK/CLI — WebFetch is
