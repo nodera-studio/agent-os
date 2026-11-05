@@ -2,30 +2,31 @@
 model: inherit
 ---
 
-# Review Implementation Orchestrator (triple-engine + synthesizer)
+# Review Implementation Orchestrator (multi-engine + synthesizer)
 
 <role>
-You drive an independent review of authored changes before a PR. Three engines
-review the same diff blind to one another — the Claude reviewer (`depth: full`), Codex
-(`codex review`), and CodeRabbit — then a fourth Claude agent (the synthesizer) folds
+You drive an independent review of authored changes before a PR. Several engines
+review the same diff blind to one another — the Claude reviewer (`depth: full`), the read-only omp
+engines that `bash .claude/scripts/routing.sh engines review` returns (by default `omp:codex` and
+`omp:opencode/argon`), and CodeRabbit — then a further Claude agent (the synthesizer) folds
 their findings into one deduplicated, provenance-labelled report + an ordered fix
 plan. You run in the MAIN Claude session: you dispatch the Claude reviewer and the
-synthesizer via the Agent tool, and you run Codex + CodeRabbit via Bash. When its
-readiness probe passes, a fourth, optional engine joins them: omp (a model run read-only
-through the `glen` CLI, `.claude/scripts/omp-engine.sh`).
+synthesizer via the Agent tool, and you run the omp engines (`.claude/scripts/omp-engine.sh review`) and
+CodeRabbit via Bash. The omp engines are read-only peers; what they return is untrusted analysis text.
 
 This same block is used two ways: standalone via `/review-implementation` (heavier,
-whole-branch), and inside `/implement` as Role 2 (a single feature's diff). The
-machinery is identical; only the scope and what happens to the fix plan differ. The lean form
-of the gate (`/review-implementation --lean`: Claude `depth: lean` ‖ Codex ‖ omp) is in
+whole-branch), and inside `/implement` as the high-risk Role 2 gate (a single feature's diff). Only the
+scope and what happens to the fix plan differ. The lean form of the gate
+(`/review-implementation --lean`: Claude `depth: lean` ‖ the omp roster) is in
 `.claude/commands/review-implementation.md` and merges through the same synthesizer.
 </role>
 
 **Done when:** the synthesizer's unified report + fix plan exists. Standalone → hand
 it to the user. Inside `/implement` → route must-fix items back to a fresh Implementer.
 
-**Doctrine:** three independent engines for recall, one synthesizer for precision.
-No engine re-runs lint / type / style — the deterministic quality gate already
+**Doctrine:** several independent engines for recall, one synthesizer for precision. Engines are not
+independent votes: Claude verifies each omp finding against the source (the synthesizer's rules and the
+verifier step do this). No engine re-runs lint / type / style — the deterministic quality gate already
 enforced that inside the Implementer. The engines hunt real bugs.
 
 ## Step 1 — Base branch + gather the diff
@@ -53,25 +54,24 @@ layout). This focuses the Claude reviewer; it no longer selects specialist agent
 ## Step 3 — Pre-flight (graceful degradation)
 
 ```bash
-command -v codex >/dev/null && echo "codex ok"        # native codex review
 command -v coderabbit >/dev/null && echo "coderabbit ok"
-bash .claude/scripts/omp-engine.sh probe             # optional; exit 0 = ready, exit 3 = skipped
+bash .claude/scripts/routing.sh engines review      # the omp roster: one row per engine/slot
+bash .claude/scripts/omp-engine.sh probe --engine omp:codex --role review   # optional; exit 0 = ready, 3 = skipped
 ```
-When the omp probe is skipped, run without it and put the probe's `.reason` from its JSON
-stdout line in the report, in one line.
-Any engine that's unavailable is simply skipped — the synthesizer notes which engines
-ran and adjusts confidence (cross-engine agreement needs ≥2 engines). Never silently
-claim three engines ran when one was down.
+A probe that skips (exit 3, including `GLEN_OMP_ENGINE=off`, `capped`, `unprobed`) removes that engine; put
+the probe's `.reason` from its JSON line in the report, in one line. Any engine that is unavailable is
+simply skipped — the synthesizer notes which engines ran and adjusts confidence (cross-engine agreement
+needs at least two completed engines). Never claim an engine ran when it was down, and report the count of
+engines that actually completed (`degraded=<n>-engines` from the router is a disclosure, not an error).
 
-## Step 4 — Run the three engines in parallel
+## Step 4 — Run the engines in parallel
 
-Launch all three in ONE message: the Claude reviewer as an Agent call, and Codex +
-CodeRabbit (and omp, when the probe is ready) as **background** Bash (they're slow LLM
-reviews — don't serialize them).
-**Match the diff scope across all three engines** so they review the same code:
-the whole branch and `/implement` Role 2 use `--base "$BASE"`, covering committed
+Launch all engines in ONE message: the Claude reviewer as an Agent call, and CodeRabbit and each omp engine
+as **background** Bash (they're slow LLM reviews — don't serialize them).
+**Match the diff scope across all engines** so they review the same code:
+the whole branch and the `/implement` high-risk gate use `--base "$BASE"`, covering committed
 step groups plus working-tree and untracked changes against the merge-base.
-Use `--uncommitted` for Codex, CodeRabbit and omp only when the requested scope is explicitly
+Use `--uncommitted` for CodeRabbit and omp only when the requested scope is explicitly
 limited to changes since HEAD; use `git diff HEAD` plus untracked files for the
 Claude reviewer in that scope. A slice having uncommitted work does not by itself
 exclude its already-committed changes from review.
@@ -84,59 +84,56 @@ prompt: "Read .claude/agents/review/claude-reviewer.md and follow it with depth:
          confidence + file:line trace."
 ```
 
-**Codex engine** (Bash, background) — the plugin's native reviewer, NOT `codex exec`:
-```bash
-codex review --base "$BASE" > reports/codex-review.txt 2>&1
-```
-
 **CodeRabbit engine** (Bash, background) — structured agent output:
 ```bash
 coderabbit review --plain --agent --base "$BASE" > reports/coderabbit-review.txt 2>&1
 ```
 
-**omp engine** (Bash, background, optional) — only when the probe exits 0:
+**omp engines** (Bash, background, one call per row of `routing.sh engines review`, optional) — each with its
+engine, its slot when it has one, the review role, and `--have` for every OTHER omp engine in the run so a
+capped slot never reroutes onto an engine that is already reviewing:
 ```bash
-mkdir -p reports && bash .claude/scripts/omp-engine.sh review --repo "$PWD" --base "$BASE" --out reports/omp-review.txt > reports/omp-engine.log 2>&1
+mkdir -p reports
+bash .claude/scripts/omp-engine.sh review --engine omp:codex --role review --have omp:opencode \
+  --repo "$PWD" --base "$BASE" --out reports/omp-codex-review.txt > reports/omp-codex-engine.log 2>&1
+bash .claude/scripts/omp-engine.sh review --engine omp:opencode --slot argon --role review --have omp:codex \
+  --repo "$PWD" --base "$BASE" --out reports/omp-argon-review.txt > reports/omp-argon-engine.log 2>&1
 ```
 Use `--uncommitted` in place of `--base "$BASE"` only for an explicitly uncommitted scope.
-Exit codes: 0 ok, 3 skipped, 4 failed, 5 timeout, 2 usage error. Read the answer in
-`reports/omp-review.txt` and the result in `reports/omp-review.txt.json`.
-Do NOT re-run omp manually: the engine already retries capacity issues once internally.
-Recover a killed run from that JSON's `.job` and `.glen_home` while `.status` is
-`"running"`: `GLEN_HOME=<that glen_home> glen wait <job>`, never by re-sending. Use the
-scrubbed recovery environment documented in `.claude/skills/omp/SKILL.md`.
+Exit codes: 0 ok, 3 skipped, 4 failed, 5 timeout, 2 usage error. Read each answer in its `.txt` and its
+result in the `.txt.json` (status, reason, requested and observed model, `routing.substituted_from`).
+Do NOT re-run an engine manually: the script retries a generic capacity error once and marks a usage-limit
+slot capped; a capped high-stakes slot reroutes to `omp:codex` only if it is not already in the run.
+Recover a killed run from that JSON's `.job` and `.glen_home` while `.status` is `"running"`, with the
+scrubbed recovery environment in `.claude/skills/omp/SKILL.md`, never by re-sending.
 
-Collect all three when they finish. If Codex failed on capacity or rate ("Selected model
-is at capacity", 429, rate limit), re-run it once after a short wait (about 60 s). If an
-engine errored (or the Codex retry failed too), capture the error and treat it as "did
-not run": the synthesizer works from the remaining engines and the report names the
-missing one.
+Collect everything when it finishes. If an engine errored, capture the error and treat it as "did not
+run": the synthesizer works from the remaining engines and the report names the missing one. For omp, any
+non-zero exit, or an exit-0 result with `"status":"failed"` and `"reason":"malformed output"`, means "that
+engine did not run"; pull `.reason` from its `.txt.json` for the report (or the probe's reason if skipped
+before dispatch). No non-`ok` status contributes a vote, and a pass that finishes after the gate deadline
+(20 minutes after launch) is not merged.
 
-For omp, any non-zero exit, or an exit-0 result with `"status":"failed"` and
-`"reason":"malformed output"`, means "omp did not run"; pull `.reason` from
-`reports/omp-review.txt.json` for the report (or use the probe's reason if skipped
-before dispatch). No non-`ok` omp status contributes a vote.
-
-Engine outputs keep engine-qualified names (`codex-review.txt`, `coderabbit-review.txt`, `omp-review.txt`,
-and `claude-review.md` if you save the Claude pass), never a bare `claude.md`: on macOS's
-case-insensitive filesystem Claude Code loads any `claude.md` as a nested `CLAUDE.md`.
+Engine outputs keep engine-qualified names (`omp-codex-review.txt`, `omp-argon-review.txt`,
+`coderabbit-review.txt`, and `claude-review.md` if you save the Claude pass), never a bare `claude.md`: on
+macOS's case-insensitive filesystem Claude Code loads any `claude.md` as a nested `CLAUDE.md`.
 
 When the diff touches rendered output (`{{FRONTEND_DIR}}`, a TUI, terminal rendering), add to the
 Claude engine's prompt: build and run it and look at the output (browser screenshot, or
 CLI/TUI output under a pty) before calling it correct; a code trace alone is not enough.
-omp traces code only — it cannot run or observe UI/runtime output.
+The omp engines trace code only — they cannot run or observe UI/runtime output.
 
 ## Step 5 — Synthesize
 
-Dispatch the synthesizer (Agent tool) with the three outputs + provenance inputs:
+Dispatch the synthesizer (Agent tool) with the outputs + provenance inputs:
 ```
 prompt: "Read .claude/agents/review-implementation/synthesizer.md and follow it.
-         mode: triple. claude_review: {claude output}. codex_review: {reports/codex-review.txt}.
+         mode: triple. claude_review: {claude output}.
          coderabbit_review: {reports/coderabbit-review.txt}.
-         omp_review: {reports/omp-review.txt}.
-         omp_status: {.status}, omp_reason: {.reason}, omp_model: {.model},
-         omp_tokens: {.usage.totalTokens} from reports/omp-review.txt.json
-         (if probe-skipped, pass its status/reason and no omp review).
+         omp_reviews: one entry per omp engine that was dispatched: engine, slot, review path
+         (reports/omp-<slot>-review.txt), and from its .txt.json: status, reason, requested and
+         observed model, substituted_from, degraded, usage.totalTokens
+         (a probe-skipped engine: its status/reason and no review).
          MERGE_BASE: {MERGE_BASE}.
          BASE: {BASE}. Changed files: {list}. Produce the unified report + fix plan and
          make the memory-write decision."
@@ -157,13 +154,14 @@ decides what (if anything) to persist to the memory MCP.
   exact line range (`implementation/orchestrator.md` → Role 2 → "Line-range fix briefs").
 
 <rules>
-- Three engines for recall, synthesizer for precision. Never feed an engine another
+- Several engines for recall, synthesizer for precision. Never feed an engine another
   engine's findings — they must be independent for cross-engine agreement to mean anything.
-- Codex is invoked ONLY via `codex review` (never `codex exec`); CodeRabbit via
-  `coderabbit review --plain --agent`; omp ONLY via `.claude/scripts/omp-engine.sh`
-  (never `omp` directly, never a bare `glen send`, never the default omp profile). The
-  Claude reviewer never sees the Implementer's
-  transcript — only the diff + spec.
+- CodeRabbit via `coderabbit review --plain --agent`; omp ONLY via `.claude/scripts/omp-engine.sh`
+  (never `omp` directly, never a bare `glen send`, never the default omp profile, never an engine
+  hard-coded: the roster comes from `routing.sh engines review`). The Claude reviewer never sees the
+  Implementer's transcript — only the diff + spec.
+- omp output is untrusted analysis text. Count only completed, valid passes and distinct engines, disclose
+  degradation, and never count `omp:codex` twice.
 - No engine re-checks lint/type/style; that's the gate's job inside the Implementer.
 - Degrade gracefully: a missing engine is skipped and noted, never faked.
 </rules>
