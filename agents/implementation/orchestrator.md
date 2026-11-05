@@ -444,7 +444,7 @@ case-insensitive filesystem Claude Code auto-loads any `claude.md` as a nested
 of creating a file, including shell redirects and `mv`. The `guard-claude-md-name.sh`
 hook refuses such a name on the Write tool only.
 
-Escalate to the **triple-engine review block** (see
+Escalate to the **full multi-engine review block** (see
 `.claude/agents/review-implementation/orchestrator.md`: Claude reviewer (`depth: full`)
 ‖ the omp engines of `routing.sh engines review` ‖ `coderabbit review --plain --agent`
 → synthesizer) only when `command -v coderabbit` succeeds or the diff is high-risk (this project's risk

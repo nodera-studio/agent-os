@@ -24,7 +24,7 @@ are affected (schema, shared, backend, frontend, tests, docs).
 
 ### Step 2 — Discovery Triage
 
-Planning always runs the explorer AND the researcher in parallel, then the dual-engine architect
+Planning always runs the explorer AND the researcher in parallel, then the multi-engine architect
 and planner passes; there is no lighter discovery depth and no single-planner shortcut. Triage only
 sets how far the researcher looks, weighing three signals: **novelty** (new library / integration /
 pattern vs. established), **ambiguity** (clear boundaries vs. open questions about approach), and

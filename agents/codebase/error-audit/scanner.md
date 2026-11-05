@@ -250,7 +250,7 @@ brief note identifying the handler, and move to the next path:
   feedback via a toast or an error state.
 
 If you are UNCERTAIN whether the handling is complete, report it as a LOW-confidence finding —
-the dual-engine voting filters downstream, so your job here is coverage, not selectivity.
+the multi-engine voting filters downstream, so your job here is coverage, not selectivity.
 Typical uncertainty: scope=backend: a missing log, a generic message, an inconsistent status
 code; scope=frontend: a generic global fallback message, unclear toast copy, inconsistent
 behavior.

@@ -213,12 +213,12 @@ caps_mark() { HARNESS_ROUTING_DIR="$RDIR" /bin/bash "$CAPS_SH" mark "$@" >/dev/n
 calls() { jq -rs "$1" "$STATE/calls.jsonl"; }
 result() { jq -r "$1" "$STDOUT"; }
 
-# E1: omp:codex review, provenance and the overlay.
+# E1: omp:codex engine run, provenance and the overlay.
 engine_case codex-ok
 step send 0 "$(envelope completed j0000001)"
 edispatch --engine omp:codex --role review
-assert_exit 'codex review exits 0' 0
-assert_eq 'codex review status' "$(result .status)" ok
+assert_exit 'omp:codex run exits 0' 0
+assert_eq 'omp:codex run status' "$(result .status)" ok
 assert_eq 'result carries the engine id' "$(result .engine)" omp:codex
 assert_eq 'result carries the profile' "$(result .profile)" glen-harness-codex
 assert_eq 'result carries the slot' "$(result .slot)" codex

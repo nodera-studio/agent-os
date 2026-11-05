@@ -32,7 +32,7 @@ engine or a model in a brief or a script: ask `routing.sh`, then pass the role t
 | Role | Used for |
 | --- | --- |
 | `review` | the second and third engine of `/review-implementation` and its `--lean` gate |
-| `planning`, `architect` | the second engine of the dual-engine planner and architect (`/plan-implementation`) |
+| `planning`, `architect` | the second engine of the multi-engine planner and architect (`/plan-implementation`) |
 | `debug` | the `/deep-debug` investigator pair |
 | `security`, `audits` | the security and audit orchestrators |
 | `explore`, `research`, `verify`, `docs` | exploration, research, finding verification, docs passes |
@@ -43,7 +43,7 @@ otherwise. Who implements follows `routing.sh implementation`, not this skill.
 
 ## When to use
 
-- **Second opinion / dual-engine review** — you want a different model to look at the same diff,
+- **Second opinion / multi-engine review** — you want a different model to look at the same diff,
   design, or root-cause hypothesis.
 - **Stuck on a hard bug** — Claude has tried 2+ approaches and isn't converging.
 - **Parallel passes** — an orchestrator needs another engine alongside the Claude passes.

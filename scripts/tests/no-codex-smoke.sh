@@ -32,6 +32,30 @@ coder-$C
 RETIRED_FILE="$TMP/retired.txt"
 printf '%s\n' "$RETIRED" | tr -d '\r' >"$RETIRED_FILE"
 
+# The intentional mentions in the real tree. Each entry is `path|reason`; a path ending in / allows the whole
+# directory. Everything else that holds a retired string is a failure under --strict. Pack payloads under
+# packs/ are excluded separately, and this file is excluded by name.
+ALLOW='hooks/block-legacy-engines.sh|the hook that DENIES `codex exec`; the string is its match target
+hooks/README.md|documents that hook and what it denies
+scripts/tests/hooks-smoke.sh|the hook smoke feeds `codex exec` and the companion name to the deny/allow cases
+scripts/tests/retired-refs-smoke.sh|the retired-name list of the reference check
+scripts/close-run.sh|calls the codex pack'"'"'s orphan sweep only when the pack installed that script (guarded by a file check)
+scripts/remove-worktree.sh|refuses on live native-Codex jobs and prints the companion cancel hint, only when the codex pack is installed
+scripts/README.md|rows for the two scripts the codex pack ships and core scripts source optionally'
+ALLOW_FILE="$TMP/allow.txt"
+printf '%s\n' "$ALLOW" | cut -d'|' -f1 >"$ALLOW_FILE"
+# allowed_filter: drop grep -n output lines (./path:N:text) whose path is allow-listed.
+allowed_filter() {
+  local line path keep a
+  while IFS= read -r line; do
+    path="${line#./}"; path="${path%%:*}"; keep=1
+    while IFS= read -r a; do
+      case "$a" in */) case "$path" in "$a"*) keep=0 ;; esac ;; *) [ "$path" = "$a" ] && keep=0 ;; esac
+    done <"$ALLOW_FILE"
+    [ "$keep" = 1 ] && printf '%s\n' "$line"
+  done
+}
+
 # retired_hits <root>: lines holding a retired string, outside .git, packs/ and this file.
 retired_hits() {
   (cd "$1" && grep -rInF -f "$RETIRED_FILE" --exclude-dir=.git --exclude-dir=packs --exclude-dir=node_modules \
@@ -65,16 +89,24 @@ printf '%s\n' "$HITS" | grep -qF '.git' && fail 'counter ignores .git' "$HITS" |
 printf '%s\n' "$HITS" | grep -qF 'allowed.md' && fail 'allowed names are not retired strings' "$HITS" || ok 'allowed names are not retired strings'
 n="$(broad_count "$F")"
 [ "$n" -eq 5 ] && ok "broad count ignores allowed names and packs (5)" || fail 'broad count ignores allowed names and packs' "got $n, want 5"
+mkdir -p "$F/hooks"
+printf 'deny %s exec here\n' "$C" >"$F/hooks/block-legacy-engines.sh"
+AL="$(retired_hits "$F" | allowed_filter)"
+printf '%s\n' "$AL" | grep -qF 'block-legacy-engines' && fail 'allow-list drops an allow-listed file' "$AL" || ok 'allow-list drops an allow-listed file'
+printf '%s\n' "$AL" | grep -qF 'agents/a.md' && ok 'allow-list keeps other files' || fail 'allow-list keeps other files' "$AL"
 mkdir -p "$TMP/clean"
 printf 'nothing here, only omp:%s\n' "$C" >"$TMP/clean/x.md"
 [ -z "$(retired_hits "$TMP/clean")" ] && [ "$(broad_count "$TMP/clean")" -eq 0 ] && ok 'a clean tree counts zero' || fail 'a clean tree counts zero'
 
-# Part 2: the real tree.
-REAL="$(retired_hits "$ROOT" | wc -l | tr -d ' ')"
+# Part 2: the real tree, minus the allow-listed files above.
+ALLOWED_N="$(retired_hits "$ROOT" | wc -l | tr -d ' ')"
+REAL_HITS="$(retired_hits "$ROOT" | allowed_filter)"
+REAL="$(printf '%s' "$REAL_HITS" | grep -c . || true)"
+echo "info $((ALLOWED_N - REAL)) allow-listed line(s) in $(wc -l <"$ALLOW_FILE" | tr -d ' ') file(s) or dirs (reasons in this file)"
 BROAD="$(broad_count "$ROOT")"
 echo "info retired Codex strings outside packs/: $REAL line(s); lines mentioning 'codex' beyond the allowed names: $BROAD"
 if [ "$REAL" -gt 0 ]; then
-  retired_hits "$ROOT" | cut -d: -f1 | sort | uniq -c | sort -rn | head -n 8 | sed 's/^/info   /'
+  printf '%s\n' "$REAL_HITS" | cut -d: -f1 | sort | uniq -c | sort -rn | head -n 8 | sed 's/^/info   /'
   if [ "$STRICT" = 1 ]; then
     fail 'real tree is codex-free' "$REAL line(s)"
   else

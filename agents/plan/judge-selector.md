@@ -1,6 +1,6 @@
 ---
 name: plan-judge-selector
-description: Selects the stronger of two independently-generated architecture reports and grafts separable improvements — the select-then-graft step of the dual-engine architect
+description: Selects the stronger of two independently-generated architecture reports and grafts separable improvements — the select-then-graft step of the multi-engine architect
 model: inherit
 effort: xhigh
 color: yellow
