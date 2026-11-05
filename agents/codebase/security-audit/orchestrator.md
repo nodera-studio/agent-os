@@ -59,7 +59,7 @@ Dispatch each agent below in ONE message, all handed the cartographer's map:
   ```bash
   bash .claude/scripts/omp-engine.sh ask --engine omp:opencode --slot argon --role security --brief "$BRIEF" --out "$OUT_ARGON" --repo "$PWD" --deadline 20m
   for i in 1 2 3; do   # flash: 2-3 independent runs; no forced tool_choice on the Go models
-    bash .claude/scripts/omp-engine.sh ask --engine omp:opencode --slot flash --role security --brief "$BRIEF" --out "$OUT_FLASH_$i" --repo "$PWD" --deadline 20m
+    bash .claude/scripts/omp-engine.sh ask --engine omp:opencode --slot flash --role security --brief "$BRIEF" --out "${OUT_FLASH}_$i" --repo "$PWD" --deadline 20m
   done
   ```
 
