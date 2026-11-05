@@ -32,15 +32,15 @@ flowchart LR
    when `routing.sh ui` names it: same fused loop with the frontend's build/test commands,
    the frontend-design skill, and a required browser check against the named design
    reference.
-3. **Review (fresh context)** — by default the lean gate (`/review-implementation --lean`): a Claude pass ‖ a
-   Codex pass ‖ the optional omp pass (via the `glen` CLI, when `omp-engine.sh probe` is
-   ready), merged by the synthesizer's 2-vote consensus (omp-only findings are advisory until verified; omp
-   plus one other engine is two votes; a skipped probe is recorded with its reason, and
-   Claude ‖ Codex still run). A high-risk diff, or one where CodeRabbit is installed, runs the
-   triple-engine review instead: Claude comprehensive reviewer ‖ `codex review` ‖ CodeRabbit
-   (plus omp when ready), each blind to the others, folded by the Claude
-   **synthesizer** into one dedup'd, provenance-labelled report + ordered fix plan (the
-   `/review-implementation` machinery). Neither ever sees the Implementer's transcript.
+3. **Review (fresh context)** — by default the lean gate (`/review-implementation --lean`): a Claude pass ‖ one
+   read-only omp pass per engine that `routing.sh engines review` returns (`omp-engine.sh review`), merged by
+   the synthesizer's 2-vote consensus (an omp-only finding is advisory until a verifier confirms it against
+   the code; only completed, valid passes and distinct engines count; a skipped or capped engine is recorded
+   with its reason and the gate says how many engines ran). A high-risk diff, or one where CodeRabbit is
+   installed, runs the full review instead: Claude comprehensive reviewer ‖ the omp roster ‖ CodeRabbit,
+   each blind to the others, folded by the Claude **synthesizer** into one dedup'd, provenance-labelled
+   report + ordered fix plan (the `/review-implementation` machinery). Neither ever sees the Implementer's
+   transcript.
 4. **parallel tail** — once Review is green: **docs-updater** updates docs from the
    landed code, ‖ **conformance-test-writer** runs the author-blind, plan-derived
    conformance gate (the anti-reward-hacking check).
@@ -54,9 +54,9 @@ session never does. Two cases go elsewhere: design-heavy UI (`{{FRONTEND_DIR}}`,
 pages, visual components) goes to the agent `routing.sh ui` names, a Claude Opus Implementer
 (`orchestrator.md` → UI implementation routing; `coder-ui.md`); integrating two
 already-reviewed parallel waves goes to the engine `routing.sh integration` names, followed
-by the gate, tests and a scoped Claude ‖ Codex review (`orchestrator.md` → Role 1;
+by the gate, tests and a scoped Claude ‖ omp review (`orchestrator.md` → Role 1;
 `loop-procedures.md` → "Shared seams"). The fused write→wire→harden→test→gate→fix loop runs
-in **Claude** via `implementer.md`, the only writer (omp and Codex engines are
+in **Claude** via `implementer.md`, the only writer (the omp engines are
 read-only). The
 former per-concern agents (`coder.md`, `wiring.md`, `error-handling.md`,
 `test-writer.md`, `test-runner.md`, `verifier.md`, `code-simplifier.md`) were fused
@@ -73,9 +73,11 @@ handoff is `progress.md` + the plan's `<task>` XML, never a transcript.
 
 ## Engines
 
-Roles come from `.claude/routing.json` through `.claude/scripts/routing.sh`. By default
-Role 1 runs in Claude (`implementer.md`); no other engine writes product code. Codex is one engine of the Review gate
-(`codex review` / `codex:codex-rescue`, see `.claude/skills/second-engine/SKILL.md`). The planner,
-Review synthesizer, the parallel tail (docs-updater ‖ conformance-test-writer), and re-index
-are Claude subagents on the main-loop model (Fable 5, then Opus). Only the routed
+Roles come from `.claude/routing.json` through `.claude/scripts/routing.sh` (`routing.sh engines <role>` for
+the omp roster). By default Role 1 runs in Claude (`implementer.md`); no other engine writes product code.
+The omp engines (`omp:codex`, `omp:opencode`; see `.claude/skills/second-engine/SKILL.md`) join the Review
+gate and the Step 4.5 advisor gate as read-only peers whose output is untrusted analysis text. The
+planner, Review synthesizer, the parallel tail (docs-updater ‖ conformance-test-writer), and re-index are
+Claude subagents; the docs-updater runs on Claude Haiku 5.5 and writes the docs itself, and the
+conformance-test-writer stays on Claude (its blindness depends on a fresh context). Only the routed
 Implementer writes product code.
