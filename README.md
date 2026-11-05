@@ -197,11 +197,32 @@ produce the same quality bar; the difference is how much you want to watch.
 ```
 
 This copies `agents/ commands/ skills/ hooks/ rules/ docs/ scripts/ prompts/
-plugin/` plus the scaffold directories, `settings.json`, and
-`CLAUDE.md.template` into `<target>/.claude/`. It will **not** overwrite an
-existing `<target>/.claude/settings.json` or `<target>/.claude/CLAUDE.md` — if
-either already exists, `install.sh` prints a warning and skips it rather than
-clobbering project-specific customization.
+plugin/ omp/ templates/` plus the scaffold directories, `settings.json`,
+`routing.json` and `CLAUDE.md.template` into `<target>/.claude/`. It will **not**
+overwrite an existing `<target>/.claude/settings.json`, `routing.json` or
+`<target>/.claude/CLAUDE.md` — if one already exists, `install.sh` prints a notice and
+skips it rather than clobbering project-specific customization. Nothing is ever deleted.
+
+**Optional packs** (native Codex, copywrite, orchestrator, learned-rules, and more) are not part of
+the plain install:
+
+```bash
+./install.sh --list-packs [/path/to/target/project]          # name, install state, description
+./install.sh /path/to/target/project --pack codex --pack copywrite
+./install.sh /path/to/target/project --remove-pack codex     # removes only files unchanged since install
+```
+
+A pack records the hash of every file it installs in `<target>/.claude/packs.lock.json`, merges its hook
+entries into `settings.json` and its routing keys into `routing.json` (unset keys only), and reports a
+modified or unmanaged file as a `CONFLICT` instead of overwriting or deleting it (exit 3). Details:
+[`packs/README.md`](packs/README.md).
+
+**Adopting new routing defaults.** `routing.json` is seeded once, so a project installed earlier keeps its
+old review/planning/debug/audit values (and a pack's routing fragment only fills unset keys).
+`install.sh` prints a note when your file differs from the release default. To adopt the omp-engine
+defaults, copy `review`, `planning`, `debug`, `audits`, `omp_engines`, `omp_roles` and `omp_fallback` from this
+repo's `routing.json` into the project's, then run the owner setup in `docs/Claude-Code-Setup.md`. What moved
+where since the earlier layout: [`docs/CHANGELOG.md`](docs/CHANGELOG.md).
 
 ### Option B — load it as a plugin (no files copied)
 

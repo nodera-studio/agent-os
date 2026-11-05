@@ -10,6 +10,14 @@ the files a pack lists. `packs/` itself is not copied into the target.
 ./install.sh <target> --remove-pack NAME        # no plain install; removes only what the manifest says is unchanged
 ```
 
+## Core routing defaults and packs
+
+`routing.json` is seeded once by the plain install and is never overwritten, and a pack's `routing` fragment only
+fills keys that are unset. So neither a re-install nor a pack changes the review, planning, debug and audit
+roster of a project that already has a `routing.json`. To adopt a newer release's defaults, copy the changed keys
+by hand (see "Adopting new routing defaults" in the root README). The `codex` pack adds native Codex as an opt-in
+tool; it does not put Codex back into the default roster (`omp_fallback` stays empty).
+
 ## Layout
 
 ```text

@@ -41,7 +41,8 @@ scripts/tests/hooks-smoke.sh|the hook smoke feeds `codex exec` and the companion
 scripts/tests/retired-refs-smoke.sh|the retired-name list of the reference check
 scripts/close-run.sh|calls the codex pack'"'"'s orphan sweep only when the pack installed that script (guarded by a file check)
 scripts/remove-worktree.sh|refuses on live native-Codex jobs and prints the companion cancel hint, only when the codex pack is installed
-scripts/README.md|rows for the two scripts the codex pack ships and core scripts source optionally'
+scripts/README.md|rows for the two scripts the codex pack ships and core scripts source optionally
+docs/CHANGELOG.md|the migration summary names the retired Codex files so downstream users can find where they went'
 ALLOW_FILE="$TMP/allow.txt"
 printf '%s\n' "$ALLOW" | cut -d'|' -f1 >"$ALLOW_FILE"
 # allowed_filter: drop grep -n output lines (./path:N:text) whose path is allow-listed.
