@@ -27,7 +27,7 @@ flowchart LR
     subgraph DEEP["Stage 2 — Deep agents (share the cartographer's map)"]
         direction TB
         IDOR["access-control-idor.md<br/>dual-engine (Claude ‖ Codex)<br/>whole-app authz, IDOR, exposure"]
-        DOM["domain-integrity.md<br/>this project's own business-invariant<br/>audit (fill in per-project)"]
+        DOM["domain-integrity.md<br/>(only if configured from the template;<br/>skipped explicitly otherwise)"]
     end
 
     DEEP --> SYN["Stage 3 — Synthesizer<br/>demands evidence (exploit path / call<br/>chain / failing test) before a finding<br/>survives; maps to ASVS 5.0 L2"]

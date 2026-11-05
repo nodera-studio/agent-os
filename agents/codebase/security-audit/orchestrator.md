@@ -41,7 +41,7 @@ Agent tool:
   prompt: "Read .claude/agents/codebase/security-audit/audit-cartographer.md and follow it.
            Produce the app-intent map: every endpoint + its intended authz, the tenant key
            (if multi-tenant), this project's domain-critical calc/state-machine sites (see
-           domain-integrity.md), the PII surface, and the external-call (SSRF) surface."
+           the domain-integrity template, if configured), the PII surface, and the external-call (SSRF) surface."
 ```
 
 ## Stage 2 — Focused deep agents (dispatched in parallel after Stage 1)
@@ -51,16 +51,21 @@ Dispatch each agent below in ONE message, all handed the cartographer's map:
 - **`access-control-idor.md`** — DUAL-engine: dispatch the Claude agent AND a Codex pass
   (`codex:codex-rescue` for open-ended call-graph reasoning, or `codex review` on the
   relevant scope). Union-merge the candidate findings. Always runs.
-- **`domain-integrity.md`** — **wire up your own domain audit agent here.** This slot
-  is a template, not a ready-to-run agent — see that file for how to fill it in with
-  THIS project's actual business-invariant class (tenant isolation, financial-logic
-  correctness, a regulated state machine, whatever applies). Engine choice follows the
+- **`domain-integrity.md`** — the project's own domain audit agent, **only when it is
+  configured.** The shipped file is a template (`templates/security-domain-integrity.md`),
+  never an agent. Check before dispatching:
+
+  ```bash
+  f=.claude/agents/codebase/security-audit/domain-integrity.md
+  if [ -f "$f" ] && ! grep -q 'STUB TEMPLATE' "$f"; then echo configured; else echo unconfigured; fi
+  ```
+
+  `configured` → dispatch it with the cartographer's map. Engine choice follows the
   same rule as below: if the invariant is anchored to a deterministic generated + run
   test suite (the gold standard), single-engine suffices; otherwise dual-engine
-  (Claude ‖ Codex) adds real recall. Skip this stage entirely if `domain-integrity.md`
-  hasn't been filled in yet, or if this project genuinely has no dominant domain
-  invariant (see that file's last section) — note the skip in the report rather than
-  silently omitting it.
+  (Claude ‖ Codex) adds real recall. `unconfigured` → **skip the lens explicitly**: do
+  not dispatch a stub, and write "domain-integrity lens: skipped (not configured)" in
+  the report so the gap is visible. The template's own file explains how to fill it in.
 
 Codex is invoked only through the plugin (`codex:codex-rescue` / `codex review`), never
 `codex exec`. A `codex:codex-rescue` brief ends with

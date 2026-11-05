@@ -8,6 +8,12 @@ color: red
 
 # Domain Integrity (fill in for THIS project)
 
+> **Template, not an agent.** This file lives in `templates/` so it is never dispatched as shipped. To use it,
+> copy it to `.claude/agents/codebase/security-audit/domain-integrity.md`, replace everything below with the
+> real agent, and delete the marker line `STUB TEMPLATE` from the text. The security orchestrator dispatches
+> the lens only when that copy exists and no longer contains `STUB TEMPLATE`; otherwise it skips the lens
+> explicitly and says so in the report.
+
 <role>
 This file is a STUB TEMPLATE, not a ready-to-run agent. In the source project this
 suite was ported from, this slot held two domain-specific agents: one auditing
@@ -50,9 +56,10 @@ structure (role → what to check → engines → report-only, no fixes).
    - **Engines** — which engine(s), and how findings are handed to the synthesizer.
    - Report-only. Never fix code. Never skip evidence.
 
-4. **Wire it into the orchestrator.** In `security-audit/orchestrator.md`'s Stage 2,
-   replace the single dispatch line below with your new agent (or two, if you kept a
-   two-invariant split):
+4. **Wire it into the orchestrator.** Copy the finished file to
+   `.claude/agents/codebase/security-audit/domain-integrity.md`. Stage 2 of
+   `security-audit/orchestrator.md` then dispatches it on its own; to use two agents
+   for a two-invariant split, point the dispatch below at both:
 
    ```
    Agent tool:
@@ -69,6 +76,6 @@ structure (role → what to check → engines → report-only, no fixes).
 
 Some projects (a CLI tool, a static site generator, a library with no persistent state)
 genuinely don't have a domain-integrity class worth a dedicated Stage-2 agent. In that
-case, delete this file and remove its dispatch from `security-audit/orchestrator.md`'s
-Stage 2 — the audit still runs with `access-control-idor.md` alone. Don't force a
+case, install nothing: Stage 2 skips the lens explicitly and the audit still runs with
+`access-control-idor.md` alone. Don't force a
 domain-integrity agent where the domain has no integrity invariant to speak of.

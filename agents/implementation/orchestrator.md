@@ -618,7 +618,7 @@ committed rubric, running in a neutral cwd blind to the plan/diff/transcript. It
 be additive to and never overlap the numeric conformance gate (which owns all
 numeric/business-logic correctness). Cap revise cycles and BLOCK the pipeline report on
 persistent failure — do not silently pass. See
-`.claude/agents/codebase/security-audit/domain-integrity.md` for the same "bring your
+`templates/security-domain-integrity.md` for the same "bring your
 own domain-specific gate" pattern applied to the security audit; this is the
 `/implement`-pipeline analog. If no such artifact class exists in this project, skip
 this arm entirely — it is optional, not a stub to fill mechanically.

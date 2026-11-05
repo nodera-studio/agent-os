@@ -66,7 +66,6 @@ workflow below) once to adapt the templated files to that project's actual stack
 │   │   ├── orchestrator.md          # cartographer → deep agents → synthesizer; union-recall + evidence-precision
 │   │   ├── audit-cartographer.md    # Stage 1 — app-intent map (endpoints/authz, tenant key, domain-critical sites, PII/SSRF)
 │   │   ├── access-control-idor.md   # Stage 2 dual-engine — whole-app authz, IDOR, exposure, SSRF (always runs)
-│   │   ├── domain-integrity.md      # Stage 2 (project-specific SLOT — a template, not a ready agent; see its own header)
 │   │   └── audit-synthesizer.md     # Stage 3 — evidence-demanding synthesis, ASVS 5.0, memory write
 │   ├── error-audit/
 │   │   ├── orchestrator.md          # 6-agent dual-engine (3 Claude + 3 Codex)
@@ -256,7 +255,7 @@ copy, and the Romanian ICU, Babel and diacritic gates stay inside the pack. See 
 
 - Tier 1 quick health check (~5 min): lightweight agents scan for dependency issues, dead code, tech debt signals, API surface, and doc freshness
 - Tier 2 deep audits: 5 standalone multi-agent audits (security, error, API, docs, tech debt) with dual-engine consensus, semi-formal reasoning, mid-thought abort, and conventions-first anchoring
-- Security audit (periodic, up to 6 agents / 4 passes): cartographer → access-control/IDOR ‖ domain-integrity (project-specific slot, optional) → evidence-demanding synthesizer; ASVS 5.0 L2 as the reporting taxonomy, not the decomposition
+- Security audit (periodic, up to 6 agents / 4 passes): cartographer → access-control/IDOR ‖ domain-integrity (optional; skipped unless the project configures it from `templates/security-domain-integrity.md`) → evidence-demanding synthesizer; ASVS 5.0 L2 as the reporting taxonomy, not the decomposition
 - Each tier 2 audit is independently invocable via its own slash command
 
 ---
@@ -282,6 +281,6 @@ All review agents produce findings in this format:
 
 - Model rides the session via `model: inherit` for every frontier role; mechanical/summarization roles stay pinned `sonnet`. Don't pin a frontier agent to a specific model — inherit is what lets the suite follow the session. See the Engine strategy note at the top.
 - Agents read this project's own `CLAUDE.md` dynamically — conventions live there, not hardcoded into the agent files.
-- Several files ship as explicit templates (`{{TOKEN}}` placeholders, `.template` suffixes, or a "STUB — fill this in" header): `bootstrap/orchestrator.md`'s target is `CLAUDE.md`/`settings.json`; `codebase/security-audit/domain-integrity.md`; the copywrite pack's brand-terms and register-memo templates. Fill these in per-project before relying on the agents that read them.
+- Several files ship as explicit templates (`{{TOKEN}}` placeholders, `.template` suffixes, or a "STUB — fill this in" header): `bootstrap/orchestrator.md`'s target is `CLAUDE.md`/`settings.json`; `templates/security-domain-integrity.md` (the security orchestrator skips that lens until a configured copy exists); the copywrite pack's brand-terms and register-memo templates. Fill these in per-project before relying on the agents that read them.
 - Stack-specific checklists (`review/claude-reviewer.md`'s Project Conventions block, the error-audit agents' `<context>`/`<conventions>` blocks) ship as placeholder shapes — fill them in with this project's real conventions; project-specific invariants belong in this project's own `.claude/rules/` files, referenced from these agents, not hand-copied into every agent.
 - Each agent is standalone — orchestrators are convenience, any specialist can be invoked directly

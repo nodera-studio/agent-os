@@ -111,9 +111,9 @@ guess and do not silently default):
   as-is or needs adapting.
 - **Which optional agents/audits actually apply** — e.g. the `copywrite` pack (`install.sh --pack copywrite`) only
   matters if the project has meaningful user-facing copy to polish; the
-  `security-audit/domain-integrity.md` slot needs a real domain invariant to be worth
-  filling in (see that file's own "if this project has no single dominant business
-  invariant" escape hatch) — don't force it.
+  security-audit domain-integrity lens needs a real domain invariant to be worth
+  configuring (copy `templates/security-domain-integrity.md` into the audit folder when it is;
+  see its own "no single dominant business invariant" escape hatch) — don't force it.
 
 ### Step 4 — Fill in the tokens
 

@@ -31,8 +31,8 @@ higher-risk, not resolved.
    (row-level security, a query-scoping helper, an ORM-level scope). List tenant-scoped
    tables and which have isolation enabled + a policy (and flag any policy that
    self-joins a membership/permissions table — a common recursion trap).
-3. **Domain-critical calc/state-machine sites** — see `domain-integrity.md` for what
-   this project's dominant business invariant actually is (money math, a regulated
+3. **Domain-critical calc/state-machine sites** — see the project's configured `domain-integrity.md` (when it has one; otherwise just
+   map the obvious money/state-machine sites) for what this project's dominant business invariant actually is (money math, a regulated
    document lifecycle, inventory consistency, etc.) and map every site where it's
    computed, persisted, or transitioned.
 4. **PII surface.** Tables/columns holding personal data and which API responses return
