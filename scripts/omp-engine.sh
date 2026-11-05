@@ -12,7 +12,7 @@ exec 3>&1
 MODE="${1:-}"
 [ "$#" -eq 0 ] || shift
 # Filled by engine_resolve from the profile registry. The helper modes that name no engine (launcher, envcheck)
-# use the registry's first profile, set below once the registry is loaded.
+# use helper_profile, the registry's first profile.
 PROFILE='' EXPECT_PROVIDER='' LOGIN_CMD='' LOGIN_LABEL=''
 # Engine mode (--engine): filled by engine_resolve from routing.sh engines and the profile registry.
 ENGINE='' SLOT='' ROLE='' HAVE_ARGS=() CONFIG_FILES='' STARTUP_MODEL='' NO_TOOLS=0 GLEN_MODEL_SPEC=''
@@ -29,7 +29,8 @@ USAGE='{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"totalTokens":0,"cost_
 log() { printf 'omp-engine: %s\n' "$*" >&2; }
 # shellcheck source=../omp/profiles.sh
 . "$(cd "$(dirname "$0")/../omp" && pwd -P)/profiles.sh" 2>/dev/null || { log 'profile registry omp/profiles.sh missing'; exit 4; }
-PROFILE="$(profile_names)" PROFILE="${PROFILE%%$'\n'*}"
+# helper_profile: the registry's first profile, for the helper modes that name no engine.
+helper_profile() { local names; names="$(profile_names)"; printf '%s\n' "${names%%$'\n'*}"; }
 stop() { STATUS="$1"; REASON="$2"; EXIT_CODE="$3"; exit "$EXIT_CODE"; }
 # shellcheck disable=SC2329 # Registered below for INT/TERM.
 interrupted() {
@@ -315,6 +316,7 @@ policy() {
 # Internal helpers deliberately expose only their requested command/path/YAML.
 case "$MODE" in
   launcher)
+    PROFILE="$(helper_profile)"
     case "$#" in
       1) resolve_launcher "$1" "$(launcher_dir_for)" || { log "$REASON"; exit 4; } ;;
       2) resolve_launcher "$1" "$2" || { log "$REASON"; exit 4; } ;;
@@ -325,6 +327,7 @@ case "$MODE" in
     ;;
   envcheck)
     # envcheck [--engine ENGINE] -- CMD...: the engine decides the profile and whether OPENCODE_API_KEY passes.
+    PROFILE="$(helper_profile)"
     if [ "${1:-}" = --engine ] && [ "$#" -ge 2 ]; then
       case "$2" in omp:codex | omp:opencode) ENGINE="$2"; PROFILE="$(profile_for_engine "$ENGINE")" ;; *) usage ;; esac
       shift 2
