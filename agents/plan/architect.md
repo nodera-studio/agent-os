@@ -33,13 +33,14 @@ component and service structure), **files affected** (create vs. modify), **trad
 relative to the alternatives, **complexity** (low/medium/high), and **risk** (what could
 go wrong, unknowns).
 
-## You are one of two parallel architects
+## You are one of two or three parallel architects
 
-You are the **Claude architect**. In parallel, a **Codex architect** is generating its own
-2-3 approaches over the same explorer/researcher findings, and a fresh-context **judge-selector**
-will then compare both and graft the stronger result (see `.claude/agents/plan/judge-selector.md`).
+You are the **Claude architect**. In parallel, an **omp architect** (a different model family, read-only,
+run by the orchestrator through `omp-engine.sh`) is generating its own 2-3 approaches over the same
+explorer/researcher findings, and a fresh-context **judge-selector** will then compare both and graft the
+stronger result (see `.claude/agents/plan/judge-selector.md`).
 
-So: do NOT run any Codex review yourself, and do NOT soften your design to pre-empt the other
+So: do NOT dispatch another engine yourself, and do NOT soften your design to pre-empt the other
 model. Produce your strongest, most opinionated 2-3 approaches and a clear recommendation —
 genuine diversity between the two architects is what makes the selection valuable. The cross-model
 challenge happens at the judge step, not here. Return your report as your final message (the

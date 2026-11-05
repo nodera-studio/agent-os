@@ -1,16 +1,17 @@
 # Plan Workflow
 
 Turns a task description into a ready-to-implement plan: explore the codebase, research
-what's unfamiliar, generate competing architectures from two independent models, pick a
-winner, turn it into a step-by-step plan (again from two models on harder tasks), and
+what's unfamiliar, generate competing architectures from independent models, pick a
+winner, turn it into a step-by-step plan (again from several models), and
 save it for `/implement` to pick up. The most complex pipeline in the suite — two
-distinct dual-engine-generate-then-judge-select rounds, preceded by a discovery triage
-that sets how far the researcher looks.
+multi-engine generate-then-judge-select rounds, preceded by a discovery triage
+that sets how far the researcher looks. There is no minimal discovery depth and no
+single-planner shortcut.
 
-## Why dual-engine, twice
+## Why multi-engine, twice
 
 One model proposing and reviewing its own architecture has no outside view. Two
-independent models (Claude + Codex) generating from the *same* explorer/researcher
+independent models (Claude plus the omp engines `routing.sh engines` names) generating from the *same* explorer/researcher
 findings surface genuinely different approaches — the diversity is the value, not an
 average of the two. A fresh **judge-selector**, which generated neither, picks the
 stronger spine and grafts only the *separable*, low-risk improvements from the
@@ -29,17 +30,17 @@ flowchart TD
     EX2 --> ARCH
     EX3 --> ARCH
 
-    subgraph ARCH["Step 4 — Architecture (always dual-engine)"]
+    subgraph ARCH["Step 4 — Architecture (always multi-engine)"]
         direction LR
         A1["Claude architect<br/>2-3 approaches"]
-        A2["Codex architect<br/>2-3 approaches"]
-        A3["Gemini architect<br/>(high-stakes specs only,<br/>if CLI present)"]
+        A2["omp architect (omp:codex)<br/>2-3 approaches"]
+        A3["omp:opencode/argon<br/>(high-stakes specs only,<br/>if available)"]
     end
 
     ARCH --> J1["Step 4.5 — Judge-selector<br/>picks the stronger spine,<br/>grafts separable improvements"]
     J1 --> GATE1{{"Step 5 — User picks the<br/>winning approach + grafts<br/>(skipped in /auto-mode)"}}
 
-    GATE1 --> P2["Step 6 — Claude planner ‖ Codex planner"]
+    GATE1 --> P2["Step 6 — Claude planner ‖ omp planner(s)"]
     P2 --> J2["Judge-selector<br/>picks stronger plan,<br/>grafts separable steps"]
     J2 --> STEP7
 
@@ -63,7 +64,7 @@ human between waves.
 | --- | --- |
 | `orchestrator.md` | Pipeline manager — triage, dispatch, gates, save |
 | `explorer.md` | Deep codebase scan for related code, patterns, existing conventions |
-| `architect.md` | One of two (or three) independent architects — 2-3 approaches with trade-offs |
+| `architect.md` | One of two (or three) independent architects (the Claude one) — 2-3 approaches with trade-offs |
 | `judge-selector.md` | Select-then-graft: picks the stronger of two parallel passes, grafts separable improvements — used twice (architecture, then plan) |
 | `planner.md` | Turns the chosen approach into an ordered, verifiable step plan |
 
@@ -76,7 +77,11 @@ per-wave pipeline. Read `orchestrator.md` directly for the full step-by-step pro
 
 ## Engines
 
-Explorer, researcher (`research/agent.md`, `mode: plan`), single-mode planner, and the judge-selector are Claude subagents.
-The architecture step is **always** dual-engine (Claude + Codex, +Gemini for high-stakes
-specs if available) regardless of triage depth — it's the highest-leverage decision in
-the pipeline. The plan-detail step is dual-engine as well, and the researcher always runs.
+Explorer, researcher (`research/agent.md`, `mode: plan`), the planner and the judge-selector are Claude
+subagents. The orchestrator asks `bash .claude/scripts/routing.sh engines architect` and
+`routing.sh engines planning` for the second (and third) engine instead of hard-coding one: by default
+`omp:codex` for both, plus `omp:opencode/argon` as plan critique and as the high-stakes third architect.
+Both steps run multi-engine regardless of triage depth, and the researcher always runs. omp engines are
+read-only: they return analysis text that Claude saves, anonymises with `scripts/blind-candidates.sh` and
+verifies; a capped or unavailable engine degrades the round and the plan says so (see
+`../../skills/second-engine/SKILL.md`).
