@@ -10,10 +10,10 @@ It is not a framework you code against. It's a `.claude/` tree: drop it in, run
 `/bootstrap-project`, and you have a working multi-agent workflow suite tuned for
 disciplined, verifiable, surgical changes.
 
-- **Agents** — 53 orchestration prompts across 8 workflows (plan · implement · review · debug · audit · copywrite · bootstrap · orchestrator)
-- **Commands** — 29 slash commands, the entry points into those workflows
-- **Skills** — 12 trigger-activated capabilities (Playwright testing, GitHub/PR workflows, Exa web search, release-flow conventions, and more)
-- **Hooks** — 10 enforcement scripts wired into `PreToolUse`/`PostToolUse`/session-lifecycle events
+- **Agents** — 32 orchestration prompts across the core workflows (plan · implement · review · debug · audit · bootstrap), plus opt-in packs (copywrite, orchestrator, queue agents)
+- **Commands** — 19 slash commands, the entry points into those workflows
+- **Skills** — 6 trigger-activated capabilities (engine dispatch, auto-mode, GitHub/PR workflows, Exa web search, release-flow conventions), plus opt-in packs
+- **Hooks** — 7 enforcement scripts wired into `PreToolUse`/`PostToolUse`/session-lifecycle events
 - **Engine model** — Claude is the only writer (`routing.json` → `implementation`). The read-only omp engines (`omp:codex`, `omp:opencode`) join review, planning, debug and audits as peers, where cross-model disagreement catches what one model misses; `routing.sh engines <role>` names the roster, an engine that is capped or not set up is skipped with a one-line reason, and native Codex is an opt-in pack
 
 ## Why this exists

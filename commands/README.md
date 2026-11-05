@@ -1,6 +1,6 @@
 # Commands
 
-25 slash commands, each a thin dispatcher into the agent suite under `agents/`. Grouped
+19 slash commands, each a thin dispatcher into the agent suite under `agents/`. Grouped
 here by workflow — see `agents/README.md` for the full agent-suite index each command
 drives.
 
