@@ -1,0 +1,17 @@
+{
+  "name": "security-scan",
+  "version": "1",
+  "description": "QUARANTINED, broken as shipped: /security-scan needs scripts/security-scan.sh, .agentshield/baseline.json and a CI workflow that do not exist.",
+  "files": [
+    "commands/security-scan.md",
+    "docs/config-security.md"
+  ],
+  "prior_hashes": {
+    "commands/security-scan.md": [
+      "eb1263a1df5e6cbe5d6c453c99a36835126bdc5c0b67d9560fd62bf35cc2e85e"
+    ],
+    "docs/config-security.md": [
+      "3d3a90ef647a0e252c4829075fe8d6a2ecf224611238b379f23c26637e7b944b"
+    ]
+  }
+}

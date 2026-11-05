@@ -163,8 +163,7 @@ produce the same quality bar; the difference is how much you want to watch.
 - **Docs** (`docs/`) — harness-setup reference material: the Claude Code config
   layer split and env-var decision matrix (`Claude-Code-Setup.md`), the status
   line setup guide (`docs/customizations/statusline-setup.md`), a custom Linear-styled
-  color theme setup guide (`docs/customizations/theme-setup.md`), a config-security
-  scanner writeup for widened-autonomy postures (`config-security.md`). The
+  color theme setup guide (`docs/customizations/theme-setup.md`). The
   learned-rules-loop schema/workflow doc ships with the `learned-rules` pack.
 - **Scripts** (`scripts/`) — standalone tooling: `bootstrap-tools.sh` (installs
   the CLI productivity layer — shellcheck, gitleaks, delta, difft, ast-grep, sd,

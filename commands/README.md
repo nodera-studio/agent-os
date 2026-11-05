@@ -45,7 +45,6 @@ drives.
 | `/api-audit` | `agents/codebase/api-audit/orchestrator.md` | 4 dual-engine agents — endpoint inventory, auth, validation, docs sync |
 | `/docs-audit` | `agents/codebase/docs-audit/orchestrator.md` | 3 agents (2 Claude + 1 Codex) — docs vs. actual code |
 | `/tech-debt-audit` | `agents/codebase/tech-debt-audit/orchestrator.md` | 4 agents (3 Claude + 1 Codex) — patterns, complexity, TODOs, library currency |
-| `/security-scan` | (inline — AgentShield + mcp-scan) | Scan `.claude/` config/hooks/MCP setup for security drift |
 
 ## Codex / cross-model
 
