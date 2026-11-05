@@ -1,7 +1,7 @@
 ---
 name: sentry-cli
 description: >-
-  Work with Sentry across two surfaces: the `sentry-cli` (3.5.1) for release/deploy
+  Work with Sentry across two surfaces: the `sentry-cli` for release/deploy
   plumbing, and the Sentry MCP for runtime issue lookup. Use the CLI whenever the user wants to
   upload sourcemaps, create or finalize a release, or associate commits with a deploy. Use the
   MCP whenever the user wants to look up a live Sentry issue, run Seer on an error, find the stack
@@ -16,7 +16,7 @@ description: >-
 
 ## CLI vs MCP — when to use which
 
-- **`sentry-cli` (3.5.1)** — release/deploy plumbing, headless/CI:
+- **`sentry-cli`** — release/deploy plumbing, headless/CI:
   `sentry-cli releases new`, `sentry-cli releases finalize`, `sentry-cli sourcemaps upload`,
   commit association. This is the deploy-time path.
 - **Sentry MCP** — runtime issue lookup when debugging a live error (mirrors a debugging
