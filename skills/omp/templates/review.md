@@ -26,7 +26,7 @@ Any `\@` in snapshot context files (including `AGENTS.md`/`CLAUDE.md`) is an int
 
 You may use `mcp__mnemosyne_memory_search` with `project: "{{PROJECT_NAME}}"` for prior decisions
 on touched areas. The profile's Mnemosyne skill documents the read-only memory tools.
-These predicted MCP tool names await live confirmation; if unavailable, say so and continue.
+If the memory tool is unavailable, say so and continue.
 Memory writes are blocked. Cite memory ids when used and keep code evidence separate.
 
 ## Review domains
@@ -38,7 +38,7 @@ Check each relevant domain for every changed file:
 - Concurrency and process lifecycle: races, ownership, deadlines, cleanup, retries.
 - Performance: concrete time, memory, or I/O costs with a reachable triggering case.
 - Tests for changed behavior: missing regression coverage or assertions that miss the bug.
-- Documentation and contract drift: compare `docs/json.md` and `skill/glen/SKILL.md`.
+- Documentation and contract drift: compare the change with the repo's documented contracts (README, docs, command and skill files that describe the touched behavior).
 
 No lint/style nitpicks. Do not flag deliberately parked behavior or conventions as defects.
 Ground findings in file:line evidence, follow the execution trace, and check existing guards.
