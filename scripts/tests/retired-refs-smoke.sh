@@ -26,6 +26,7 @@ skill-codex|skills/codex/SKILL.md
 core-codex-hook|block-old-codex
 learned-rules-hook|mnemosyne-capture
 copywrite-pack|agents/copywrite commands/copywrite.md apple-style-guide voice-rubric microcopy-specialist localization-editor consistency-checker voice-editor
+queue-agents-pack|debug/queue.md
 orchestrator-pack|commands/orchestrate.md commands/audit-agent-gaps.md agents/orchestrator/ scripts/orchestrator/ record-gap gap-auditor orchestrator-mode.md GapLog gaps.jsonl
 '
 

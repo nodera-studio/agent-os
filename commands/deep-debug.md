@@ -14,8 +14,8 @@ pass would miss. You gather evidence, then conclude — never guess.
 Follow this procedure (diagram in `.claude/agents/debug/README.md`):
 intake/classify → 2-minute triage → **pull runtime context from your error-tracking
 MCP (issue details, trace/spans) when the bug has a production issue** → parallel
-dual-engine dispatch (`.claude/agents/debug/{investigator|queue}.md` +
-`codex:codex-rescue`) → cross-reference the two or three reports → adversarial verification
+dual-engine dispatch (`.claude/agents/debug/investigator.md`, or `queue.md` from the `queue-agents`
+pack for an async-pipeline bug, + `codex:codex-rescue`) → cross-reference the two or three reports → adversarial verification
 (`.claude/agents/debug/adversary.md`) → evidence-verified report.
 
 After triage and any runtime-context pull, create `.claude/evidence/` and write the triage

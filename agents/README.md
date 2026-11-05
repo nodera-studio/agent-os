@@ -57,8 +57,7 @@ workflow below) once to adapt the templated files to that project's actual stack
 │
 ├── debug/                           # Workflow: Heavy investigation
 │   ├── investigator.md              # Claude + Codex (+ optional omp) — root cause analysis, log tracing
-│   ├── adversary.md                 # Claude — adversarial hypothesis tester (disprove/confirm)
-│   └── queue.md                     # Claude + Codex (+ optional omp) — background job / async pipeline tracing
+│   └── adversary.md                 # Claude — adversarial hypothesis tester (disprove/confirm)
 │
 ├── codebase/                        # Workflow: Full-codebase analysis (occasional)
 │   ├── orchestrator.md              # Two-tier dispatcher (quick health check / deep audits)
@@ -71,8 +70,7 @@ workflow below) once to adapt the templated files to that project's actual stack
 │   │   └── audit-synthesizer.md     # Stage 3 — evidence-demanding synthesis, ASVS 5.0, memory write
 │   ├── error-audit/
 │   │   ├── orchestrator.md          # 6-agent dual-engine (3 Claude + 3 Codex)
-│   │   ├── scanner.md               # `scope=backend` (controllers/routes, services, global infra) | `scope=frontend` (hooks, components, pages, global UI)
-│   │   └── queue.md                 # Background-job processors, pipeline UX, concurrency
+│   │   └── scanner.md               # `scope=backend` (controllers/routes, services, global infra) | `scope=frontend` (hooks, components, pages, global UI)
 │   ├── api-audit/
 │   │   └── orchestrator.md          # 4-agent dual-engine (endpoint inventory + contract)
 │   ├── docs-audit/
@@ -161,9 +159,8 @@ deliberate memory-write decision — not just a wall of comments. See
 Root-cause investigation with a built-in check on its own conclusions: a dual-engine
 investigator (Claude + Codex, + optional omp) proposes a hypothesis, then a dedicated adversary agent
 tries to disprove it — up to 3 cycles — before you act on anything. A quick triage step
-runs first so trivial bugs don't pull in the heavy machinery, and `debug/queue.md` is a
-generic background-job/async-pipeline specialist you adapt to whatever queue or broker
-this project actually runs. See `agents/debug/README.md` for the full diagram.
+runs first so trivial bugs don't pull in the heavy machinery. The optional `queue-agents` pack adds a
+background-job/async-pipeline specialist for debug and for `/error-audit`. See `agents/debug/README.md` for the full diagram.
 
 ## Codebase audit workflows (`/codebase-audit` and friends)
 
@@ -195,7 +192,7 @@ copy, and the Romanian ICU, Babel and diacritic gates stay inside the pack. See 
 | `/implement`             | Build features/fixes                                                              | `implementation/orchestrator.md` (includes a lean internal Claude‖Codex code-review gate)     |
 | `/review-implementation` | Self-review (heavy, standalone); `--lean` is the lean dual-engine gate on the current diff (standalone form of `/implement` Step 13) | `review-implementation/orchestrator.md`; `--lean`: `review/claude-reviewer.md` (`depth: lean`) ‖ `codex:codex-rescue`, merged by `review-implementation/synthesizer.md` |
 | `/second-opinion`        | Second opinion from the other engine; `--advisor` = read-only adversarial critique | `scripts/omp-engine.sh ask` (`omp:codex`)                                                     |
-| `/deep-debug`            | Heavy investigation                                                               | `debug/investigator.md` + `debug/adversary.md` (+ `debug/queue.md` for async-pipeline bugs)   |
+| `/deep-debug`            | Heavy investigation                                                               | `debug/investigator.md` + `debug/adversary.md` (+ the queue-agents pack's `queue.md` for async-pipeline bugs) |
 | `/run-ci`                | CI verification                                                                   | `local-ci.md`                                                                                 |
 | `/respond-to-review`     | PR response drafting                                                              | `respond-to-review.md`                                                                        |
 | `/improve-prompt`        | Prompt optimization                                                               | Uses `prompts/prompt-engineering.md` guide                                                    |
@@ -243,7 +240,7 @@ copy, and the Romanian ICU, Babel and diacritic gates stay inside the pack. See 
 - Adversarial verification loop: investigator proposes hypothesis, adversary tries to disprove it (max 3 cycles)
 - Dual-engine investigation (Claude agent + Codex, + optional read-only omp via `omp-engine.sh`) with cross-reference merge
 - Quick triage step before heavy agent dispatch
-- Generic background-job/async-pipeline specialist (`debug/queue.md`) — adapt to whatever queue/broker system this project actually uses
+- Optional `queue-agents` pack: background-job/async-pipeline specialists for debug and error-audit — adapt to whatever queue/broker system this project actually uses
 
 **Review pipelines:**
 

@@ -12,7 +12,7 @@ color: orange
 Your brief names the scope: `scope=backend` or `scope=frontend`. Apply the blocks marked with
 your scope and ignore the other scope's blocks. The unmarked blocks apply to both. If the brief
 names no scope, or one that is neither, stop and report that instead of guessing. Background-job
-processors are never in either scope (`queue.md` covers them).
+processors are never in either scope (the optional queue-agents pack covers them).
 
 <role>
 Error path auditor for {{PROJECT_NAME}} ({{FRAMEWORK}}). You systematically examine every
@@ -297,7 +297,7 @@ LOW -- Error handling works but could be more helpful
 - Read every file in your scope fully. Do not sample.
   - scope=backend: every controller and service file.
   - scope=frontend: every hook, page component, and interactive component.
-- Be exhaustive within your scope. Do NOT audit queue processors (covered by queue.md);
+- Be exhaustive within your scope. Do NOT audit queue processors (covered by the optional queue agent);
   scope=frontend also does not audit backend code.
 - Every finding must reference an exact file path and method name (scope=frontend: component or
   hook name).

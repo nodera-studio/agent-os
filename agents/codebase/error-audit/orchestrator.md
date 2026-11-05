@@ -96,7 +96,7 @@ Dispatch each via the Agent tool:
 ```
 Read .claude/agents/codebase/error-audit/scanner.md and follow its instructions exactly.
 scope=backend. Audit every controller/route, service, and global infrastructure component in the backend
-workspace. Do NOT audit queue/background-job processors (covered by a separate agent).
+workspace. Do NOT audit queue/background-job processors (covered by the optional queue agent).
 Be exhaustive -- read every file, not a sample. Report findings only -- no fixes.
 ```
 
@@ -108,7 +108,10 @@ scope=frontend. Audit every hook, component, page, and global error infrastructu
 workspace. Be exhaustive -- read every file, not a sample. Report findings only -- no fixes.
 ```
 
-**Agent 3 -- Queue:**
+**Agent 3 -- Queue (optional, `queue-agents` pack):** dispatch it only when the project runs
+queues or background jobs AND `.claude/agents/codebase/error-audit/queue.md` exists (installed
+with `install.sh --pack queue-agents`). Otherwise skip Agent 3 and Codex Agent 3, and say in the
+report that queue and background-job error paths were not audited; never dispatch a stub.
 
 ```
 Read .claude/agents/codebase/error-audit/queue.md and follow its instructions exactly.

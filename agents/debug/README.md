@@ -11,7 +11,7 @@ flowchart TD
 
     subgraph ENGINES["Mandatory dual-engine dispatch — parallel, independent"]
         direction LR
-        C["Claude subagent<br/>investigator.md or queue.md"]
+        C["Claude subagent<br/>investigator.md<br/>(queue.md from the queue-agents pack)"]
         X["Codex agent<br/>codex:codex-rescue"]
         O["omp investigator (optional)<br/>omp-engine.sh debug"]
     end
@@ -33,8 +33,10 @@ shipping a wrong fix.
 | Agent | File | Focus |
 |-------|------|-------|
 | `debug-investigator` | `investigator.md` | General application errors -- request flows, stack traces, logs, state |
-| `debug-queue` | `queue.md` | Background job / async pipeline failures -- stalled jobs, stuck processing, worker issues |
 | `debug-adversary` | `adversary.md` | Mandatory hypothesis-disproving pass before any root cause is reported |
+
+The `queue-agents` pack (`install.sh --pack queue-agents`) adds `debug-queue` (`queue.md`) for background-job and
+async-pipeline failures -- stalled jobs, stuck processing, worker issues -- and a queue scanner for `/error-audit`.
 
 ## Entry Point
 
