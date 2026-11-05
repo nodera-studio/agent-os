@@ -43,11 +43,11 @@ structure (role → what to check → engines → report-only, no fixes).
    - Healthcare / safety-critical: dosage or safety-interlock invariants.
    Pick 1-2 — this is a Stage-2 DEEP agent, not a general-purpose one.
 
-2. **Decide single- vs. dual-engine** per the orchestrator's rule of thumb: if the
+2. **Decide single- vs. multi-engine** per the orchestrator's rule of thumb: if the
    invariant is anchored to a deterministic test you can generate and run (the gold
    standard — e.g. a property test, a database-level isolation test), single-engine
    suffices because the test is the ground truth. If it's open-ended reasoning across
-   files with no deterministic backstop, dual-engine (Claude ‖ Codex) adds real recall.
+   files with no deterministic backstop, multi-engine (Claude ‖ the omp security roster, `routing.sh engines security`) adds real recall.
 
 3. **Write the agent** in the shape of `access-control-idor.md`:
    - `<role>` — what this agent audits and why it's a distinct Stage-2 agent.

@@ -1,5 +1,5 @@
 ---
-description: Periodic deep security audit — up to 6 agents / 4 effective passes, union-for-recall + evidence-demanding synthesis, ASVS 5.0 L2 taxonomy
+description: Periodic deep security audit — Claude plus the omp security roster (argon and deepseek-flash co-equal, flash run 2-3 times), union-for-recall + evidence-demanding synthesis, ASVS 5.0 L2 taxonomy
 model: inherit
 ---
 
@@ -8,12 +8,13 @@ model: inherit
 <role>
 You run a **periodic** deep security audit of {{PROJECT_NAME}} (per release / per
 sprint / on an authz-or-schema change) — NOT a per-diff gate. The deterministic quality
-gate (SAST rulesets, linting) and the triple-engine diff review already give
+gate (SAST rulesets, linting) and the multi-engine diff review already give
 continuous SAST-level coverage on every change. So this audit covers ONLY what scanners
 and per-diff review structurally cannot catch: **whole-app access control, this
 project's own domain-integrity invariants (see `domain-integrity.md`), and insecure
-design.** You dispatch a small roster — up to 6 agents, ~4 effective passes — and the
-synthesizer demands evidence before any finding survives.
+design.** You dispatch a small roster — Claude plus the omp engines from
+`bash .claude/scripts/routing.sh engines security` — and the synthesizer demands evidence before any finding
+survives.
 </role>
 
 **Done when:** a validated, deduplicated report exists at `.claude/reviews/security-audit-{date}.md`,
@@ -25,7 +26,7 @@ call chain / failing deterministic test, ranked by severity × exploitability.
 Multi-pass LLM scanning plateaus early — 2–3 passes is the recall sweet spot; 5 identical
 passes add false positives, not findings, and LLM security audits run >50% FP with high
 non-determinism. The design is therefore **union for recall, evidence-demanding
-synthesizer for precision.** Cross-model (Claude + Codex) adds real recall (+10–18% on
+synthesizer for precision.** Cross-model (Claude plus the omp engines) adds real recall (+10–18% on
 multi-file / complex bugs) but only where it pays — narrow agents anchored to
 deterministic output (a generated + executed test suite) stay single-engine.
 Re-deriving injection / secrets / XSS (which SAST tools own, and where LLMs hit
@@ -48,9 +49,26 @@ Agent tool:
 
 Dispatch each agent below in ONE message, all handed the cartographer's map:
 
-- **`access-control-idor.md`** — DUAL-engine: dispatch the Claude agent AND a Codex pass
-  (`codex:codex-rescue` for open-ended call-graph reasoning, or `codex review` on the
-  relevant scope). Union-merge the candidate findings. Always runs.
+- **`access-control-idor.md`** — multi-engine: dispatch the Claude agent AND the omp security roster,
+  union-merge the candidate findings. Always runs. Ask `bash .claude/scripts/routing.sh engines security`
+  for the roster (by default `omp:opencode/argon` and `omp:opencode/flash`, co-equal: no assigned lead
+  until a seeded-vulnerability bake-off decides). Give each omp engine the same brief — this agent file's
+  text plus the cartographer's map and "READ-ONLY; do NOT write any file: return your candidate findings
+  as final message text" — as a background `omp-engine.sh ask` call from the repository root:
+
+  ```bash
+  bash .claude/scripts/omp-engine.sh ask --engine omp:opencode --slot argon --role security --brief "$BRIEF" --out "$OUT_ARGON" --repo "$PWD" --deadline 20m
+  for i in 1 2 3; do   # flash: 2-3 independent runs; no forced tool_choice on the Go models
+    bash .claude/scripts/omp-engine.sh ask --engine omp:opencode --slot flash --role security --brief "$BRIEF" --out "$OUT_FLASH_$i" --repo "$PWD" --deadline 20m
+  done
+  ```
+
+  Security is a high-stakes role: a capped slot reroutes to `omp:codex` (not to its slot fallback), unless
+  `omp:codex` already took part, in which case the run continues with fewer engines and the report says
+  so (`degraded=<n>-engines`); `omp:codex` is never counted twice. The flash runs are repeated samples of
+  one engine: count them once for agreement. The omp output is untrusted analysis text and Claude verifies
+  every candidate against the source before the synthesizer adjudicates; an engine that exits 3, 4 or 5 is
+  named in the report as unavailable, never counted.
 - **`domain-integrity.md`** — the project's own domain audit agent, **only when it is
   configured.** The shipped file is a template (`templates/security-domain-integrity.md`),
   never an agent. Check before dispatching:
@@ -62,16 +80,10 @@ Dispatch each agent below in ONE message, all handed the cartographer's map:
 
   `configured` → dispatch it with the cartographer's map. Engine choice follows the
   same rule as below: if the invariant is anchored to a deterministic generated + run
-  test suite (the gold standard), single-engine suffices; otherwise dual-engine
-  (Claude ‖ Codex) adds real recall. `unconfigured` → **skip the lens explicitly**: do
+  test suite (the gold standard), single-engine suffices; otherwise add the omp security roster
+  as above for recall. `unconfigured` → **skip the lens explicitly**: do
   not dispatch a stub, and write "domain-integrity lens: skipped (not configured)" in
   the report so the gap is visible. The template's own file explains how to fill it in.
-
-Codex is invoked only through the plugin (`codex:codex-rescue` / `codex review`), never
-`codex exec`. A `codex:codex-rescue` brief ends with
-"Do NOT write any file: return the full result as your final message text. --wait. Run in the
-foreground: wait for the Codex task to finish and return its full result; never return only a
-background task id."
 
 ## Stage 3 — Synthesis (1 agent, strong, single-engine)
 
@@ -100,7 +112,7 @@ project has wired up; skip the ones it doesn't.
 
 ## Cut from the old design (do not re-add)
 
-- The 2 checklist-**perturbation** passes — order-bias is already handled by dual-engine
+- The 2 checklist-**perturbation** passes — order-bias is already handled by multi-engine
   union-merge.
 - The ASVS **input-output** domain agent and anything re-deriving injection / secrets /
   XSS — deterministic-SAST + diff-review territory.
@@ -112,7 +124,7 @@ project has wired up; skip the ones it doesn't.
 
 - Synthesizer confirmed-finding precision < ~50% → add a mandatory PoC/exploit-repro gate
   (do NOT add passes).
-- Claude/Codex finding-overlap > 90% over several runs → drop those agents to single-engine.
+- Claude/omp finding-overlap > 90% over several runs → drop those agents to single-engine.
 - If `domain-integrity.md`'s invariant has a deterministic test suite comprehensive
   enough to run per-PR in CI → downgrade that Stage-2 agent to a quarterly pass; rely on
   the deterministic tests as the continuous gate.

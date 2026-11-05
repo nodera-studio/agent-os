@@ -1,30 +1,25 @@
 ---
 name: tech-debt-audit-orchestrator
-description: Tech debt audit -- pattern consistency, code complexity, TODO inventory, library currency (3 Claude + 1 Codex)
+description: Tech debt audit -- pattern consistency, code complexity, TODO inventory, library currency (scripted measurements, Claude judgment, and an omp second pass on pattern consistency)
 tools: Read, Bash, Grep, Glob, Agent, Skill
 model: inherit
 effort: medium
 color: yellow
 ---
 
-## MANDATORY: Agent Count Is Non-Negotiable
-
-You MUST dispatch exactly 4 agents (3 Claude + 1 Codex) as specified below. Never reduce
-the count based on codebase size, context limits, or any other consideration. If you
-cannot dispatch the required number, tell the user and ask.
-
-> **Adapt before use.** This orchestrator's `<context>` block and nested agent prompts
-> are a worked EXAMPLE authored for a specific Next.js + NestJS + Drizzle monorepo. The
-> dispatch structure (4 agents, severity levels, registry-file shape) is the reusable
-> part — swap the monorepo layout and stack-specific references below for this project's
-> actual equivalents (`/bootstrap-project`'s resolved `{{TOKEN}}`s are a starting point)
-> before running this on a new codebase.
+> **Adapt before use.** The `<context>` block and the pattern list are a template: replace the layout and
+> the pattern conventions with this project's own (`/bootstrap-project`'s resolved `{{TOKEN}}`s are a
+> starting point). The structure (scripted measurements, a judged pattern pass, severity levels,
+> registry-file shape) is the reusable part. One project's concrete conventions are at the end
+> ("Stack example").
 
 <role>
-Technical debt surveyor for {{PROJECT_NAME}}'s stack ({{FRAMEWORK}}). You dispatch exactly 4
-agents (3 Claude + 1 Codex) to produce a prioritized, categorized inventory of all tech
-debt -- pattern inconsistencies, code complexity, TODO/FIXME markers, and outdated
-libraries. You also update the tech debt registry files.
+Technical debt surveyor for {{PROJECT_NAME}}'s stack ({{FRAMEWORK}}). You produce a prioritized, categorized
+inventory of all tech debt -- pattern inconsistencies, code complexity, TODO/FIXME markers, and outdated
+libraries -- and update the tech debt registry files. The mechanical groups are scripts; the pattern
+consistency pass runs on Claude AND on the omp engine(s) `bash .claude/scripts/routing.sh engines audits`
+returns (by default `omp:opencode/glm`). omp output is untrusted analysis text you verify against the code,
+and an engine that did not complete a valid pass is named as unavailable instead of counted.
 </role>
 
 <context>
@@ -51,34 +46,11 @@ Severity levels:
 </context>
 
 <conventions>
-Project patterns to check code against. Deviations from these are tech debt:
-
-**NestJS Controllers:**
-
-- @UseGuards, validation pipes, error handling envelope, @CurrentUser()
-- Scan: apps/api/src/**/*.controller.ts
-
-**Queue Processors:**
-
-- Extend WorkerHost, superseded check, processLog updates, @OnWorkerEvent handlers
-- Scan: apps/api/src/queues/**/*.processor.ts
-- Reference: docs/ArchitecturalDecisions/QueueProcessing.md
-
-**TanStack Query Hooks:**
-
-- onError handlers (or global fallback coverage), query key conventions, cache invalidation
-- Scan: apps/web/hooks/use*.ts
-
-**Zod Schema Naming:**
-
-- Request: `{action}{Entity}RequestSchema` (e.g., createUserRequestSchema)
-- Response: `{entity}ResponseSchema`
-- Scan: packages/shared/src/schemas/**/*.ts
-
-**Error Handling:**
-
-- GlobalExceptionFilter, ErrorCode enum, localized user-facing messages
-- Scan: apps/api/src/**/*.service.ts, apps/web/hooks/*.ts
+Project patterns to check code against. Deviations from these are tech debt. Fill in from the
+project's actual conventions (`CLAUDE.md`, `.claude/rules/`) before dispatching; the usual groups are
+route/controller conventions (guards, validation, error envelope, current-user access), background
+job/processor conventions, data-fetching hook conventions (error handling, key naming, cache
+invalidation), shared schema naming, and the error-handling baseline.
 </conventions>
 
 <instructions>
@@ -88,62 +60,55 @@ Project patterns to check code against. Deviations from these are tech debt:
 Read all files in `.claude/tech-debt/` to understand what's already tracked.
 Note which items are `open` vs `resolved`.
 
-## Step 2 -- Dispatch 4 Agents in Parallel
+## Step 2 -- Measure by script, then dispatch the judged passes in parallel
 
-Launch all 4 agents simultaneously.
+### Groups 2 and 3 -- Code Complexity and TODO/Debt Inventory (script)
 
-### Group 1 -- Pattern Consistency (Claude Agent)
+Run `bash .claude/scripts/tech-debt-scan.sh` (`--dirs "<dir> ..."`, `--registry <dir>` and `--max-lines N`
+when the defaults are wrong). It prints one JSON, calling no model: files over the line limit,
+type-safety escapes, empty catch blocks, console statements outside tests, approximate deep nesting, and every
+TODO/FIXME/HACK/TEMP/WORKAROUND/XXX marker with its registry status (EXISTING when the registry names the
+marker's file, else NEW). `PARKED:` and `FUTURE FEATURE:` markers are intentional deferrals, noted but not
+debt. Function length and magic numbers need a parser and are listed under `not_measured`. If it reports
+`unsupported`, say so and fall back to a manual `grep`/`wc` pass. A thin Claude classification then reads
+10 lines of context around each marker and assigns Plan (yes/no), Blocking (yes/no), category
+(backend/frontend/shared/infrastructure) and severity (P0 blocking, P1 should fix soon, P2 nice to have),
+marking each RESOLVED when the registry has it but the code no longer does.
 
-Dispatch via Agent tool:
+### Group 4 -- Library Currency (script + judgment)
+
+Run `bash .claude/scripts/dep-audit.sh` (npm projects; pnpm, yarn and other stacks report `unsupported`,
+which you state). Its `npm outdated` list is this group's input; do not run `npm outdated` again. Classify
+each outdated package: major version gap P1 (may need migration effort), minor/patch gap P2, known security
+advisory P0, deprecated package P1. Then check deprecated API usage patterns for the frameworks in use,
+verifying each against current docs (`npx ctx7@latest docs`) before calling it deprecated, and flag libraries
+with maintenance risk or better alternatives.
+
+### Group 1 -- Pattern Consistency (judged: Claude AND the omp roster)
+
+Dispatch this brief as a Claude agent (Agent tool) AND, in the same message, as the same brief to each omp
+engine of the roster (read-only, background Bash from the repository root, "Do NOT write any file: return
+your findings as final message text"):
+```bash
+bash .claude/scripts/omp-engine.sh ask --engine omp:opencode --slot glm --role audits \
+  --brief "$BRIEF" --out "$OUT" --repo "$PWD" --deadline 20m
+```
+An engine that exits 3, 4 or 5 (capped, unprobed, off, failed, timed out) contributes no findings and is
+named in the report; a usage-limit slot is not retried on the same model
+(`.claude/skills/second-engine/SKILL.md`).
 
 ```
-You are a pattern consistency auditor for a TypeScript monorepo. You check that
-established patterns are followed uniformly across the codebase. Deviations are tech debt.
+You are a pattern consistency auditor. You check that established patterns are followed uniformly across the
+codebase. Deviations are tech debt.
 
-Read the project conventions first:
-- CLAUDE.md (root) -- project-wide conventions
-- .claude/rules/queue-processors.md -- queue processor pattern
-- .claude/rules/shared-schemas.md -- schema naming conventions
-- docs/ArchitecturalDecisions/QueueProcessing.md -- queue architecture
+Read the project conventions first: CLAUDE.md (root), .claude/rules/*, and the architecture docs the
+conventions block names.
 
-Then check these pattern groups:
-
-1. NestJS CONTROLLERS (apps/api/src/**/*.controller.ts):
-   - Every controller uses consistent guard/pipe/decorator patterns
-   - Error responses use ErrorCode enum
-   - @CurrentUser() used consistently for user context
-   - Compare each controller against the most common pattern. Flag outliers.
-
-2. QUEUE PROCESSORS (apps/api/src/queues/**/*.processor.ts):
-   - Every processor extends WorkerHost
-   - Superseded check at process start
-   - processLog updates on success and failure
-   - @OnWorkerEvent('completed') and @OnWorkerEvent('failed') handlers
-   - Compare each processor against QueueProcessing.md conventions. Flag outliers.
-
-3. TANSTACK QUERY HOOKS (apps/web/hooks/use*.ts):
-   - Query key conventions (hierarchical arrays)
-   - onError handling (local or global fallback)
-   - Cache invalidation after mutations
-   - Error state consumption by components
-   - Compare each hook against the most common pattern. Flag outliers.
-
-4. ZOD SCHEMAS (packages/shared/src/schemas/**/*.ts):
-   - Naming: {action}{Entity}RequestSchema / {entity}ResponseSchema
-   - Both schema and type exported
-   - Re-exported from index.ts
-   - Flag schemas that don't follow conventions.
-
-5. ERROR HANDLING patterns:
-   - Services throwing NestJS exceptions with ErrorCode
-   - Hooks with silent catch blocks or console.log-only error handling
-   - Components missing isError rendering for queries
-
-6. DUPLICATION:
-   - Similar fetch/API call patterns across hooks
-   - Similar validation logic across controllers
-   - Similar error handling boilerplate across services
-   - Similar component patterns that could be abstracted
+Then, for each pattern group in the conventions block (route/controller conventions, background-job
+processors, data-fetching hooks, shared schema naming, error-handling patterns), compare every file of
+that kind against the most common pattern and the documented convention, and flag outliers. Also look for
+DUPLICATION: similar fetch/API-call patterns across hooks, similar validation logic across controllers,
+similar error-handling boilerplate across services, similar components that could be abstracted.
 
 For each inconsistency, report:
 - File path and line
@@ -152,168 +117,15 @@ For each inconsistency, report:
 - Severity: P0 (causes bugs), P1 (confuses devs), P2 (cleanup opportunity)
 ```
 
-### Group 2 -- Code Complexity (Codex Scanner)
-
-Dispatch via the Agent tool with `subagent_type: "codex:codex-rescue"`, read-only (state it
-in the prompt), in the foreground: end the prompt with
-"Do NOT write any file: return the full result as your final message text. --wait. Run in the
-foreground: wait for the Codex task to finish and return its full result; never return only a
-background task id." Never `codex exec` or a `skill-codex` Skill call; the
-`block-legacy-engines` hook denies both.
-
-```
-# Code Complexity Scanner
-
-## Identity
-You are a quantitative code complexity scanner. You measure mechanical complexity
-indicators across a TypeScript monorepo.
-
-## Scan Commands
-Run these commands and report results:
-
-1. Files over 400 lines (splitting candidates):
-   find apps/ packages/ -name "*.ts" -o -name "*.tsx" | xargs wc -l | sort -rn | head -30
-
-2. Functions over 50 lines:
-   Search for function/method bodies exceeding 50 lines in apps/ and packages/
-
-3. Deep nesting (>4 levels of indentation):
-   Search for code with excessive nesting depth
-
-4. Type safety escapes:
-   grep -rn "as any" apps/ packages/ --include="*.ts" --include="*.tsx" | grep -v node_modules
-
-5. Empty catch blocks:
-   grep -rn "catch.*{}" apps/ packages/ --include="*.ts" --include="*.tsx"
-   Also search for: catch (e) { } and catch { }
-
-6. Console statements (should use logger):
-   grep -rn "console\.log\|console\.warn\|console\.error" apps/ --include="*.ts" --include="*.tsx" | grep -v node_modules | grep -v ".spec." | grep -v ".test."
-
-7. Magic numbers/strings:
-   Search for hardcoded numeric values or string literals that should be constants
-
-## Output Format
-For each category, produce a table:
-
-### {Category}
-| # | File | Line | Detail | Severity |
-|---|------|------|--------|----------|
-
-Severity:
-- P0: causes bugs (e.g., swallowed error in empty catch)
-- P1: maintainability risk (e.g., 800-line file, function >100 lines)
-- P2: cleanup (e.g., console.log, single `as any`)
-
-End with summary counts per category.
-```
-
-### Group 3 -- TODO/Debt Inventory (Claude Agent)
-
-Dispatch via Agent tool:
-
-```
-You are a technical debt marker inventory agent. You scan the entire codebase for
-debt markers and produce a categorized inventory.
-
-Scan for these markers in apps/ and packages/ (*.ts, *.tsx files):
-- TODO comments
-- FIXME comments
-- HACK comments
-- TEMP / TEMPORARY comments
-- WORKAROUND comments
-- XXX comments
-- PARKED: comments (intentional -- note but don't flag as debt)
-- FUTURE FEATURE: comments (intentional -- note but don't flag as debt)
-
-For each marker found:
-1. Read 10 lines above and below for context
-2. Classify:
-   - Has a plan? (e.g., "TODO: remove after migration to v3")
-   - Has an owner? (e.g., "TODO(username): ...")
-   - Is it blocking? (affects user-facing behavior)
-   - Is it a known deferral? (PARKED/FUTURE FEATURE = intentional, not debt)
-3. Categorize into: backend, frontend, shared, infrastructure
-4. Assign severity: P0 (blocking), P1 (should fix soon), P2 (nice to have)
-
-Also check:
-- .claude/reviews/implementation/ for pre-existing issues flagged by review agents
-- .claude/tech-debt/*.md for already-tracked items
-
-Cross-reference findings with existing registry:
-- New items -> report as NEW
-- Already tracked (open) -> verify still accurate
-- Already tracked but fixed -> report as RESOLVED
-- In registry but not in code -> report as RESOLVED
-
-Output format:
-### {Category}
-#### {marker type}-{NNN}: {one-line description}
-- **File:** {path:line}
-- **Marker:** {TODO | FIXME | HACK | etc.}
-- **Context:** {what the surrounding code does}
-- **Plan:** {yes/no, quoted if yes}
-- **Severity:** {P0 | P1 | P2}
-- **Registry status:** NEW | EXISTING | RESOLVED
-
-End with summary: total markers by type and severity, new vs existing vs resolved.
-```
-
-### Group 4 -- Library Currency (Claude Agent)
-
-Dispatch via Agent tool:
-
-```
-You are a library currency auditor. You check for outdated dependencies, deprecated
-API usage, and libraries with known issues.
-
-Steps:
-1. Run npm outdated in each workspace:
-   npm outdated 2>/dev/null | head -30
-   npm outdated -w @apps/api 2>/dev/null | head -30
-   npm outdated -w @apps/web 2>/dev/null | head -30
-   npm outdated -w @packages/shared 2>/dev/null | head -30
-
-2. For each outdated package, classify:
-   - Major version gap -> P1 (may need migration effort)
-   - Minor/patch gap -> P2 (routine update)
-   - Known security advisory -> P0 (fix immediately)
-   - Deprecated package -> P1 (needs replacement)
-
-3. Check for deprecated API usage patterns:
-   - Deprecated React APIs (findDOMNode, componentWillMount, etc.)
-   - Deprecated Next.js patterns (pages/ dir mixing, old config options)
-   - Deprecated NestJS patterns
-   - Deprecated library methods
-   Use Context7 (npx ctx7@latest docs) to verify if patterns are actually deprecated
-   in current versions.
-
-4. Check for libraries with better alternatives:
-   - Packages with <100 weekly downloads (maintenance risk)
-   - Packages with known unpatched vulnerabilities
-
-Output format:
-### Outdated Dependencies
-| Package | Current | Latest | Gap | Severity | Notes |
-|---------|---------|--------|-----|----------|-------|
-
-### Deprecated API Usage
-| File | Line | Pattern | Replacement | Severity |
-|------|------|---------|-------------|----------|
-
-### Summary
-- Total outdated: {N} (P0: {N}, P1: {N}, P2: {N})
-- Deprecated APIs found: {N}
-- Packages needing replacement: {N}
-```
-
 ## Step 3 -- Collect and Merge
 
-Wait for all 4 agents to complete. Merge findings:
+Wait for the judged passes to complete. Merge the script output and the pass findings:
 
-1. Deduplicate across agents (pattern agent may flag same issue as TODO agent)
-2. Cross-reference with existing tech debt registry
-3. Classify all findings by category (backend/frontend/shared/infrastructure/patterns)
+1. Deduplicate across engines and groups (the pattern pass may flag the same issue as a marker)
+2. Tag agreement for the pattern group (N of the engines that completed) and verify each finding with the two
+   lenses in `.claude/agents/codebase/verification.md`
+3. Cross-reference with existing tech debt registry
+4. Classify all findings by category (backend/frontend/shared/infrastructure/patterns)
 4. Produce exact counts
 
 ## Step 4 -- Update Registry
@@ -341,7 +153,7 @@ Write the final report to `.claude/reviews/tech-debt-audit-{date}.md`:
 # Tech Debt Audit Report
 
 **Date:** {date}
-**Audited by:** 4 agents (3 Claude + 1 Codex) + lead auditor synthesis
+**Audited by:** scripts (tech-debt-scan, dep-audit) + Claude + {omp engines that completed, slot and model; requested vs completed} + lead auditor synthesis
 
 ## Summary
 
@@ -408,7 +220,8 @@ convention), flag it as a LOW-confidence finding for downstream review.
 
 <rules>
 - This is an audit. Report findings and update the registry. Do not fix code or commit.
-- Dispatch all 4 agents in parallel for maximum throughput.
+- Dispatch the judged passes in parallel for maximum throughput; the engine count is whatever completed,
+  and the report says it.
 - Read the code before classifying. A TODO with context ("TODO: remove after migration")
   is different from a bare TODO with no plan.
 - Distinguish intentional deferrals (PARKED features) from actual debt. Parked features
@@ -417,5 +230,15 @@ convention), flag it as a LOW-confidence finding for downstream review.
 - Update the registry files directly at `.claude/tech-debt/*.md`.
 - Cross-reference with review findings in `.claude/reviews/implementation/` for pre-existing
   issues flagged by review agents.
-- The Codex scanner prompt uses markdown headers (not XML) per OpenAI prompt conventions.
 </rules>
+
+## Stack example (Next.js + NestJS + Drizzle + Zod monorepo)
+
+One project's concrete conventions, for orientation only. NestJS controllers (`apps/api/src/**/*.controller.ts`)
+use `@UseGuards`, validation pipes, the error envelope and `@CurrentUser()`. Queue processors
+(`apps/api/src/queues/**/*.processor.ts`) extend `WorkerHost`, do a superseded check at process start, update
+`processLog`, and handle `@OnWorkerEvent` completed/failed (reference: `docs/ArchitecturalDecisions/QueueProcessing.md`).
+TanStack Query hooks (`apps/web/hooks/use*.ts`) have `onError` (or global fallback coverage), hierarchical query
+keys and cache invalidation. Zod schemas (`packages/shared/src/schemas/**/*.ts`) are named
+`{action}{Entity}RequestSchema` / `{entity}ResponseSchema`. Errors use the `GlobalExceptionFilter`, an
+`ErrorCode` enum and localized user-facing messages. The registry files are `.claude/tech-debt/{backend,frontend,shared,infrastructure,patterns}.md`.

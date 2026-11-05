@@ -8,7 +8,7 @@ color: purple
 ---
 
 <role>
-Codebase audit orchestrator for a Next.js 16 + NestJS 11 monorepo. You dispatch
+Codebase audit orchestrator for {{PROJECT_NAME}} ({{PRIMARY_LANGUAGE}} / {{FRAMEWORK}}{{MONOREPO}}; its real layout is in `CLAUDE.md`). You dispatch
 specialized analysis agents based on the user's requested scope, collect their reports,
 and produce a unified audit summary.
 
@@ -23,10 +23,10 @@ Two-tier audit architecture:
 
 | Agent               | File                                          | What it scans                                                  |
 | ------------------- | --------------------------------------------- | -------------------------------------------------------------- |
-| `dependency-audit`  | `.claude/agents/codebase/dependency-audit.md` | npm vulnerabilities, outdated packages, licenses, Node.js CVEs |
-| `tech-debt-light`   | _(inline in command)_                         | TODO/FIXME counts, `as any`, large files, empty catches        |
-| `api-surface-light` | _(inline in command)_                         | Endpoint count, public endpoints, controller count             |
-| `docs-light`        | _(inline in command)_                         | Doc freshness vs. recent source changes                        |
+| `dependency-audit`  | `scripts/dep-audit.sh` (+ `.claude/agents/codebase/dependency-audit.md` to judge it) | npm vulnerabilities, outdated packages, licenses, Node.js CVEs |
+| `tech-debt-light`   | `scripts/tech-debt-scan.sh`                   | TODO/FIXME counts, `as any`, large files, empty catches        |
+| `api-surface-light` | `scripts/endpoint-inventory.sh`               | Endpoint count, public endpoints, controller count             |
+| `docs-light`        | `scripts/stale-reference-scan.sh`             | Doc references to files, env vars, scripts, commands that no longer exist |
 
 **Tier 2 audits** (full-scope, each has its own orchestrator and sub-agents):
 
@@ -82,9 +82,11 @@ Announce the scope to the user before dispatching:
 
 ## Step 2 -- Dispatch
 
-**Quick mode:** Dispatch dependency-audit via Agent tool. Run the 3 inline light scans
-(tech-debt-light, api-surface-light, docs-light) yourself using Bash/Grep commands while
-it works.
+**Quick mode:** run the four scripts yourself (each prints one JSON and calls no model):
+`bash .claude/scripts/dep-audit.sh`, `bash .claude/scripts/tech-debt-scan.sh`,
+`bash .claude/scripts/endpoint-inventory.sh` and `bash .claude/scripts/stale-reference-scan.sh`. A script that
+reports `unsupported` (another stack or package manager) is listed as not covered, never guessed.
+Dispatch the `dependency-audit` agent via the Agent tool only to judge a dep-audit result that needs it.
 
 **Deep mode / named modes:** Dispatch the selected tier 2 audit commands via Agent
 tool. Run sequentially to avoid overloading context.
@@ -93,16 +95,8 @@ tool. Run sequentially to avoid overloading context.
 
 Wait for all dispatched agents to complete.
 
-**Verify every finding with two lenses.** Every finding of every severity, LOW included, gets two
-independent verifiers (separate agents, neither sees the other's verdict):
-
-- **REPRODUCE:** run the command that shows it, or cite the exact `path:line` that proves it.
-- **REFUTE:** look for the guard, test or convention that makes it a non-issue.
-
-Keep a finding only when REPRODUCE confirms it **and** REFUTE fails to refute it. Record the kill
-rate per lens in the report (findings in, killed by REPRODUCE, killed by REFUTE, kept). A single
-REPRODUCE lens is too lenient: one audit kept 54 of 56 findings that way, and LOW findings may
-have passed too easily.
+**Verify every finding with two lenses** (REPRODUCE and REFUTE, every severity), exactly as
+`.claude/agents/codebase/verification.md` says, and record the kill rate per lens in the report.
 
 Then produce a unified audit summary with:
 

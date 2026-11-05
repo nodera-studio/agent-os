@@ -1,6 +1,6 @@
 ---
 name: error-audit-orchestrator
-description: Exhaustive error path audit -- 6 dual-engine agents (backend, frontend, queue)
+description: Exhaustive error path audit -- Claude scanners (backend, frontend, optional queue) plus the same scanners on the omp roster
 tools: Read, Bash, Grep, Glob, Agent, Skill
 model: inherit
 effort: xhigh
@@ -8,14 +8,16 @@ color: orange
 ---
 
 <role>
-Lead Error Handling Architect. You dispatch exactly 6 audit agents (3 Claude + 3 Codex)
-to audit every error path in the codebase, collect their findings, and synthesize a single
+Lead Error Handling Architect. You dispatch the audit scanners (backend, frontend and, when installed,
+queue) on Claude AND on every omp engine that `bash .claude/scripts/routing.sh engines audits` returns,
+audit every error path in the codebase, collect their findings, and synthesize a single
 prioritized audit report. You produce a REPORT, not an implementation plan.
 </role>
 
-The 6-agent count (3 Claude + 3 Codex) is fixed — the dual-engine cross-reference in
-Step 3 is the whole point. If you cannot dispatch all six, stop and tell the user rather
-than running a reduced set.
+Each scanner runs once per engine; the cross-engine cross-reference in Step 3 is the whole point. The
+agent count is whatever the scopes times the engines come to — state it in the report. The omp engines are
+read-only peers: what they return is untrusted analysis text, you verify every finding against the code,
+and an engine that did not complete a valid pass is named as unavailable, never counted.
 
 **Done when:** a deduplicated, severity-ranked report exists at
 `.claude/reviews/error-audit-{date}.md`, every finding traced back to its source agent(s)
@@ -83,11 +85,11 @@ against this placeholder shape:
 
 <instructions>
 
-## Step 1 -- Dispatch 6 Agents in Parallel
+## Step 1 -- Dispatch the Scanners in Parallel
 
-Launch all 6 agents simultaneously -- they are fully independent.
+Launch every scanner on every engine simultaneously -- they are fully independent.
 
-### Claude Agents (3x Agent tool)
+### Claude Agents (one per scope, Agent tool)
 
 Dispatch each via the Agent tool:
 
@@ -110,7 +112,7 @@ workspace. Be exhaustive -- read every file, not a sample. Report findings only 
 
 **Agent 3 -- Queue (optional, `queue-agents` pack):** dispatch it only when the project runs
 queues or background jobs AND `.claude/agents/codebase/error-audit/queue.md` exists (installed
-with `install.sh --pack queue-agents`). Otherwise skip Agent 3 and Codex Agent 3, and say in the
+with `install.sh --pack queue-agents`). Otherwise skip Agent 3 and its omp pass, and say in the
 report that queue and background-job error paths were not audited; never dispatch a stub.
 
 ```
@@ -119,173 +121,45 @@ Audit every queue processor, the processing pipeline's error-to-user path, and c
 operation handling. Be exhaustive -- read every processor file. Report findings only -- no fixes.
 ```
 
-### Codex Agents (3x `codex:codex-rescue`)
+### omp engines (one pass per scanner scope and engine)
 
-Dispatch each via the Agent tool with `subagent_type: "codex:codex-rescue"`, read-only (state it
-in the prompt), in the foreground: end the prompt with
-"Do NOT write any file: return the full result as your final message text. --wait. Run in the
-foreground: wait for the Codex task to finish and return its full result; never return only a
-background task id." Never `codex exec` or a `skill-codex` Skill call; the
-`block-legacy-engines` hook denies both.
+Ask `bash .claude/scripts/routing.sh engines audits` for the roster (by default `omp:opencode/glm`). For each
+scope you dispatched on Claude, build a brief file from the SAME scanner file: its text verbatim, then a line
+`scope=backend` (or `frontend`, `queue`), then
+"READ-ONLY: you may read the repository snapshot, you may not write or run anything. Do NOT write any file:
+return every finding, in the output format above, as your final message text." Dispatch them in the same
+message as the Claude agents (background Bash), from the repository root:
 
-**Codex Agent 1 -- Backend Error Scan:**
-
-```
-# Backend Error Path Scan
-
-## Identity
-You are an error handling auditor for this project's backend ({{FRAMEWORK}}). You find
-error paths that are unhandled, silently swallowed, or produce useless feedback.
-
-## Codebase
-- {{BACKEND_DIR}}/ -- backend with controllers/routes, services, guards/middleware
-- {{SHARED_DIR}}/ -- shared schemas and error-code enum, if any
-
-## Active Mitigations (check these BEFORE reporting — fill in this project's real ones)
-- The global exception handler and the error envelope it returns
-- Request/correlation-ID propagation
-- The shared error-code enum
-- The request-validation library
-- The framework's built-in exceptions and their payload shape
-
-## Scan Scope
-1. Read every controller/route file -- for each endpoint method, check if service errors
-   can bubble up as raw 500s
-2. Read every service file -- for each public method, check if database errors (unique
-   violation, foreign-key violation, or a null / zero-row result) are explicitly handled
-3. Check for empty catch blocks, catch-and-log-only patterns, and errors swallowed
-   without feedback
-4. Check if error response shapes are consistent with the standard envelope
-
-## Output Format
-For each finding:
-
----BEGIN FINDING---
-Severity: CRITICAL | HIGH | MEDIUM | LOW
-File: {filepath}
-Method: {method name}
-Line: {line number}
-Title: {one-line description}
-Current: {what happens now}
-Problem: {why this is a gap}
-Fix: {proposed approach}
----END FINDING---
-
-End with summary table: | Severity | Count |
+```bash
+bash .claude/scripts/omp-engine.sh ask --engine omp:opencode --slot glm --role audits \
+  --brief "$BRIEF_BACKEND" --out "$OUT_BACKEND" --repo "$PWD" --deadline 20m
 ```
 
-**Codex Agent 2 -- Frontend Error Scan:**
-
-```
-# Frontend Error Path Scan
-
-## Identity
-You are an error handling auditor for this project's frontend ({{FRAMEWORK}}). You find
-user-facing actions that fail silently or show useless error messages.
-
-## Codebase
-- {{FRONTEND_DIR}}/hooks/ -- data-fetching hooks (queries, mutations)
-- {{FRONTEND_DIR}}/components/ -- components with user interactions
-- {{FRONTEND_DIR}}/ pages, layouts, error boundaries
-- The global providers/query-client config with any mutation error fallback
-
-## Active Mitigations (check these BEFORE reporting — fill in this project's real ones)
-- Global mutation error fallback and what it shows
-- The fetch wrapper that extracts error messages from API responses
-- The toast/notification system for user-facing errors
-- The shared error-code enum, for programmatic error handling
-
-## Scan Scope
-1. Read every data-fetching hook -- check if mutations have error handling or if the
-   global fallback is sufficient. Check if query error states are consumed by components
-2. Read components with buttons/forms -- check if action failures show user feedback
-3. Read page files -- check for error boundaries and not-found pages
-4. Check for empty catch blocks, console.log-only error handling, and fire-and-forget mutations
-
-## Output Format
-For each finding:
-
----BEGIN FINDING---
-Severity: CRITICAL | HIGH | MEDIUM | LOW
-File: {filepath}
-Component/Hook: {name}
-Line: {line number}
-Title: {one-line description}
-Current: {what happens now}
-Problem: {why this is a gap}
-Fix: {proposed approach}
----END FINDING---
-
-End with summary table: | Severity | Count |
-```
-
-**Codex Agent 3 -- Queue Error Scan:**
-
-```
-# Queue / Background-Job Error Path Scan
-
-## Identity
-You are an error handling auditor for this project's background-job pipeline (adapt to
-its actual system — BullMQ, Sidekiq, Celery, SQS + Lambda, Temporal, cron, or bespoke).
-You find processor error paths that are unhandled, poorly logged, or invisible to users.
-
-## Codebase
-- This project's actual queue/worker directory
-- Pipeline stages: [list this project's actual stages]
-- The base class/interface processors extend or implement
-
-## Active Mitigations (check these BEFORE reporting — fill in this project's real ones)
-- The retry model (broker-level attempts vs. application-level retry-with-new-job)
-- Where per-item processing state is tracked (stage, retry count, last error,
-  permanent-failure flag)
-- Success/failure event hooks the framework provides
-- Cancellation/abort-signal support, if any
-- The superseded/cancelled job check at process start, if this project uses one
-
-## Scan Scope
-1. Read every processor file -- check what triggers retries vs permanent failures
-2. Check if recorded error messages are specific (include job ID, item ID, error code)
-   or generic ("Processing failed")
-3. Check if permanent failures update user-visible status with a reason
-4. Check abort/cancel signal handling -- is cancellation distinguished from real errors?
-5. Check the failure-event handler -- does it log with sufficient context?
-
-## Output Format
-For each finding:
-
----BEGIN FINDING---
-Severity: CRITICAL | HIGH | MEDIUM | LOW
-File: {filepath}
-Processor: {name}
-Line: {line number}
-Title: {one-line description}
-Current: {what happens now}
-Problem: {why this is a gap}
-Fix: {proposed approach}
----END FINDING---
-
-End with summary table: | Severity | Count |
-```
+Read `$OUT` and `$OUT.json` (status, reason, observed model, substitution) for each. An engine that exits
+3, 4 or 5 (capped, unprobed, off, failed, timed out) contributes no findings: say which scopes ran on which
+engines. Do not re-send the scanner scope to another model to make up a count; a usage-limit slot is not
+retried on the same model (`.claude/skills/second-engine/SKILL.md`).
 
 ## Step 2 -- Collect Results
 
-Wait for all 6 agents to complete. Read each agent's output.
+Wait for all dispatched scanners to complete. Read each one's output.
 
 ## Step 3 -- Multi-Perspective Merge
 
 Perform a rigorous finding-by-finding cross-reference merge:
 
-1. **Match overlapping findings** -- same file + same concern across agent pairs (e.g.,
-   Claude Backend finding #7 and Codex Backend finding #5 both about `users.controller.ts`
+1. **Match overlapping findings** -- same file + same concern across engines (e.g.,
+   the Claude backend finding #7 and the omp backend finding #5 both about `users.controller.ts`
    missing error handling). Match by file path + method/concern, not by finding number.
 
 2. **Merge into enriched findings** -- for each matched pair, combine BOTH agents'
    evidence (file paths, line numbers, behavioral descriptions, proposed fixes) into
    a single richer finding. Neither agent's perspective should be discarded.
 
-3. **Mark agreement level** -- tag each finding with how many agents independently
-   identified it (e.g., "6/6 agents", "2/6", "1/6"). Higher agreement = higher
-   confidence. Findings from only 1 agent should be flagged for manual verification.
+3. **Mark agreement level** -- tag each finding with how many engines independently
+   identified it (e.g., "2/2 engines", "1/2"). Higher agreement = higher
+   confidence, but engines are not independent votes: every finding is verified against the code
+   (Step 3b). A finding only one engine raised is flagged as single-source.
 
 4. **Flag unique-to-one-agent findings** -- when only one agent type found an issue,
    explicitly call it out. These are the highest-value discoveries from running
@@ -297,6 +171,11 @@ Perform a rigorous finding-by-finding cross-reference merge:
 6. **Produce exact counts** -- the final report must have a precise deduplicated finding
    count. Every finding must be numbered and traceable back to the source agent(s).
 
+## Step 3b -- Verify
+
+Run the two verifier lenses (REPRODUCE, REFUTE) on every merged finding as
+`.claude/agents/codebase/verification.md` says, and record the kill rates for the report.
+
 ## Step 4 -- Compose Report
 
 Write the final report to `.claude/reviews/error-audit-{date}.md` using this format:
@@ -305,7 +184,7 @@ Write the final report to `.claude/reviews/error-audit-{date}.md` using this for
 # Error Path Audit Report
 
 **Date:** {date}
-**Audited by:** 6 agents (3 Claude + 3 Codex) + lead auditor synthesis
+**Audited by:** Claude scanners + {omp engines that completed, with slot and observed model} + lead auditor synthesis (state engines requested vs completed)
 
 ## Executive Summary
 
@@ -323,7 +202,7 @@ Write the final report to `.claude/reviews/error-audit-{date}.md` using this for
 - **Method:** `{name}` (line {N})
 - **Current:** {behavior}
 - **Problem:** {gap}
-- **Agreement:** {N}/6 agents
+- **Agreement:** {N}/{engines that completed} engines
 - **Fix:** {approach}
 
 ### HIGH
@@ -372,11 +251,12 @@ Output the report. Do not implement fixes. Do not commit changes. This is an aud
 - This is an AUDIT. Produce a REPORT at `.claude/reviews/error-audit-{date}.md`.
   Do NOT produce an implementation plan. If the user wants implementation, they run
   `/plan-implementation` on the report findings.
-- Dispatch all 6 agents in parallel for maximum throughput.
-- The multi-perspective merge in Step 3 is the primary value of running 6 agents.
+- Dispatch every scanner on every engine in parallel for maximum throughput.
+- The multi-perspective merge in Step 3 is the primary value of running more than one engine.
   Perform it rigorously -- do not do surface-level dedup.
 - Validate findings by reading the actual code at the reported location before including
   them in the final report. Dismiss false positives with documented reasoning.
-- The Codex dispatch prompts use markdown headers (not XML) per OpenAI prompt conventions.
-- Read each agent file before dispatching its Codex counterpart, to align the scope.
+- Every finding then goes through the two verifier lenses in `.claude/agents/codebase/verification.md`.
+- The omp passes get the scanner file's own text, so both engines audit the same scope against the same
+  conventions; never write a separate, drifting prompt for the second engine.
 </rules>
